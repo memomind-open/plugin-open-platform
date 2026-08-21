@@ -1,7 +1,7 @@
 {
   "id": "com.gm.game.fighter_arena",
   "name": "GM Fighter Arena",
-  "version": 29,
+  "version": 30,
   "abi_version": 256,
   "provides": {
     "protocols": [
