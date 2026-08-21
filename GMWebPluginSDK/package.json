@@ -1,0 +1,20 @@
+{
+  "name": "gm-web-plugin-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "node tools/studio-cli.mjs --plugin examples/counter",
+    "build:devkit": "node tools/build-devkit.mjs",
+    "pack:plugin": "node tools/build-mmpkg.mjs",
+    "test": "node --test packages/*/test/*.test.mjs tools/test/*.test.mjs",
+    "check": "node tools/check.mjs",
+    "verify": "npm test && npm run check"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -7,6 +7,7 @@ import argparse
 import binascii
 import json
 import pathlib
+import re
 import struct
 import sys
 
@@ -20,6 +21,8 @@ RELA = struct.Struct("<IIi")
 GMP_HEADER = struct.Struct("<4sHHIIIII")
 GMP_PACKAGE_CRC_OFFSET = GMP_HEADER.size - 4
 MAX_PACKAGE_SIZE = 200 * 1024
+PROTOCOL_ID = re.compile(r"^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$")
+PROTOCOL_VERSION = re.compile(r"^\d+(?:\.\d+){0,3}$")
 
 PT_LOAD = 1
 SHT_SYMTAB = 2
@@ -41,6 +44,30 @@ ALLOWED_RELOCATIONS = {
 }
 class PackageError(RuntimeError):
     pass
+
+
+def validate_provided_protocols(manifest: dict) -> None:
+    provides = manifest.get("provides")
+    if provides is None:
+        return
+    if not isinstance(provides, dict):
+        raise PackageError("manifest provides must be an object")
+    protocols = provides.get("protocols")
+    if not isinstance(protocols, list) or len(protocols) > 16:
+        raise PackageError("manifest provides.protocols must be a list of at most 16 items")
+    seen: set[str] = set()
+    for protocol in protocols:
+        if not isinstance(protocol, dict):
+            raise PackageError("provided protocol must be an object")
+        protocol_id = protocol.get("id")
+        version = protocol.get("version")
+        if not isinstance(protocol_id, str) or not PROTOCOL_ID.fullmatch(protocol_id):
+            raise PackageError(f"invalid provided protocol id: {protocol_id!r}")
+        if not isinstance(version, str) or not PROTOCOL_VERSION.fullmatch(version):
+            raise PackageError(f"invalid provided protocol version: {version!r}")
+        if protocol_id in seen:
+            raise PackageError(f"duplicate provided protocol: {protocol_id}")
+        seen.add(protocol_id)
 
 
 def align_up(value: int, alignment: int) -> int:
@@ -174,6 +201,7 @@ def main() -> int:
     if (isinstance(abi_version, bool) or not isinstance(abi_version, int) or
             not 0 <= abi_version <= 0xFFFF):
         raise PackageError("manifest abi_version must fit uint16")
+    validate_provided_protocols(manifest_object)
     image, memory_size, entry_offset, image_size, base_relocations = parse_elf(args.elf)
     header_size = GMP_HEADER.size
     image_offset = header_size

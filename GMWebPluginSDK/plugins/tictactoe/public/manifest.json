@@ -1,0 +1,16 @@
+{
+  "id": "com.memomind.demo.tictactoe",
+  "name": "中文井字棋",
+  "version": "1.3.1",
+  "entry": "index.html",
+  "bridgeVersion": "1.0",
+  "permissions": ["display", "device.events", "storage"],
+  "deviceRequirements": {
+    "preferredPluginId": "com.gm.example.web-bridge",
+    "protocols": [
+      { "id": "gm.scene", "minVersion": "1.0" },
+      { "id": "gm.scene-lz4", "minVersion": "1.0" },
+      { "id": "gm.device-events", "minVersion": "1.0" }
+    ]
+  }
+}

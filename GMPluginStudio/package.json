@@ -1,0 +1,13 @@
+{
+  "name": "gm-plugin-studio-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cargo run --release --manifest-path desktop/src-tauri/Cargo.toml",
+    "dev:debug": "cargo run --manifest-path desktop/src-tauri/Cargo.toml",
+    "check": "cargo check --manifest-path desktop/src-tauri/Cargo.toml",
+    "build": "cd desktop/src-tauri && cargo tauri build",
+    "test": "node --test desktop/ui/*.test.mjs"
+  }
+}

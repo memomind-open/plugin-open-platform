@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GM Plugin Studio</title>
+    <link rel="stylesheet" href="./studio.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div><p>GM PLUGIN SDK</p><h1>Desktop Studio</h1></div>
+      <div id="pair-status" class="pair-status">等待选择插件</div>
+    </header>
+
+    <section class="pair-toolbar">
+      <div class="plugin-picker">
+        <label><span>Web 插件工作区 / 包 · 可选</span><select id="web-plugin"><option value="">正在识别…</option></select></label>
+        <div class="picker-actions">
+          <button id="refresh-web" class="secondary">刷新仓库</button>
+          <button id="import-web-workspace" class="secondary">导入外部工作区</button>
+          <button id="import-web-file" class="secondary">导入 .mmpkg</button>
+          <button id="run-web" class="secondary">运行 / 重载</button>
+          <button id="share-web">打包 / 扫码安装</button>
+        </div>
+      </div>
+      <div class="plugin-picker">
+        <label><span>设备插件工作区 / 包 · 必需</span><select id="device-plugin"><option value="">正在识别…</option></select></label>
+        <p id="device-compatibility" class="compatibility-status">等待设备插件</p>
+        <div class="picker-actions">
+          <button id="refresh-device" class="secondary">刷新仓库</button>
+          <button id="import-device-workspace" class="secondary">导入外部工作区</button>
+          <button id="import-device-file" class="secondary">导入 .gmp</button>
+          <button id="run-device">加载并运行</button>
+          <button id="share-device">扫码安装</button>
+          <button id="stop-device" class="secondary">停止</button>
+        </div>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <section class="pane web-pane">
+        <div class="pane-title"><span>WEB PLUGIN</span><strong id="web-state">未加载</strong></div>
+        <div id="web-empty-state" class="web-empty-state" hidden>
+          <strong>仅设备插件调试</strong>
+          <p>Web 插件未启用。右侧设备画面、按键和头部手势模拟仍可独立使用。</p>
+        </div>
+        <iframe id="plugin-frame" title="Web plugin" allow="autoplay"></iframe>
+      </section>
+      <section class="pane device-pane">
+        <div class="pane-title"><span>DEVICE PLUGIN</span><strong id="device-state">未加载</strong></div>
+        <div class="device-stage">
+          <div class="glasses-shell"><canvas id="device-canvas" width="600" height="350"></canvas></div>
+        </div>
+        <div class="device-controls" aria-label="设备事件模拟">
+          <span>按键</span>
+          <button class="secondary" data-button-action="1">单击</button>
+          <button class="secondary" data-button-action="2">双击</button>
+          <button class="secondary" data-button-action="3">长按</button>
+          <span>手势</span>
+          <button class="secondary" data-gesture="7">左转</button>
+          <button class="secondary" data-gesture="8">右转</button>
+          <button class="secondary" data-gesture="2">抬头</button>
+          <button class="secondary" data-gesture="3">低头</button>
+          <button class="secondary" data-gesture="1">点头</button>
+          <button class="secondary" data-gesture="4">摇头</button>
+        </div>
+        <div class="device-meta">
+          <span>600 × 350</span><span>GRAY_4</span><span id="frame-rate">0 FPS</span>
+        </div>
+      </section>
+    </main>
+
+    <section class="log-panel">
+      <div class="pane-title"><span>BRIDGE</span><strong id="bridge-mode-label">Web ↔ Device</strong><button id="clear-log" class="secondary">清空</button></div>
+      <ol id="logs"></ol>
+    </section>
+
+    <dialog id="share-dialog">
+      <div class="share-header">
+        <div><p>APP INSTALL</p><h2 id="share-title">扫码安装插件</h2></div>
+        <button id="close-share" class="secondary" aria-label="关闭">关闭</button>
+      </div>
+      <div class="share-content">
+        <canvas id="share-qr" width="360" height="360" aria-label="插件安装二维码"></canvas>
+        <div class="share-details">
+          <strong id="share-name"></strong>
+          <p id="share-help">手机与电脑需连接同一局域网，请在对应的 App 调试入口扫码。</p>
+          <dl><dt>下载地址</dt><dd id="share-address"></dd><dt>本地包</dt><dd id="share-path"></dd></dl>
+          <details><summary>二维码协议内容</summary><code id="share-payload"></code></details>
+          <button id="stop-share" class="secondary">停止共享</button>
+        </div>
+      </div>
+    </dialog>
+    <script type="module" src="./studio.js"></script>
+  </body>
+</html>

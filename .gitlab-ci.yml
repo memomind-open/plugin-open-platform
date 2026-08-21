@@ -1,0 +1,56 @@
+stages:
+  - test
+  - build
+
+web_sdk_verify:
+  image: node:22-alpine
+  stage: test
+  cache:
+    key: "web-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - GMWebPluginSDK/.npm/
+  script:
+    - cd GMWebPluginSDK
+    - npm config set cache "$CI_PROJECT_DIR/GMWebPluginSDK/.npm" --global
+    - npm ci
+    - npm run verify
+    - npm run build:devkit
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - GMWebPluginSDK/dist/gm-web-plugin-devkit-*.zip
+      - GMWebPluginSDK/dist/gm-web-plugin-devkit-*.zip.sha256
+
+studio_protocol_test:
+  image: node:22-alpine
+  stage: test
+  script:
+    - npm test --prefix GMPluginStudio
+
+device_sdk_verify:
+  image: python:3.11-bookworm
+  stage: build
+  before_script:
+    - python -m pip install --disable-pip-version-check -r GMPluginSDK/requirements.txt
+  script:
+    - cd GMPluginSDK
+    - python -m unittest discover -s tests -v
+    - sh ./gm-build all
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - GMPluginSDK/build-host/**/*.gmp
+
+previewer_verify:
+  image: debian:bookworm-slim
+  stage: build
+  needs:
+    - job: device_sdk_verify
+      artifacts: true
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends build-essential cmake ripgrep
+  script:
+    - GMPluginStudio/previewer/build.sh
+    - ctest --test-dir GMPluginStudio/previewer/build --output-on-failure
+    - GMPluginStudio/previewer/tests/smoke.sh

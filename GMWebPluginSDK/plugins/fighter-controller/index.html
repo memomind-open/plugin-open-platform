@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+    <meta name="theme-color" content="#080b12">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>Fighter Arena Controller</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="joystick.css">
+    <link rel="stylesheet" href="action-buttons.css">
+    <link rel="stylesheet" href="desktop-preview.css">
+    <link rel="stylesheet" href="forced-landscape.css">
+  </head>
+  <body>
+    <aside class="rotate-device" aria-live="polite">
+      <div class="phone-icon">↻</div>
+      <strong>Rotate your phone</strong>
+      <span>Fighter Arena Controller is designed for landscape play.</span>
+    </aside>
+    <main>
+      <header>
+        <div><p>GM GAMEPAD</p><h1>Fighter Arena</h1></div>
+        <div id="status" class="status"><i></i><span>Starting…</span></div>
+      </header>
+
+      <section class="controller" aria-label="Fighter Arena game controller">
+        <div id="joystick" class="joystick" role="slider" tabindex="0"
+             aria-label="Movement joystick" aria-valuetext="center">
+          <span class="joystick-ring"></span>
+          <span class="joystick-axis horizontal"></span>
+          <span class="joystick-axis vertical"></span>
+          <span id="joystick-knob" class="joystick-knob"><i></i></span>
+        </div>
+
+        <div class="right-controls">
+          <div class="actions" aria-label="Attack controls">
+            <button class="control attack light" data-bit="4"><b>J</b><span>LIGHT</span></button>
+            <button class="control attack heavy" data-bit="5"><b>K</b><span>HEAVY</span></button>
+            <button class="control attack kick" data-bit="6"><b>U</b><span>KICK</span></button>
+            <button class="control attack block" data-bit="7"><b>I</b><span>BLOCK</span></button>
+          </div>
+          <div class="skills">
+            <button class="control skill" data-bit="10">SKILL 1</button>
+            <button class="control skill" data-bit="11">SKILL 2</button>
+          </div>
+        </div>
+        <div class="system-controls">
+          <button class="control start" data-bit="8">START</button>
+          <button id="pause" class="pause" type="button">PAUSE</button>
+        </div>
+      </section>
+
+      <footer>
+        <span id="telemetry">CH 0x4647 · 20 Hz</span>
+      </footer>
+    </main>
+    <script type="module" src="plugin.js"></script>
+  </body>
+</html>

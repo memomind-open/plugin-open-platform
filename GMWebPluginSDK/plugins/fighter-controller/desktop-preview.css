@@ -1,0 +1,24 @@
+/* Keep the controller testable inside Studio's narrow desktop iframe. */
+@media (orientation: portrait) and (pointer: fine) {
+  main { display: flex; }
+  .rotate-device { display: none; }
+  .controller {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 16px;
+    padding: 12px 0;
+  }
+  .skills { grid-column: 1; }
+  .joystick, .right-controls, .system-controls { grid-column: 1; grid-row: auto; }
+  .system-controls { flex-direction: row; }
+  .joystick { width: 176px; height: 176px; }
+  .actions {
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(3, 58px);
+    gap: 5px;
+    transform: none;
+  }
+  .attack > * { transform: none; }
+  .attack b { font-size: 18px; }
+  .attack span { font-size: 7px; }
+}

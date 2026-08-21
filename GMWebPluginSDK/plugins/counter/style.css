@@ -1,0 +1,11 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; }
+body { margin: 0; background: #101216; color: #f5f7fa; }
+main { max-width: 680px; margin: 0 auto; padding: 56px 24px 24px; }
+.badge { color: #8de1c2; font-size: 11px; letter-spacing: .12em; }
+h1 { margin: 8px 0; }
+.counter { display: grid; place-items: center; min-height: 220px; margin: 24px 0; border: 1px solid #343a46; border-radius: 24px; background: #181c22; }
+.counter span { font-size: 92px; font-variant-numeric: tabular-nums; }
+.counter small { color: #9da8b8; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+button { border: 0; border-radius: 999px; padding: 12px 18px; background: #7ce0bd; color: #09251c; font-weight: 700; }
+pre { white-space: pre-wrap; color: #aab5c4; min-height: 72px; }

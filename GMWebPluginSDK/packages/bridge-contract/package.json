@@ -1,0 +1,6 @@
+{
+  "name": "@memomind/gm-plugin-bridge-contract",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.js"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "gm-plugin-open-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix GMPluginStudio",
+    "dev:debug": "npm run dev:debug --prefix GMPluginStudio",
+    "test": "npm run test:web && npm run test:studio",
+    "test:web": "npm test --prefix GMWebPluginSDK",
+    "test:studio": "npm test --prefix GMPluginStudio",
+    "check:studio": "npm run check --prefix GMPluginStudio"
+  }
+}

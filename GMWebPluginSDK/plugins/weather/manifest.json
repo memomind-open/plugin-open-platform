@@ -1,0 +1,21 @@
+{
+  "id": "com.memomind.demo.weather",
+  "name": "城市天气",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "bridgeVersion": "1.0",
+  "permissions": [
+    {
+      "name": "network",
+      "description": "查询公开天气预报",
+      "origins": ["https://api.open-meteo.com"]
+    },
+    "display"
+  ],
+  "deviceRequirements": {
+    "preferredPluginId": "com.gm.example.web-bridge",
+    "protocols": [
+      { "id": "gm.scene", "minVersion": "1.0" }
+    ]
+  }
+}

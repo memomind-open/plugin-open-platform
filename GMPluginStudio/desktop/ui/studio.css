@@ -1,0 +1,46 @@
+:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; background: #090d13; color: #eef6f2; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 1050px; background: radial-gradient(circle at top, #18242a 0, #090d13 42%); }
+button, input, select { font: inherit; }
+button { border: 1px solid #2d6c59; border-radius: 9px; padding: 9px 13px; color: #06140e; background: #5bf0ba; cursor: pointer; font-weight: 750; }
+button.secondary { color: #cfe5dc; background: #121c22; border-color: #33464e; }
+button:disabled { cursor: wait; opacity: .55; }
+.app-header { height: 82px; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #253139; }
+.app-header p, .app-header h1 { margin: 0; }.app-header p { color: #5bf0ba; font-size: 11px; letter-spacing: .18em; }.app-header h1 { font-size: 24px; }
+.pair-status { color: #95a9a1; padding: 8px 12px; border: 1px solid #33434a; border-radius: 20px; }.pair-status.ready { color: #5bf0ba; border-color: #318566; }
+.pair-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px 20px; border-bottom: 1px solid #253139; background: #0d141a; }
+.plugin-picker { min-width: 0; display: grid; gap: 8px; padding: 11px; border: 1px solid #26363d; border-radius: 12px; background: #0a1116; }
+.picker-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.picker-actions button { flex: 0 0 auto; }
+.compatibility-status { min-height: 18px; margin: 0; color: #81968e; font-size: 11px; }
+.compatibility-status.compatible { color: #5bf0ba; }.compatibility-status.incompatible { color: #ff987e; }
+.pair-toolbar label { display: flex; flex-direction: column; gap: 4px; }.pair-toolbar label span { color: #81968e; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
+.pair-toolbar input, .pair-toolbar select { width: 100%; border: 1px solid #304149; border-radius: 8px; padding: 9px 10px; color: #e9f6f0; background: #111a20; }
+.pair-toolbar button { align-self: end; white-space: nowrap; }
+.workspace { height: calc(100vh - 356px); min-height: 430px; padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pane, .log-panel { overflow: hidden; border: 1px solid #2a3940; border-radius: 14px; background: #0c1318; box-shadow: 0 20px 50px #0008; }
+.pane { display: flex; flex-direction: column; }.pane-title { height: 48px; padding: 11px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #25343b; }.pane-title span { color: #5bf0ba; font-size: 10px; letter-spacing: .14em; }.pane-title strong { color: #a8bbb4; font-size: 12px; }.pane-title button { margin-left: auto; padding: 5px 9px; }
+#plugin-frame { flex: 1; width: 100%; border: 0; background: #fff; }
+.web-empty-state { flex: 1; place-content: center; padding: 48px; text-align: center; background: radial-gradient(circle, #162329 0, #080d11 70%); }
+.web-empty-state:not([hidden]) { display: grid; }
+.web-empty-state strong { color: #d9ebe4; font-size: 20px; }.web-empty-state p { max-width: 430px; margin: 10px auto 0; color: #849991; line-height: 1.7; }
+.device-stage { flex: 1; display: grid; place-items: center; padding: 28px; background: radial-gradient(circle, #17282a 0, #080d11 65%); }
+.glasses-shell { width: min(96%, 720px); padding: 24px; border: 1px solid #314b47; border-radius: 44px; background: linear-gradient(150deg, #22312f, #070b0d 55%); box-shadow: inset 0 0 0 8px #080c0e, 0 25px 70px #000b; }
+#device-canvas { display: block; width: 100%; image-rendering: pixelated; border-radius: 14px; background: #00150d; box-shadow: 0 0 34px #1dff9b25; }
+.device-controls { display: flex; align-items: center; gap: 6px; padding: 7px 12px; overflow-x: auto; border-top: 1px solid #25343b; background: #0a1116; }
+.device-controls span { margin-left: 5px; color: #70867e; font-size: 10px; letter-spacing: .1em; }.device-controls button { min-width: 38px; padding: 5px 8px; font-size: 11px; }
+.device-meta { display: flex; gap: 18px; padding: 10px 16px; color: #82968f; font-size: 11px; border-top: 1px solid #25343b; }
+.log-panel { height: 170px; margin: 0 20px 20px; }.log-panel .pane-title { height: 40px; }.log-panel ol { height: 128px; margin: 0; padding: 8px 16px 12px 38px; overflow: auto; color: #9eb2aa; font: 11px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; }
+dialog { width: min(820px, calc(100vw - 48px)); padding: 0; color: #eef6f2; border: 1px solid #345048; border-radius: 18px; background: #0c1318; box-shadow: 0 30px 100px #000d; }
+dialog::backdrop { background: #020609cc; backdrop-filter: blur(5px); }
+.share-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid #25343b; }
+.share-header p, .share-header h2 { margin: 0; }.share-header p { color: #5bf0ba; font-size: 10px; letter-spacing: .16em; }.share-header h2 { margin-top: 3px; font-size: 20px; }
+.share-content { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 24px; padding: 24px; }
+#share-qr { width: 360px; height: 360px; border-radius: 12px; background: #fff; }
+.share-details { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 10px 0; }
+.share-details > strong { color: #5bf0ba; font-size: 17px; overflow-wrap: anywhere; }.share-details p { margin: 0; color: #9eb2aa; line-height: 1.6; }
+.share-details dl { width: 100%; margin: 0; }.share-details dt { margin-top: 10px; color: #71877f; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }.share-details dd { margin: 4px 0 0; color: #d8e9e2; overflow-wrap: anywhere; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.share-details details { width: 100%; color: #8fa49c; font-size: 11px; }.share-details code { display: block; margin-top: 8px; padding: 9px; overflow-wrap: anywhere; border-radius: 8px; background: #080d11; }
+.share-details #stop-share { margin-top: auto; }
+@media (max-width: 1250px) { .workspace { height: calc(100vh - 388px); } }
+@media (max-width: 760px) { .share-content { grid-template-columns: 1fr; }.share-content #share-qr { width: min(100%, 360px); height: auto; justify-self: center; } }

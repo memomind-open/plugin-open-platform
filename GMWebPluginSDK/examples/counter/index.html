@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GM Counter Plugin</title>
+    <link rel="stylesheet" href="./style.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "@memomind/gm-plugin-bridge-contract": "/contract/index.js",
+          "@memomind/gm-plugin-web-sdk": "/sdk/index.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">EXAMPLE WEB PLUGIN</p>
+      <h1>设备交互计数器</h1>
+      <p class="counter" id="counter">0</p>
+      <p id="status">正在连接 Studio…</p>
+      <button id="draw" disabled>绘制到眼镜</button>
+      <button id="save" class="secondary" disabled>保存状态</button>
+      <pre id="events">等待设备事件</pre>
+    </main>
+    <script type="module" src="./plugin.js"></script>
+  </body>
+</html>

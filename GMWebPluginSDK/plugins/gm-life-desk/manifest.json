@@ -1,0 +1,22 @@
+{
+  "id": "com.memomind.lifedesk",
+  "name": "浮光桌面",
+  "version": "2.2.3",
+  "entry": "index.html",
+  "bridgeVersion": "1.0",
+  "permissions": [
+    "display",
+    "device.events",
+    "storage",
+    "network"
+  ],
+  "deviceRequirements": {
+    "preferredPluginId": "com.gm.example.web-bridge",
+    "protocols": [
+      { "id": "gm.scene", "minVersion": "1.0" },
+      { "id": "gm.scene-lz4", "minVersion": "1.0" },
+      { "id": "gm.scene-atomic-frame", "minVersion": "1.0" },
+      { "id": "gm.device-events", "minVersion": "1.0" }
+    ]
+  }
+}

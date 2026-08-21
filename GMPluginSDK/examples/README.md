@@ -31,6 +31,7 @@ spacing, or minimum usable layout sizes rather than device width or height.
 | `bluetooth` | bidirectional channel + byte messages | Bluetooth |
 | `device_state` | battery, charging, wearing and connection state | device state |
 | `scene_bridge` | phone-driven text/rect/line/bitmap scene | display bitmap + Bluetooth |
+| `web_bridge` | WebView-driven Scene rendering plus button/IMU uplink and framed LZ4 transfer | display bitmap + Bluetooth + button + IMU; optional LZ4 |
 | `game/breakout` | complete local game | button + raw IMU + locale |
 | `game/tetris` | grid game with IMU movement and button rotation | button + raw IMU + locale |
 | `game/jet_runner` | scrolling IMU-controlled runner | button + raw IMU + locale |

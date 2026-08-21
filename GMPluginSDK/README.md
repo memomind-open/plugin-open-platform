@@ -172,6 +172,7 @@ Build every maintained example:
 | [GRAPHICS.md](GRAPHICS.md) | Shared LVGL and direct framebuffer rendering |
 | [SECURITY.md](SECURITY.md) | Package integrity, trust, and isolation limits |
 | [PROTOCOL.md](PROTOCOL.md) | Phone/PC-to-glasses transport protocol |
+| [PROTOCOL_COMPATIBILITY.md](PROTOCOL_COMPATIBILITY.md) | Declare Web/device protocol requirements and compatibility |
 | [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md) | Mapping from applications to low-level Host services |
 | [examples/README.md](examples/README.md) | Maintained examples and build instructions |
 

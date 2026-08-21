@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'none'; connect-src https://api.open-meteo.com; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'"
+    >
+    <title>城市天气</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="plugin.js" defer></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="appbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>天气</span>
+        </div>
+        <div class="app-actions">
+          <label class="city-picker" for="city">
+            <span class="pin" aria-hidden="true"></span>
+            <select id="city" aria-label="选择城市">
+              <option value="beijing">北京</option>
+              <option value="shanghai">上海</option>
+              <option value="shenzhen">深圳</option>
+              <option value="hangzhou">杭州</option>
+              <option value="chengdu">成都</option>
+            </select>
+          </label>
+          <button id="refresh" class="refresh" type="button" aria-label="刷新天气">
+            <span aria-hidden="true">↻</span>
+          </button>
+        </div>
+      </header>
+
+      <section id="weather-card" class="weather-card" aria-live="polite">
+        <div class="placeholder">
+          <div class="loading-orb" aria-hidden="true"></div>
+          <p>正在连接天气服务</p>
+        </div>
+      </section>
+
+      <section class="forecast-section">
+        <div class="section-heading">
+          <h2>未来三天</h2>
+          <span id="updated-at">--:-- 更新</span>
+        </div>
+        <div id="forecast" class="forecast-list">
+          <div class="forecast-skeleton"></div>
+          <div class="forecast-skeleton"></div>
+          <div class="forecast-skeleton"></div>
+        </div>
+      </section>
+
+      <footer>
+        <span id="network-badge" class="badge badge-idle">准备中</span>
+        <span>OPEN-METEO</span>
+      </footer>
+    </main>
+  </body>
+</html>
