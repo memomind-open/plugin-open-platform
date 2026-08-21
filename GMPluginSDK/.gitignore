@@ -1,0 +1,7 @@
+build/
+.toolchains/
+build-host/
+__pycache__/
+*.o
+*.elf
+*.gmp
