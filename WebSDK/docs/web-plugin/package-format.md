@@ -75,7 +75,7 @@ Web 插件可通过 `deviceRequirements` 声明所需设备协议，供 Studio �
 
 协议 ID 使用小写字母、数字、点和连字符；版本为一到四段数字。设备 `.gmp` manifest
 通过 `provides.protocols` 声明提供的协议。公共协议及设备端格式见
-[`../../../GMPluginSDK/PROTOCOL_COMPATIBILITY.md`](../../../GMPluginSDK/PROTOCOL_COMPATIBILITY.md)。
+[`../../../GlassSDK/PROTOCOL_COMPATIBILITY.md`](../../../GlassSDK/PROTOCOL_COMPATIBILITY.md)。
 
 ## 打包命令
 
@@ -84,7 +84,7 @@ Web 插件可通过 `deviceRequirements` 声明所需设备协议，供 Studio �
 ```sh
 npm run build
 
-node /path/to/GMWebPluginSDK/tools/build-mmpkg.mjs \
+node /path/to/WebSDK/tools/build-mmpkg.mjs \
   ./dist \
   ./release/weather-1.0.0.mmpkg
 ```

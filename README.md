@@ -6,9 +6,9 @@ plugins and companion-app Web plugins.
 ## Repository layout
 
 ```text
-GMPluginSDK/       Native RV32 `.gmp` SDK, examples, packaging and install tools
-GMWebPluginSDK/    Bridge v1 Web SDK, browser simulator, `.mmpkg` tools and docs
-GMPluginStudio/    Cross-platform dual-ended Studio and the GMP previewer core
+GlassSDK/    Native RV32 `.gmp` SDK, examples, packaging and install tools
+WebSDK/      Bridge v1 Web SDK, browser simulator, `.mmpkg` tools and docs
+Studio/      Cross-platform dual-ended Studio and the GMP previewer core
 ```
 
 The two package formats serve different runtimes: `.gmp` runs on the glasses,
@@ -33,9 +33,10 @@ Run repository-level JavaScript tests:
 npm test
 ```
 
-Build all native device examples from `GMPluginSDK/`:
+Build all native device examples from `GlassSDK/`:
 
 ```sh
+cd GlassSDK
 sh ./gm-build all
 ```
 

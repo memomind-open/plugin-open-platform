@@ -69,10 +69,10 @@ fonts/
 CLI 示例：
 
 ```bash
-./build/gmplugin-preview-cli ../../GMPluginSDK/build-host/lvgl_ui/lvgl_ui.gmp \
+./build/gmplugin-preview-cli ../../GlassSDK/build-host/lvgl_ui/lvgl_ui.gmp \
   --frames 30 --pgm /tmp/lvgl-ui.pgm
 
-./build/gmplugin-preview-cli ../../GMPluginSDK/build-host/bluetooth/bluetooth.gmp \
+./build/gmplugin-preview-cli ../../GlassSDK/build-host/bluetooth/bluetooth.gmp \
   --bt 1 "Hello plugin"
 ```
 
@@ -118,7 +118,7 @@ CLI 示例：
 ./tests/smoke.sh
 ```
 
-回归脚本会运行 `GMPluginSDK/build-host` 中的所有维护示例，并额外验证：
+回归脚本会运行 `GlassSDK/build-host` 中的所有维护示例，并额外验证：
 
 - Bluetooth message 进入插件并产生回包；
 - button 和 IMU gesture 事件进入插件；

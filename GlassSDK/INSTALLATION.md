@@ -1,6 +1,6 @@
 # Install a GM Plugin on Glasses
 
-GMPluginSDK builds `.gmp` packages but does not contain the transport UI. Use
+GM Plugin SDK builds `.gmp` packages but does not contain the transport UI. Use
 one of the official companion tools to install and manage a package on the
 glasses.
 

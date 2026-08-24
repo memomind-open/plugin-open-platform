@@ -1,6 +1,6 @@
 # Repository contribution rules
 
-GMPluginSDK is a public repository for international developers. All public
+GlassSDK is a public workspace for international developers. All public
 repository content and Git metadata must be understandable without access to
 internal company systems.
 

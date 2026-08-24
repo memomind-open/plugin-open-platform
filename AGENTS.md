@@ -7,7 +7,7 @@ internal company systems.
 ## Default simulator
 
 - The default interactive application is the cross-platform dual-ended Studio
-  under `GMPluginStudio/desktop`.
+  under `Studio/desktop`.
 - When a request only says to run, start, or open the simulator, run `npm run
   dev` from the repository root.
 - The browser-only Studio and standalone Win32 previewer are compatibility
