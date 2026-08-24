@@ -24,14 +24,14 @@
 ## Studio 运行
 
 ```sh
-# 在 GMWebPluginSDK 仓库根目录执行
+# 在 WebSDK 工作区根目录执行
 node tools/studio-cli.mjs --plugin plugins/gm-life-desk
 ```
 
 ## 打包
 
 ```sh
-# 在 GMWebPluginSDK 仓库根目录执行
+# 在 WebSDK 工作区根目录执行
 npm run pack:plugin -- plugins/gm-life-desk dist/gm-life-desk.mmpkg
 ```
 

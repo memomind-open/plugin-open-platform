@@ -138,7 +138,7 @@ Keep framebuffer tiles separate from active LVGL objects. A later LVGL redraw
 may overwrite direct framebuffer pixels in an overlapping region.
 
 ```sh
-cd GMPluginSDK
+cd GlassSDK
 ./gm-build build --example web_bridge
 ```
 

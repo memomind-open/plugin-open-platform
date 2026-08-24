@@ -32,10 +32,10 @@ npm run build
 
 构建产物位于 `dist/`。`vite.config.ts` 使用相对资源路径，产物可以由 Aphrodite 的本地插件资源服务器直接加载。
 
-在 GMWebPluginSDK Studio 中验证构建产物：
+在 WebSDK Browser Studio 中验证构建产物：
 
 ```bash
-# 在 GMWebPluginSDK 仓库根目录执行
+# 在 WebSDK 工作区根目录执行
 node tools/studio-cli.mjs --plugin plugins/tictactoe/dist
 ```
 

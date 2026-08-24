@@ -2,7 +2,7 @@
 
 Source workspace for the App built-in plugin `com.memomind.demo.weather`.
 
-Run it from the GMWebPluginSDK repository root:
+Run it from the `WebSDK` workspace root:
 
 ```sh
 node tools/studio-cli.mjs --plugin plugins/weather

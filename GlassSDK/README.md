@@ -1,6 +1,6 @@
 # GM Plugin SDK
 
-GMPluginSDK lets third-party developers build applications independently from
+GM Plugin SDK lets third-party developers build applications independently from
 the glasses firmware. A plugin is compiled as RV32 position-independent code
 and packed into a `.gmp` file. It accesses glasses features only through the
 versioned Host API; it does not link firmware symbols or private driver data.

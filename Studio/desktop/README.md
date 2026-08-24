@@ -10,7 +10,7 @@ WebView，右侧使用相邻 `previewer/` 的 RV32/Host 模拟核心。
   自带 CSP 在两个平台上一致工作；服务只监听 `127.0.0.1`。
 - 直接打开 `.mmpkg`，或从目录加载开发中的 Web 插件；入口读取 `manifest.json`，无
   manifest 时回退到 `index.html`。
-- 启动时自动扫描 `GMWebPluginSDK/plugins/*` 和 `GMWebPluginSDK/examples/*`，优先使用
+- 启动时自动扫描 `WebSDK/plugins/*` 和 `WebSDK/examples/*`，优先使用
   `plugins/` 中的完整插件工作区，并兼容 Vite 等项目的 `dist` 或 `build` 产物。启动后
   默认进入“仅设备调试”，不擅自运行 Web 插件。
 - 设备插件是 Studio 的必需运行端，Web 插件是可选输入。开发普通 Web 插件且未手动指定
@@ -22,10 +22,10 @@ WebView，右侧使用相邻 `previewer/` 的 RV32/Host 模拟核心。
   `provides.protocols`，按插件 ID、最低版本和协议版本自动选择设备端，并在下拉框中标记
   “推荐”“兼容”或“不兼容”。手动选择不兼容组合仍可用于诊断，但不会显示为就绪。
 - Web 侧可导入仓库外的开发目录或 `.mmpkg` 文件；设备侧会扫描
-  `GMPluginSDK/build-host` 中已构建的 `.gmp`，也可导入外部工作区中的构建产物或单个
+  `GlassSDK/build-host` 中已构建的 `.gmp`，也可导入外部工作区中的构建产物或单个
   `.gmp` 文件。
 - 将当前 Web 插件一键打包为 `.mmpkg`，通过局域网 TCP 服务提供下载并显示二维码。
-  二维码和下载协议见 [`../../GMWebPluginSDK/docs/web-plugin/lan-install.md`](../../GMWebPluginSDK/docs/web-plugin/lan-install.md)。
+  二维码和下载协议见 [`../../WebSDK/docs/web-plugin/lan-install.md`](../../WebSDK/docs/web-plugin/lan-install.md)。
 - 将当前设备 `.gmp` 通过兼容 SDK 安装工具的 `gmp+tcp` 服务共享并显示二维码，供支持
   设备插件安装的 App 扫码下载。
 - 加载并持续运行一个设备 `.gmp`。
@@ -52,7 +52,7 @@ WebView，右侧使用相邻 `previewer/` 的 RV32/Host 模拟核心。
 构建脚本直接编译，不要求安装 CMake。
 
 ```bash
-cd GMPluginStudio/desktop/src-tauri
+cd Studio/desktop/src-tauri
 cargo run
 ```
 
@@ -63,7 +63,7 @@ cargo install tauri-cli --version 2.11.4 --locked
 npm run desktop:build
 ```
 
-“打包并生成二维码”使用与 `GMWebPluginSDK/tools/build-mmpkg.mjs` 相同的 `.mmpkg v1` 结构和
+“打包并生成二维码”使用与 `WebSDK/tools/build-mmpkg.mjs` 相同的 `.mmpkg v1` 结构和
 SHA-256 文件表，生成包写入 SDK 的 `dist/` 目录。手机与电脑必须处于同一局域网；
 App 需要实现 `mmpkg+tcp` 调试安装协议。
 
@@ -71,4 +71,4 @@ App 需要实现 `mmpkg+tcp` 调试安装协议。
 
 macOS 应在 macOS runner 上构建并签名 `.app/.dmg`；Windows 应在 Windows runner 上使用
 MSVC 构建并签名 `.msi/.exe`。两端共享全部 Rust、前端和 C++ Core 源码，现有
-`GMPluginStudio/previewer/src/main_win32.cpp` 继续作为独立 Windows 原生调试器保留。
+`Studio/previewer/src/main_win32.cpp` 继续作为独立 Windows 原生调试器保留。

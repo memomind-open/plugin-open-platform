@@ -12,8 +12,8 @@ This workspace contains:
 - the browser-only compatibility Studio;
 - deterministic `.mmpkg` and DevKit packaging tools.
 
-The default dual-ended desktop application lives in the sibling
-`GMPluginStudio/` workspace. This directory remains independently testable and
+The default dual-ended desktop application lives in the sibling `Studio/`
+workspace. This directory remains independently testable and
 can produce a standalone Web developer kit.
 
 ## Quick start
