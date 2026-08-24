@@ -22,7 +22,7 @@ spacing, or minimum usable layout sizes rather than device width or height.
 | Example | What it teaches | Required capability |
 | --- | --- | --- |
 | `minimal` | entry point and lifecycle | none |
-| `extension` | define, query and call an `extension_get` function table | demo extension |
+| `extension` | query, validate and call an `extension_get` function table | LZ4 extension |
 | `lz4` | compress and decompress a raw LZ4 block through the Host | LZ4 extension |
 | `lvgl_ui` | core `host->graphics.lvgl` drawing, text and `on_loop` | none (core LVGL) |
 | `framebuffer` | zero-copy lock/draw/unlock across Host framebuffer slices | display bitmap |

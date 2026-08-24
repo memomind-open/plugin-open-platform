@@ -59,6 +59,8 @@ ABI_CHECK(gm_display_control_api_initial_size,
 ABI_CHECK(gm_pixel_format_is_compact, sizeof(gm_plugin_pixel_format_t) == 1U);
 ABI_CHECK(gm_extension_id_is_fixed,
           sizeof(gm_plugin_extension_id_t) == 4U);
+ABI_CHECK(gm_reserved_extension_id_is_fixed,
+          GM_PLUGIN_EXTENSION_RESERVED_1 == UINT32_C(1));
 ABI_CHECK(gm_lz4_extension_id_is_fixed,
           GM_PLUGIN_EXTENSION_LZ4 == UINT32_C(2));
 ABI_CHECK(gm_lz4_extension_initial_size,
