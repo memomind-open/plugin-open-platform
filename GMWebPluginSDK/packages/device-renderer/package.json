@@ -1,0 +1,9 @@
+{
+  "name": "@memomind/gm-plugin-device-renderer",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.js",
+  "dependencies": {
+    "@memomind/gm-plugin-bridge-contract": "0.1.0"
+  }
+}

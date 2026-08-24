@@ -1,0 +1,10 @@
+{
+  "name": "@memomind/gm-plugin-studio-runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.js",
+  "dependencies": {
+    "@memomind/gm-plugin-bridge-contract": "0.1.0",
+    "@memomind/gm-plugin-device-renderer": "0.1.0"
+  }
+}

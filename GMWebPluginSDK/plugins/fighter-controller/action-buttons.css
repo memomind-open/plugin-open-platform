@@ -1,0 +1,116 @@
+/* Four-button diamond: guard top, kick left, heavy right, light down. */
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+main {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(68px, 12vh));
+  grid-template-rows: repeat(3, minmax(68px, 12vh));
+  gap: 8px;
+  transform: none;
+  justify-content: center;
+  align-items: center;
+}
+
+.attack {
+  width: 100%;
+  height: 100%;
+}
+
+.attack > * { transform: none; }
+.attack.block { grid-area: 1 / 2; }
+.attack.light { grid-area: 3 / 2; }
+.attack.heavy { grid-area: 2 / 3; }
+.attack.kick { grid-area: 2 / 1; }
+
+.attack.block b { color: #78e1b1; }
+.attack.light b { color: #68ddff; }
+.attack.heavy b { color: #ff7588; }
+.attack.kick b { color: #ffd166; }
+
+.right-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-height: 0;
+  align-self: end;
+  margin-bottom: 6px;
+  transform: none;
+}
+
+.right-controls .skills,
+.system-controls {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+}
+
+.controller {
+  grid-template-columns: minmax(190px, 1fr) auto minmax(220px, 1fr);
+  grid-template-rows: 1fr;
+}
+
+.joystick { grid-column: 1; grid-row: 1; }
+.system-controls {
+  grid-column: 2;
+  grid-row: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  align-self: end;
+  margin-bottom: 6px;
+  transform: none;
+}
+.right-controls { grid-column: 3; grid-row: 1; }
+
+.right-controls .skill,
+.system-controls .start,
+.system-controls .pause {
+  min-width: 122px;
+  height: 44px;
+  font-size: 12px;
+}
+
+.right-controls .skill {
+  min-width: 120px;
+  height: 42px;
+  margin-top: 16px;
+  font-size: 12px;
+}
+
+.control:focus { outline: none; }
+.control:focus-visible {
+  border-color: #66e3ff;
+  box-shadow: 0 0 0 2px rgba(102, 227, 255, .28), 0 0 22px rgba(102, 227, 255, .2);
+}
+
+/* A separate animation class is restarted on every pointerdown. Unlike the
+ * held .active state, this remains visible for very fast repeated taps. */
+.control.press-feedback { animation: press-feedback .2s ease-out; }
+@keyframes press-feedback {
+  0% {
+    filter: brightness(1.65);
+    box-shadow: 0 0 0 0 rgba(102, 227, 255, .8), 0 0 30px rgba(102, 227, 255, .42);
+    transform: scale(.9);
+  }
+  55% {
+    filter: brightness(1.25);
+    box-shadow: 0 0 0 7px rgba(102, 227, 255, .2), 0 0 20px rgba(102, 227, 255, .25);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 0 11px rgba(102, 227, 255, 0);
+    transform: scale(.94);
+  }
+}

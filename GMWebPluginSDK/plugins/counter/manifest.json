@@ -1,0 +1,15 @@
+{
+  "id": "com.memomind.demo.counter",
+  "name": "Memo Plugin Counter Demo",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "bridgeVersion": "1.0",
+  "permissions": ["display", "device.events", "storage"],
+  "deviceRequirements": {
+    "preferredPluginId": "com.gm.example.web-bridge",
+    "protocols": [
+      { "id": "gm.scene", "minVersion": "1.0" },
+      { "id": "gm.device-events", "minVersion": "1.0" }
+    ]
+  }
+}

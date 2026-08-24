@@ -2,5 +2,10 @@
   "id": "com.gm.example.scene-bridge",
   "name": "GM Scene Bridge",
   "version": 1,
-  "abi_version": 256
+  "abi_version": 256,
+  "provides": {
+    "protocols": [
+      { "id": "gm.scene", "version": "1.0" }
+    ]
+  }
 }

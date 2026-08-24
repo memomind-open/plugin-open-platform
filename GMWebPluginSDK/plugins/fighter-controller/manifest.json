@@ -1,0 +1,16 @@
+{
+  "id": "com.memomind.fighter.controller",
+  "name": "Fighter Arena Controller",
+  "version": "0.1.0",
+  "entry": "index.html",
+  "bridgeVersion": "1.0",
+  "permissions": ["device.events"],
+  "deviceRequirements": {
+    "preferredPluginId": "com.gm.game.fighter_arena",
+    "requiredPluginId": "com.gm.game.fighter_arena",
+    "minPluginVersion": "29",
+    "protocols": [
+      { "id": "gm.fighter-control", "minVersion": "2.0" }
+    ]
+  }
+}

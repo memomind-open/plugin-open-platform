@@ -1,1 +1,2 @@
 qrcodegen==1.8.0
+Pillow==10.4.0

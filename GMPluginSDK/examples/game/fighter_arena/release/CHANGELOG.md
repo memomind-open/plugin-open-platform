@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0-beta.22
+
+- Replaced both human fighter identities with original music-and-cosmos mascot
+  characters while keeping the existing 12 combat poses, four reaction poses,
+  collision spacing, and 112 x 98 runtime frame format.
+- Preserved the user-requested soft star head molds as the primary silhouette
+  feature while differentiating faces, clothing, footwear, accessories, and
+  props from the physical references.
+- Extended the asset builder to regenerate either fighter, preserve real alpha,
+  remove baked transparency previews, and filter detached cross-cell fragments.
+- Regenerated the review PNGs and all runtime sprite headers. The packaged game
+  remains below the 80,000-byte beta budget.
+
 ## 0.1.0-beta.21
 
 - Removed the visible `GD` row and all guard depletion, recovery and guard-break

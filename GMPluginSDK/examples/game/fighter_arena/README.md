@@ -2,7 +2,7 @@
 
 `fighter_arena` is a focused single-player fighting game for the GM plugin
 runtime. It uses the Bluetooth and sliced GRAY_4 framebuffer paths and ships
-one polished fixed matchup for the public beta.
+one polished fixed original-mascot matchup for the public beta.
 
 ## Game flow
 
@@ -11,7 +11,8 @@ one polished fixed matchup for the public beta.
 3. Fixed `ZEN` versus `RIVAL` best-of-three match
 4. Win, loss, or draw result, then replay
 
-`ZEN` and `RIVAL` each have an original twelve-frame sprite set. Every normal
+`ZEN` is a star-crown rhythm fighter and `RIVAL` is a soft five-point
+star fighter; each has an original twelve-frame sprite set. Every normal
 attack now has a readable wind-up, contact and recovery sequence: jab, heavy
 cross and roundhouse use separate anticipation and impact silhouettes, while
 the special uses a dedicated two-hand energy-release pose. Hit stun, walking,
@@ -90,8 +91,9 @@ The encoded sheets are stored in `zen_combat_sprites.h` and
 are kept beside the game for regeneration and visual review. Combat sheets use
 a fixed per-character scale in a 112 x 98 action canvas, so wide punches and
 kicks extend across transparent space instead of shrinking the whole fighter.
-The build tool also anchors the torso and keeps only the connected character
-body in each cell, preventing both size pulsing and isolated cell-leak pixels.
+The build tool also anchors each figure inside the established action bounds
+and filters small detached components, preventing both size pulsing and
+isolated cell-leak pixels.
 Rendering treats source row 95 as the ground contact and enforces a minimum
 brightness across the final foot rows, preventing dark shoe pixels from fading
 out or hovering above the stage line.

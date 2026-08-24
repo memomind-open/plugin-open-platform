@@ -1,0 +1,62 @@
+.joystick {
+  position: relative;
+  width: min(44vh, 260px);
+  height: min(44vh, 260px);
+  margin: auto;
+  border: 1px solid #2a3850;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 42% 38%, rgba(102, 227, 255, .08), transparent 35%),
+    linear-gradient(145deg, #131d2b, #090e16);
+  box-shadow: inset 0 0 32px rgba(0, 0, 0, .48), 0 18px 36px rgba(0, 0, 0, .3);
+  touch-action: none;
+  outline: none;
+}
+
+.joystick-ring {
+  position: absolute;
+  inset: 15%;
+  border: 1px solid rgba(102, 227, 255, .17);
+  border-radius: 50%;
+}
+
+.joystick-axis {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: rgba(128, 144, 168, .14);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.joystick-axis.horizontal { width: 74%; height: 1px; }
+.joystick-axis.vertical { width: 1px; height: 74%; }
+
+.joystick-knob {
+  position: absolute;
+  left: calc(50% - 25%);
+  top: calc(50% - 25%);
+  width: 50%;
+  height: 50%;
+  display: grid;
+  place-items: center;
+  border: 2px solid #3d6072;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #263e50, #111a27 68%);
+  box-shadow: inset 0 3px 8px rgba(255, 255, 255, .06), 0 8px 18px rgba(0, 0, 0, .4);
+  transition: border-color .12s, box-shadow .12s;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.joystick-knob i {
+  width: 28%;
+  height: 28%;
+  border: 1px solid rgba(102, 227, 255, .35);
+  border-radius: 50%;
+}
+
+.joystick.active .joystick-knob {
+  border-color: #66e3ff;
+  box-shadow: 0 0 24px rgba(102, 227, 255, .25), inset 0 3px 8px rgba(255, 255, 255, .08);
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@memomind/gm-plugin-web-sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "dependencies": {
+    "@memomind/gm-plugin-bridge-contract": "0.1.0"
+  }
+}
