@@ -1,7 +1,7 @@
 # Fighter Arena Beta Quick Start
 
-Version: `0.1.0-beta.21`
-Plugin manifest version: `29`
+Version: `0.1.0-beta.22`
+Plugin manifest version: `30`
 
 ## Requirements
 
@@ -10,7 +10,7 @@ Plugin manifest version: `29`
 - A paired outgoing Bluetooth SPP COM port
 - The bundled `GMPluginWindows.exe`
 
-Use the EXE from this same Beta 21 package. Older Windows tools do not contain
+Use the EXE from this same Beta 22 package. Older Windows tools do not contain
 the current multi-channel audio event handling.
 
 ## Install and play

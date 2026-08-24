@@ -1,12 +1,19 @@
 # Beta Validation Status
 
-Date: 2026-08-19
+Date: 2026-08-21
 
 ## Completed
 
 - RISC-V build completed with `-Wall -Wextra -Werror`.
-- `fighter_arena.gmp` validated at 78,896 bytes, below the 80,000-byte beta
+- `fighter_arena.gmp` validated at 75,920 bytes, below the 80,000-byte beta
   budget.
+- Both mascot combat sheets and reaction sheets were visually inspected after
+  normalization. Their requested head molds remain consistent across poses,
+  detached cross-cell fragments are removed, and all hands and feet stay inside
+  their 112 x 98 runtime frames.
+- Fresh simulator captures of the title, neutral fight, heavy recoil, and late
+  knockdown states were inspected. Both mascots remain readable against the
+  stage and retain their head silhouettes at runtime scale.
 - All 24 GMPluginWindows protocol and Fighter Arena application unit tests
   passed for this release scope.
 - The GMPluginWindows help text was rebuilt to describe the six-hit tracking
@@ -33,7 +40,7 @@ Date: 2026-08-19
   preview state.
 - Left/right knockdown captures were visually inspected at initial recoil and
   later hurt-sheet frames; both fighters consistently fall away from the hit.
-- Deterministic combat tests passed 45/45 scenarios, including shoe-ground
+- Deterministic combat tests passed 48/48 scenarios, including shoe-ground
   visibility, light/heavy kick near-hit and far-whiff behavior, distinct kick
   frames, 152-pixel tracking advance, six-hit rush, launching palm finisher,
   distant-rush lockout, large-wave projectile lifecycle, both normal target combos,
