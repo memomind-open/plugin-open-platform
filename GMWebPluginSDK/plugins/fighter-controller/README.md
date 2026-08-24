@@ -10,7 +10,7 @@ Movement uses a virtual analog joystick with a center deadzone. It maps to the
 same digital left/right/up/down bits expected by the game and supports diagonal
 bit combinations.
 The four attack buttons use a separated gamepad diamond: `I` guard at the top,
-`J` light attack on the left, `K` heavy attack on the right, and `U` kick at
+`U` kick on the left, `K` heavy attack on the right, and `J` light attack at
 the bottom.
 
 - Input channel: `0x4647`

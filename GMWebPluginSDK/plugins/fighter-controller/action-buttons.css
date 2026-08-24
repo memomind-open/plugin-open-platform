@@ -1,4 +1,4 @@
-/* Classic four-button diamond: guard top, light left, heavy right, kick down. */
+/* Four-button diamond: guard top, kick left, heavy right, light down. */
 html, body {
   width: 100%;
   height: 100%;
@@ -28,9 +28,9 @@ main {
 
 .attack > * { transform: none; }
 .attack.block { grid-area: 1 / 2; }
-.attack.light { grid-area: 2 / 1; }
+.attack.light { grid-area: 3 / 2; }
 .attack.heavy { grid-area: 2 / 3; }
-.attack.kick { grid-area: 3 / 2; }
+.attack.kick { grid-area: 2 / 1; }
 
 .attack.block b { color: #78e1b1; }
 .attack.light b { color: #68ddff; }
