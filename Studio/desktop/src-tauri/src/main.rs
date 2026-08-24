@@ -427,7 +427,7 @@ struct WebManifest {
 fn sdk_root() -> Result<PathBuf, String> {
     if let Ok(current) = std::env::current_dir() {
         for candidate in current.ancestors() {
-            let web_sdk = candidate.join("GMWebPluginSDK");
+            let web_sdk = candidate.join("WebSDK");
             if web_sdk.join("tools/build-mmpkg.mjs").is_file() && web_sdk.join("examples").is_dir()
             {
                 return web_sdk
@@ -437,7 +437,7 @@ fn sdk_root() -> Result<PathBuf, String> {
         }
     }
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../GMWebPluginSDK")
+        .join("../../../WebSDK")
         .canonicalize()
         .map_err(|error| format!("Could not resolve SDK root: {error}"))
 }
@@ -554,7 +554,7 @@ fn inspect_web_plugin(path: String) -> Result<DiscoveredWebPlugin, String> {
 fn device_sdk_root() -> Result<PathBuf, String> {
     if let Ok(current) = std::env::current_dir() {
         for candidate in current.ancestors() {
-            let device_sdk = candidate.join("GMPluginSDK");
+            let device_sdk = candidate.join("GlassSDK");
             if device_sdk.join("gm-build").is_file() && device_sdk.join("examples").is_dir() {
                 return device_sdk
                     .canonicalize()
@@ -563,7 +563,7 @@ fn device_sdk_root() -> Result<PathBuf, String> {
         }
     }
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../GMPluginSDK")
+        .join("../../../GlassSDK")
         .canonicalize()
         .map_err(|error| format!("Could not resolve device SDK root: {error}"))
 }

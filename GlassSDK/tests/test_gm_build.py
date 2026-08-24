@@ -1,15 +1,38 @@
 from __future__ import annotations
 
+import os
 import pathlib
+import tempfile
 import unittest
 from unittest import mock
 
-from tools.gm_build import cmake_build_path, cmake_target, default_example, package_path
+from tools.gm_build import cmake_build_path, cmake_target, latest_package, package_path
 
 
 class CMakeBuildDriverTest(unittest.TestCase):
-    def test_default_qr_example_comes_from_the_checked_in_config(self) -> None:
-        self.assertEqual(default_example(), "lvgl_ui")
+    def test_latest_package_selects_the_most_recent_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            older = package_path(root, "minimal")
+            newer = package_path(root, "game/snake")
+            older.parent.mkdir(parents=True)
+            newer.parent.mkdir(parents=True)
+            older.write_bytes(b"older")
+            newer.write_bytes(b"newer")
+            os.utime(older, ns=(1_000_000_000, 1_000_000_000))
+            os.utime(newer, ns=(2_000_000_000, 2_000_000_000))
+            self.assertEqual(
+                latest_package(root, ("minimal", "game/snake")), newer
+            )
+            os.utime(older, ns=(2_000_000_000, 2_000_000_000))
+            self.assertEqual(
+                latest_package(root, ("game/snake", "minimal")), older
+            )
+
+    def test_latest_package_rejects_an_empty_build(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(RuntimeError, "no built GMP packages"):
+                latest_package(pathlib.Path(directory), ("minimal",))
 
     def test_cmake_target_uses_a_stable_nested_example_name(self) -> None:
         self.assertEqual(cmake_target("game/snake"), "gm_plugin_game_snake")

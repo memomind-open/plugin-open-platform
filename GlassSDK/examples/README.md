@@ -10,9 +10,9 @@ not a required convention. Do not add an example-local `CMakeLists.txt`: the
 SDK-root build file discovers every `manifest.json` and compiles all `.c` files
 in its example directory.
 
-The QR package used after the first full build or when nothing changed is set
-by `[serve] default_example` in the SDK-root `gm-build.ini`; it is `lvgl_ui` by
-default. Set it to an `examples/`-relative directory, without a `.gmp` suffix.
+After the build completes, the QR server selects the valid example `.gmp` with
+the newest modification time. The same rule applies after a full build, when
+nothing changed, or when a shared input rebuilt several examples.
 
 Display geometry is a runtime capability. Examples that size or position a
 screen-level layout call `host->display_get_info()` instead of assuming a fixed

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-sdk_build="${GMPLUGIN_SDK_BUILD:-$project_dir/../../GMPluginSDK/build-host}"
+sdk_build="${GMPLUGIN_SDK_BUILD:-$project_dir/../../GlassSDK/build-host}"
 cli="$project_dir/build/gmplugin-preview-cli"
 
 if [[ ! -x "$cli" ]]; then
