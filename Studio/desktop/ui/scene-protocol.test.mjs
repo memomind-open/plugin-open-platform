@@ -2,10 +2,38 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  decodeGlassesMessage,
   decodeDeviceMessage,
+  encodePluginBridgeEventData,
   encodeSceneMessage,
+  PLUGIN_TRANSPORT,
   SCENE_CHANNELS,
 } from './scene-protocol.js';
+
+test('desktop routes glasses plugin messages only on uplink command 0x29', () => {
+  assert.deepEqual(PLUGIN_TRANSPORT, {
+    service: 0x0f,
+    phoneToGlassesCommand: 0x28,
+    glassesToPhoneCommand: 0x29,
+  });
+  const encoded = {
+    service: 0x0f,
+    command: 0x29,
+    channel: 0x4648,
+    dataBase64: 'AQIDBA==',
+  };
+  assert.deepEqual(decodeGlassesMessage(encoded), {
+    kind: 'plugin', channel: 0x4648, payload: Uint8Array.of(1, 2, 3, 4),
+  });
+  assert.throws(
+    () => decodeGlassesMessage({ ...encoded, command: 0x28 }),
+    /unexpected glasses-to-phone command/,
+  );
+  assert.deepEqual(encodePluginBridgeEventData(decodeGlassesMessage(encoded)), {
+    channel: 0x4648,
+    dataBase64: 'AQIDBA==',
+  });
+});
 
 test('desktop Scene codec matches Aphrodite LZ4 Channel 7 framing', () => {
   const encoded = encodeSceneMessage('display.updateImageLz4', {

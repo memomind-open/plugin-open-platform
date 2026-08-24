@@ -2,10 +2,11 @@
 *.log
 
 node_modules/
+.pnpm-store/
 coverage/
 dist/
 target/
 
-GMPluginStudio/previewer/build/
-GMPluginStudio/previewer/build-windows/
-GMPluginStudio/desktop/src-tauri/gen/schemas/
+Studio/previewer/build/
+Studio/previewer/build-windows/
+Studio/desktop/src-tauri/gen/schemas/

@@ -18,10 +18,17 @@ the bottom.
 - Bridge permission: `device.events` for connection-state subscription;
   plugin messaging itself is available by default
 
-Input confirmation sounds from GMPluginWindows play locally for attack, guard,
-skill, start and pause controls. Hit, successful block, KO, round-result and
-background music remain disabled until the App Bridge forwards channel
-`0x4648` game events from the glasses.
+Input confirmation sounds play locally for attack, guard, skill, start and
+pause controls. The controller also consumes the glasses plugin's four-byte
+channel `0x4648` event frames through `gm.plugin.onMessage()`. It plays combat
+impacts, successful blocks, guard breaks, special launches, jumps, KO,
+round-start and round-result cues, menus, and five music states. Matching local
+and game-confirmed attack sounds are deduplicated within 350 ms.
+
+The event payload is `[version, sequence, event, value]`, where version is `1`.
+Events `1..11` are hit, block, guard-break, special-launch, round-end, attack,
+jump, round-start, menu, KO, and music. Generated audio assets are documented
+under `assets/sfx/README.md`.
 
 Run it in Studio:
 
@@ -38,3 +45,5 @@ npm run pack:plugin -- plugins/fighter-controller dist/fighter-controller.mmpkg
 Studio validates and records the outgoing messages. Real glasses control also
 requires the App WebView host to implement `plugin.sendMessage` by forwarding
 the channel and decoded payload through GM service `0x0F`, command `0x28`.
+The App must route unsolicited command `0x29` messages to the WebView event
+bridge as `plugin.message` rather than its `0x28` command-response queue.

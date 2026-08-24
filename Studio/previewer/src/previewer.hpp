@@ -9,6 +9,10 @@
 
 namespace gmpreview {
 
+inline constexpr uint8_t kPluginServiceId = 0x0f;
+inline constexpr uint8_t kPluginCommandPhoneToGlasses = 0x28;
+inline constexpr uint8_t kPluginCommandGlassesToPhone = 0x29;
+
 struct PackageInfo {
     uint16_t format_version = 0;
     uint16_t abi_version = 0;
@@ -47,6 +51,8 @@ struct TextOverlay {
 };
 
 struct BluetoothMessage {
+    uint8_t service = kPluginServiceId;
+    uint8_t command = kPluginCommandGlassesToPhone;
     uint16_t channel = 0;
     std::vector<uint8_t> payload;
 };

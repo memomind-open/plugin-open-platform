@@ -1,4 +1,4 @@
-# Phone-to-glasses protocols
+# Phone and glasses protocols
 
 This document describes the wire protocols exercised by GM Plugin Studio: the
 GM command channel used for plugin management and system commands, plus the
@@ -58,17 +58,18 @@ Multi-byte integer TLVs use network byte order. Install chunks must be
 sequential. The phone must wait for the command acknowledgement before sending
 the next chunk.
 
-| Command | ID | Request TLVs |
-| --- | ---: | --- |
-| Get capabilities | `0x20` | none |
-| Install begin | `0x21` | `INT32 decoded_size`, `INT32 encoded_size`, `INT32 decoded_crc32` |
-| Install chunk | `0x22` | `INT32 offset`, `BYTES encoded_data` |
-| Install commit | `0x23` | none |
-| Install abort | `0x24` | none |
-| Start | `0x25` | none |
-| Stop | `0x26` | none |
-| Remove | `0x27` | none |
-| Plugin message | `0x28` | `INT16 channel`, `BYTES data` |
+| Direction | Command | ID | TLVs |
+| --- | --- | ---: | --- |
+| Phone to glasses | Get capabilities | `0x20` | none |
+| Phone to glasses | Install begin | `0x21` | `INT32 decoded_size`, `INT32 encoded_size`, `INT32 decoded_crc32` |
+| Phone to glasses | Install chunk | `0x22` | `INT32 offset`, `BYTES encoded_data` |
+| Phone to glasses | Install commit | `0x23` | none |
+| Phone to glasses | Install abort | `0x24` | none |
+| Phone to glasses | Start | `0x25` | none |
+| Phone to glasses | Stop | `0x26` | none |
+| Phone to glasses | Remove | `0x27` | none |
+| Phone to glasses | Plugin message | `0x28` | `INT16 channel`, `BYTES data` |
+| Glasses to phone | Plugin message | `0x29` | `INT16 channel`, `BYTES data` |
 
 `BYTES data` in a plugin message must contain at least one byte. Use an
 application-level opcode when a command has no additional payload; empty BYTES
@@ -87,16 +88,16 @@ optional relocation table and runtime-memory tail; trailing bytes are rejected.
 Management acknowledgements reuse the request command ID and contain `INT8
 status`, followed by `INT32 next_offset`. Status `0` is success; nonzero is the
 positive form of the corresponding `GM_PLUGIN_E*` value. For a successful chunk,
-`next_offset` is the first byte the phone should send next. A plugin message in
-the glasses-to-phone direction contains `INT16 channel`, followed by `BYTES`.
+`next_offset` is the first byte the phone should send next. Command `0x28`
+therefore has only two valid roles: a phone-to-glasses plugin message and its
+glasses-to-phone transport acknowledgement.
 
-Command `0x28` remains backward compatible in both directions. Its TLV shape
-distinguishes a transport acknowledgement (`INT8 status`, optionally followed
-by `INT32 next_offset`) from an unsolicited plugin message (`INT16 channel`,
-`BYTES data`). A receiver must route by TLV shape before placing packets in its
-command-response queue. Glasses never send an unsolicited plugin message unless
-the running plugin explicitly calls `bt_send()`, so updating either endpoint
-alone does not add traffic to existing SPP services or drawing channels.
+Unsolicited plugin messages from glasses use command `0x29`. A phone must route
+`0x29` directly to its plugin-event path instead of placing it in the
+command-response queue. Its payload contains `INT16 channel`, followed by
+`BYTES data`. Glasses never send command `0x29` unless the running plugin
+explicitly calls `bt_send()`, so existing plugins that do not use the Host send
+API do not add traffic.
 
 The `data` pointer in `GM_PLUGIN_EVENT_BT_MESSAGE` is borrowed and remains valid
 only for the duration of `on_event()`. A plugin must copy data that it needs

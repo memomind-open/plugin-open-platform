@@ -13,6 +13,12 @@ export const SCENE_CHANNELS = Object.freeze({
   ping: 0x7ffe,
 });
 
+export const PLUGIN_TRANSPORT = Object.freeze({
+  service: 0x0f,
+  phoneToGlassesCommand: 0x28,
+  glassesToPhoneCommand: 0x29,
+});
+
 export const DISPLAY_CAPABILITIES = Object.freeze([
   'text', 'gray4', 'clear', 'gray4-lz4', 'atomic-framed-lz4',
 ]);
@@ -87,6 +93,33 @@ export function decodeDeviceMessage(channel, payload) {
   return { kind: 'event', name: definition.name, sequence, timestampMs, data };
 }
 
+export function decodeGlassesMessage(encoded) {
+  if (!encoded || typeof encoded !== 'object') {
+    throw protocolError('INVALID_REQUEST', 'glasses message must be an object');
+  }
+  if (encoded.service !== PLUGIN_TRANSPORT.service) {
+    throw protocolError('INVALID_REQUEST', `unexpected plugin service ${encoded.service}`);
+  }
+  if (encoded.command !== PLUGIN_TRANSPORT.glassesToPhoneCommand) {
+    throw protocolError('INVALID_REQUEST', `unexpected glasses-to-phone command ${encoded.command}`);
+  }
+  return decodeDeviceMessage(encoded.channel, decodeBase64(encoded.dataBase64));
+}
+
+export function encodePluginBridgeEventData(message) {
+  if (message?.kind !== 'plugin') {
+    throw protocolError('INVALID_REQUEST', 'plugin message is required');
+  }
+  uint(message.channel, 16, 'channel');
+  if (!(message.payload instanceof Uint8Array) || message.payload.length === 0) {
+    throw protocolError('INVALID_REQUEST', 'plugin payload must be non-empty bytes');
+  }
+  if (message.payload.length > MAX_PAYLOAD_BYTES) {
+    throw protocolError('PAYLOAD_TOO_LARGE', `plugin payload exceeds ${MAX_PAYLOAD_BYTES} bytes`);
+  }
+  return { channel: message.channel, dataBase64: encodeBase64(message.payload) };
+}
+
 export function decodeBase64(value) {
   if (typeof value !== 'string' || value.length === 0 || value.length % 4 !== 0 ||
       !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) {
@@ -94,6 +127,14 @@ export function decodeBase64(value) {
   }
   try { return Uint8Array.from(atob(value), (character) => character.charCodeAt(0)); }
   catch { throw protocolError('INVALID_REQUEST', 'dataBase64 must be valid standard Base64'); }
+}
+
+function encodeBase64(value) {
+  let binary = '';
+  for (let offset = 0; offset < value.length; offset += 0x8000) {
+    binary += String.fromCharCode(...value.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
 }
 
 function encodeText(params) {

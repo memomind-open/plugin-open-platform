@@ -60,6 +60,28 @@ test('Studio runtime only emits subscribed device events', async () => {
   assert.deepEqual(events.map((event) => event.name), ['device.button', 'device.imuGesture']);
 });
 
+test('Studio runtime emits plugin messages without a device event subscription', () => {
+  const runtime = new StudioRuntime({
+    renderer: new FakeRenderer(),
+    sessionToken: 'token',
+    runtimeGeneration: 4,
+  });
+  const events = [];
+  runtime.onEvent((event) => events.push(event));
+
+  runtime.emitPluginMessage(0x4648, Uint8Array.of(1, 2, 3, 4));
+
+  assert.deepEqual(events, [{
+    name: 'plugin.message',
+    data: { channel: 0x4648, dataBase64: 'AQIDBA==' },
+    runtimeGeneration: 4,
+  }]);
+  assert.throws(
+    () => runtime.emitPluginMessage(0x10000, Uint8Array.of(1)),
+    { code: 'INVALID_REQUEST' },
+  );
+});
+
 test('Studio runtime rejects stale generations and unknown methods', async () => {
   const runtime = new StudioRuntime({ renderer: new FakeRenderer(), sessionToken: 'token', runtimeGeneration: 3 });
   const stale = await runtime.handle({ version: '1.0', sessionToken: 'token', requestId: 'stale', method: 'runtime.ready', params: {}, runtimeGeneration: 2 });

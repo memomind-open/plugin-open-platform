@@ -691,8 +691,9 @@ bool Previewer::handleTrap(Rv32 &cpu, uint32_t address)
         message.payload.resize(length);
         cpu.memory.read(data, message.payload.data(), length);
         bt_outbox_.push_back(std::move(message));
-        appendLog("[Bluetooth out] channel=" + std::to_string(channel) +
-                  " bytes=" + std::to_string(length));
+        appendLog("[Bluetooth out] service=0x0f command=0x29 channel=" +
+                  std::to_string(channel) + " bytes=" +
+                  std::to_string(length));
         finish(OK);
         return true;
     }

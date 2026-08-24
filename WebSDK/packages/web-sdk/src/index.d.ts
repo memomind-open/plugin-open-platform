@@ -36,6 +36,11 @@ export interface PluginMessageResult {
   payloadBytes: number;
 }
 
+export interface PluginMessage {
+  channel: number;
+  data: Uint8Array;
+}
+
 export interface FrameBeginOptions {
   frameId: number;
   tileCount: number;
@@ -80,6 +85,7 @@ export function createGMPlugin(options?: { transport?: BridgeTransport; timeoutM
   device: Record<string, (...args: any[]) => Promise<unknown> | (() => void)>;
   plugin: {
     sendMessage(channel: number, data: Uint8Array): Promise<PluginMessageResult>;
+    onMessage(listener: (message: PluginMessage, event: PluginEvent) => void): () => void;
   };
   close(): void;
 };

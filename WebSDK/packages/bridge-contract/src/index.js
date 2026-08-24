@@ -26,6 +26,7 @@ export const SCENE_TRANSPORT_PROFILE = Object.freeze({
 
 export const PLUGIN_MESSAGE_PROFILE = Object.freeze({
   maxPayloadBytes: 81901,
+  uplinkEvent: 'plugin.message',
 });
 
 export const METHOD_NAMES = Object.freeze([
@@ -57,6 +58,7 @@ export const EVENT_NAMES = Object.freeze([
   'device.imuGesture',
   'device.rawImu',
   'device.connection',
+  'plugin.message',
   'runtime.lifecycleChanged',
 ]);
 

@@ -52,8 +52,36 @@ const frame = Uint8Array.of(2, sequence, buttons >> 8, buttons & 0xff);
 const result = await gm.plugin.sendMessage(0x4647, frame);
 ```
 
+Receive a generic binary message sent by the currently running glasses plugin:
+
+```js
+const offMessage = gm.plugin.onMessage(({ channel, data }) => {
+  if (channel !== 0x4648) return;
+  console.log([...data]); // data is a Uint8Array
+});
+
+// Remove the listener when it is no longer needed.
+offMessage();
+```
+
+The Bridge event name is `plugin.message`. Its wire data is
+`{ channel, dataBase64 }`; `gm.plugin.onMessage()` validates the channel and
+payload and exposes the decoded payload as `Uint8Array`. The event uses the
+active `runtimeGeneration`, is not part of `device.subscribeEvents`, and does
+not require a manifest permission.
+
+An App host forwards an uplink by invoking the WebView callback with the same
+event envelope:
+
+```js
+window.__memoPluginEmit({
+  name: 'plugin.message',
+  data: { channel, dataBase64 },
+  runtimeGeneration,
+});
+```
+
 - `channel` 必须是 `0..65535` 的整数。
 - `data` 必须是非空 `Uint8Array`，最大 81,901 B。
 - 此能力默认可用，不需要 manifest 权限。
 - 返回成功表示设备已 ACK 且消息已送达当前运行的 GMP，不表示 GMP 的业务逻辑或显示结果已完成。
-- 当前 Bridge v1 只提供 H5 到 GMP 的主动发送；设备插件回传自定义消息到 H5 尚未开放。

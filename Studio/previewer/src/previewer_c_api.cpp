@@ -146,6 +146,22 @@ size_t gm_preview_outbox_count(const gm_preview_handle *handle)
     return handle ? handle->previewer.bluetoothOutbox().size() : 0;
 }
 
+int gm_preview_outbox_service(const gm_preview_handle *handle, size_t index,
+                              uint8_t *service)
+{
+    if (!handle || !service || index >= handle->previewer.bluetoothOutbox().size()) return 0;
+    *service = handle->previewer.bluetoothOutbox()[index].service;
+    return 1;
+}
+
+int gm_preview_outbox_command(const gm_preview_handle *handle, size_t index,
+                              uint8_t *command)
+{
+    if (!handle || !command || index >= handle->previewer.bluetoothOutbox().size()) return 0;
+    *command = handle->previewer.bluetoothOutbox()[index].command;
+    return 1;
+}
+
 int gm_preview_outbox_channel(const gm_preview_handle *handle, size_t index,
                               uint16_t *channel)
 {

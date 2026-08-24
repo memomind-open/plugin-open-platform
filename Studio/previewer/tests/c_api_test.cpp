@@ -79,6 +79,12 @@ int main(int argc, char **argv)
         assert(gm_preview_send_bluetooth(handle, 0x7ffe, nonce, sizeof(nonce), &handled) == 1);
         assert(handled == 1);
         assert(gm_preview_outbox_count(handle) == 1);
+        uint8_t service = 0;
+        uint8_t command = 0;
+        assert(gm_preview_outbox_service(handle, 0, &service) == 1);
+        assert(gm_preview_outbox_command(handle, 0, &command) == 1);
+        assert(service == 0x0f);
+        assert(command == 0x29);
         uint16_t channel = 0;
         assert(gm_preview_outbox_channel(handle, 0, &channel) == 1);
         assert(channel == 0x7ffe);

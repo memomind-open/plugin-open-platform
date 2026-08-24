@@ -2,6 +2,7 @@
 #include "gm_plugin_extensions.h"
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_package.h"
+#include "gm_plugin_protocol.h"
 
 #define ABI_CHECK(name, condition) typedef char name[(condition) ? 1 : -1]
 
@@ -17,6 +18,11 @@ ABI_CHECK(gm_lvgl_selector_knob,
           GM_PLUGIN_LVGL_SELECTOR_KNOB == UINT32_C(0x030000));
 ABI_CHECK(gm_package_v1_value, GM_PLUGIN_PACKAGE_FORMAT_VERSION == 1U);
 ABI_CHECK(gm_package_v1_header_size, GM_PLUGIN_PACKAGE_HEADER_SIZE == 28U);
+ABI_CHECK(gm_plugin_service_id, GM_PLUGIN_SERVICE_ID == UINT8_C(0x0F));
+ABI_CHECK(gm_plugin_downlink_command,
+          GM_PLUGIN_COMMAND_PHONE_TO_GLASSES == UINT8_C(0x28));
+ABI_CHECK(gm_plugin_uplink_command,
+          GM_PLUGIN_COMMAND_GLASSES_TO_PHONE == UINT8_C(0x29));
 
 ABI_CHECK(gm_cap_display_bitmap, GM_PLUGIN_CAP_DISPLAY_BITMAP == (1U << 0));
 ABI_CHECK(gm_cap_button, GM_PLUGIN_CAP_BUTTON == (1U << 1));

@@ -30,6 +30,7 @@ $dependencies = @(
     (Join-Path $PSScriptRoot "fighter_arena_adapter.c"),
     (Join-Path $PSScriptRoot "simulator.h"),
     (Join-Path $sdkRoot "include\gm_plugin.h"),
+    (Join-Path $sdkRoot "include\gm_plugin_protocol.h"),
     (Join-Path $sdkRoot "examples\game\fighter_arena\fighter_arena.c"),
     (Join-Path $sdkRoot "examples\game\fighter_arena\zen_combat_sprites.h"),
     (Join-Path $sdkRoot "examples\game\fighter_arena\rival_combat_sprites.h"),

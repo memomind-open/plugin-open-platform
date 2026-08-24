@@ -8,6 +8,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "gm_plugin_protocol.h"
 #include "simulator.h"
 
 #define WINDOW_SCALE 2
@@ -143,6 +144,9 @@ static gm_plugin_result_t host_bt_send(gm_plugin_bt_channel_t channel,
 {
     const uint8_t *bytes = data;
     if (data == NULL || length == 0U) return GM_PLUGIN_EINVAL;
+    fprintf(stderr, "plugin uplink: service=0x%02x command=0x%02x\n",
+            (unsigned int)GM_PLUGIN_SERVICE_ID,
+            (unsigned int)GM_PLUGIN_COMMAND_GLASSES_TO_PHONE);
     if (channel == EVENT_CHANNEL && length == 4U) {
         if (fight_event_failures != 0U) {
             --fight_event_failures;
