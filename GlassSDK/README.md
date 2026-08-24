@@ -87,7 +87,7 @@ later runs rebuild only the compiler-detected dependencies.
 
 | Command | Description |
 | --- | --- |
-| `gm-build` | Rebuild plugins affected by changed C, header, manifest, or linker inputs; otherwise build and serve the configured default |
+| `gm-build` | Rebuild affected plugins, then serve the most recently updated GMP |
 | `gm-build build --example bluetooth` | Build one example |
 | `gm-build build --example game/2048` | Build a nested game example |
 | `gm-build all` | Build all maintained examples |
@@ -98,20 +98,13 @@ later runs rebuild only the compiler-detected dependencies.
 Use `.\gm-build` on Windows PowerShell and `./gm-build` on macOS/Linux. Outputs are
 stored under `build-host/<example>/`.
 
-## Default QR package
+## QR package selection
 
-[`gm-build.ini`](gm-build.ini) controls which package is served after the first
-full build or when there are no changed plugin outputs:
-
-```ini
-[serve]
-default_example = lvgl_ui
-```
-
-Set `default_example` to an `examples/`-relative directory such as
-`game/snake`; do not add a `.gmp` suffix. A single changed plugin is served
-instead. A shared-input change that rebuilds several packages prints their
-paths rather than selecting one arbitrarily.
+After the incremental build completes, the driver serves the valid example
+`.gmp` with the newest modification time. This also applies to the first full
+build, a no-change run, and a shared-input change that rebuilds several
+packages. If modification times are identical, the example path provides a
+stable tie-breaker.
 
 Examples do not need their own `CMakeLists.txt`. The SDK-root
 [`CMakeLists.txt`](CMakeLists.txt) discovers every example directory containing
@@ -241,8 +234,8 @@ dependency graph: a changed `.c` rebuilds only that object and GMP; a changed
 header, manifest, or linker input rebuilds every affected GMP. The first run
 after `clean` builds every example. CMake, Ninja, the RISC-V compiler, and the
 QR dependency are installed automatically when absent. With no changed input,
-it serves the `default_example` configured in [`gm-build.ini`](gm-build.ini),
-which is `lvgl_ui` by default.
+it serves the most recently updated valid example package already present in
+`build-host`.
 
 Command Prompt is not supported. On Windows, `gm-build.exe` is a native
 PowerShell launcher, so it is not subject to the PowerShell script-signing or

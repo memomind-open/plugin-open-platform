@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import configparser
 import hashlib
 import importlib
 import os
@@ -54,7 +53,6 @@ PACKAGES = {
         "4e60e2a54c16385e4e2476d08240f857495d5a61609d97e1ee49f72875a6ec1e",
     ),
 }
-BUILD_CONFIG = SDK / "gm-build.ini"
 
 
 def host() -> tuple[str, str]:
@@ -229,22 +227,6 @@ def example_names() -> tuple[str, ...]:
     return tuple(sorted(examples))
 
 
-def default_example() -> str:
-    config = configparser.ConfigParser()
-    try:
-        with BUILD_CONFIG.open(encoding="utf-8") as stream:
-            config.read_file(stream)
-        example = config.get("serve", "default_example")
-    except (OSError, configparser.Error) as error:
-        raise RuntimeError(f"could not read {BUILD_CONFIG.name}: {error}") from error
-    normalized = example.replace("\\", "/").strip("/")
-    if not normalized or normalized not in example_names():
-        raise RuntimeError(
-            f"{BUILD_CONFIG.name} has an unknown serve.default_example: {example!r}"
-        )
-    return normalized
-
-
 def cmake_target(example: str) -> str:
     return "gm_plugin_" + example.replace("\\", "/").strip("/").replace("/", "_")
 
@@ -252,6 +234,22 @@ def cmake_target(example: str) -> str:
 def package_path(build_root: pathlib.Path, example: str) -> pathlib.Path:
     normalized = pathlib.PurePosixPath(example.replace("\\", "/").strip("/"))
     return build_root.joinpath(*normalized.parts, f"{normalized.name}.gmp")
+
+
+def latest_package(
+    build_root: pathlib.Path, examples: tuple[str, ...] | None = None,
+) -> pathlib.Path:
+    candidates = [
+        package_path(build_root, example)
+        for example in (examples if examples is not None else example_names())
+        if package_path(build_root, example).is_file()
+    ]
+    if not candidates:
+        raise RuntimeError(f"no built GMP packages found in {build_root}")
+    return max(
+        candidates,
+        key=lambda candidate: (candidate.stat().st_mtime_ns, candidate.as_posix()),
+    )
 
 
 def cmake_build_path(build_root: pathlib.Path) -> pathlib.Path:
@@ -348,7 +346,6 @@ def main() -> int:
             return 0
         cmake, ninja = ensure_build_tools()
         bin_dir = ensure_toolchain(args.insecure_download)
-        initial_build = not (cmake_build_path(build_root) / "CMakeCache.txt").is_file()
         configure_cmake(cmake, ninja, build_root, bin_dir)
         if args.command == "all":
             build_cmake(cmake, build_root)
@@ -358,28 +355,9 @@ def main() -> int:
             build_cmake(cmake, build_root, cmake_target(example))
             gmp = package_path(build_root, example)
         elif args.command == "serve":
-            configured_example = default_example()
-            before = {
-                example: package_path(build_root, example).stat().st_mtime_ns
-                for example in example_names()
-                if package_path(build_root, example).is_file()
-            }
             build_cmake(cmake, build_root)
-            changed = [
-                example for example in example_names()
-                if package_path(build_root, example).is_file() and
-                package_path(build_root, example).stat().st_mtime_ns != before.get(example)
-            ]
-            if initial_build or not changed:
-                gmp = package_path(build_root, configured_example)
-                print(f"Using {configured_example} for the QR installation server.")
-            elif len(changed) == 1:
-                gmp = package_path(build_root, changed[0])
-            else:
-                print("Built every plugin affected by the changed shared inputs:")
-                for example in changed:
-                    print(f"- {package_path(build_root, example)}")
-                return 0
+            gmp = latest_package(build_root)
+            print(f"Using the most recently updated package: {gmp}")
         else:
             example = "game/breakout"
             build_cmake(cmake, build_root, cmake_target(example))

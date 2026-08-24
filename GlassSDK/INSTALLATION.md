@@ -58,14 +58,10 @@ of these methods:
 
 2. Locate the generated package at `build-host/game/2048/2048.gmp`.
 
-For the no-argument QR workflow, edit `gm-build.ini` in the SDK root. Its
-`[serve] default_example` value is an `examples/`-relative directory and
-defaults to `lvgl_ui`; do not include the `.gmp` suffix.
-
 Run `./gm-build` on macOS/Linux or `.\gm-build` in Windows PowerShell to build
-incrementally and serve a QR code. It serves one changed plugin automatically;
-if nothing changed, it serves the configured default. A shared header or linker
-change can rebuild multiple packages, in which case their paths are printed.
+incrementally and serve a QR code for the valid example package with the newest
+modification time. The same rule applies when nothing changes or a shared input
+rebuilds multiple packages.
 
 You can now transfer and run this `.gmp` with either of the following methods.
 
