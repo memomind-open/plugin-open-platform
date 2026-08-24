@@ -108,6 +108,12 @@ uint8_t sim_plugin_test_display_scale(uint16_t width, uint16_t height)
     return display_scale(width, height);
 }
 
+bool sim_plugin_test_hurt_uses_source_direction(uint8_t character,
+                                                bool hurt_right)
+{
+    return hurt_uses_source_direction(character, hurt_right);
+}
+
 void sim_plugin_test_constrain_display(uint16_t width, uint16_t height,
                                        int16_t player_x, int16_t cpu_x,
                                        int16_t *player_result,

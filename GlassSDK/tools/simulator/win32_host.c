@@ -868,6 +868,13 @@ static int run_combat_test(HINSTANCE instance)
     combat_check(sim_plugin_test_display_scale(280U, 1340U) == 3U,
                  "tall_narrow_display_scale", "expected=3 actual=%u",
                  sim_plugin_test_display_scale(280U, 1340U));
+    combat_check(
+        sim_plugin_test_hurt_uses_source_direction(0U, false) &&
+        !sim_plugin_test_hurt_uses_source_direction(0U, true) &&
+        !sim_plugin_test_hurt_uses_source_direction(1U, false) &&
+        sim_plugin_test_hurt_uses_source_direction(1U, true),
+        "hurt_sprite_source_orientation",
+        "Zen source falls left and Rival source falls right");
     sim_plugin_test_constrain_display(280U, 1340U, 30, 30,
                                       &constrained_player_x,
                                       &constrained_cpu_x);
