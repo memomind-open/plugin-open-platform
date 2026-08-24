@@ -9,14 +9,19 @@ export class GMPluginError extends Error {
 }
 
 export class ParentFrameTransport {
-  constructor({ windowObject = globalThis.window, timeoutMs = 5000 } = {}) {
+  constructor({ windowObject = globalThis.window, timeoutMs = 5000, parentOrigin } = {}) {
     if (!windowObject?.parent || windowObject.parent === windowObject) {
       throw new GMPluginError('CAPABILITY_UNAVAILABLE', 'Studio parent frame is unavailable');
     }
     this.window = windowObject;
+    this.parentOrigin = parentOrigin ?? inferParentOrigin(windowObject);
+    if (!this.parentOrigin || this.parentOrigin === 'null') {
+      throw new GMPluginError('CAPABILITY_UNAVAILABLE', 'Studio parent origin is unavailable');
+    }
     this.timeoutMs = timeoutMs;
     this.pending = new Map();
     this.listeners = new Set();
+    this.bootstrapListeners = new Set();
     this.onMessage = this.onMessage.bind(this);
     this.window.addEventListener('message', this.onMessage);
   }
@@ -28,7 +33,7 @@ export class ParentFrameTransport {
         reject(new GMPluginError('TIMEOUT', `Bridge request timed out: ${request.method}`));
       }, this.timeoutMs);
       this.pending.set(request.requestId, { resolve, reject, timer });
-      this.window.parent.postMessage({ type: 'gm-plugin:request', request }, '*');
+      this.window.parent.postMessage({ type: 'gm-plugin:request', request }, this.parentOrigin);
     });
   }
 
@@ -38,6 +43,7 @@ export class ParentFrameTransport {
   }
 
   onMessage(message) {
+    if (message.source !== this.window.parent || message.origin !== this.parentOrigin) return;
     const envelope = message.data;
     if (!envelope || typeof envelope !== 'object') return;
     if (envelope.type === 'gm-plugin:response') {
@@ -51,7 +57,7 @@ export class ParentFrameTransport {
     } else if (envelope.type === 'gm-plugin:event') {
       for (const listener of this.listeners) listener(envelope.event);
     } else if (envelope.type === 'gm-plugin:bootstrap') {
-      this.bootstrap?.(envelope.bootstrap);
+      this.replaceBootstrap(envelope.bootstrap);
     }
   }
 
@@ -59,21 +65,43 @@ export class ParentFrameTransport {
     if (this.bootstrapData) return Promise.resolve(this.bootstrapData);
     return new Promise((resolve) => {
       this.bootstrap = (value) => {
-        this.bootstrapData = value;
         resolve(value);
       };
-      this.window.parent.postMessage({ type: 'gm-plugin:bootstrap-request' }, '*');
+      this.window.parent.postMessage({ type: 'gm-plugin:bootstrap-request' }, this.parentOrigin);
     });
+  }
+
+  replaceBootstrap(value) {
+    if (this.bootstrapData && (this.bootstrapData.sessionToken !== value?.sessionToken ||
+        this.bootstrapData.runtimeGeneration !== value?.runtimeGeneration)) {
+      this.rejectPending('Bridge runtime was replaced');
+    }
+    this.bootstrapData = value;
+    this.bootstrap?.(value);
+    this.bootstrap = undefined;
+    for (const listener of this.bootstrapListeners) listener(value);
+  }
+
+  currentBootstrap() { return this.bootstrapData; }
+
+  subscribeBootstrap(listener) {
+    this.bootstrapListeners.add(listener);
+    return () => this.bootstrapListeners.delete(listener);
+  }
+
+  rejectPending(message, code = 'RUNTIME_REPLACED') {
+    for (const { reject, timer } of this.pending.values()) {
+      clearTimeout(timer);
+      reject(new GMPluginError(code, message));
+    }
+    this.pending.clear();
   }
 
   close() {
     this.window.removeEventListener('message', this.onMessage);
-    for (const { reject, timer } of this.pending.values()) {
-      clearTimeout(timer);
-      reject(new GMPluginError('RUNTIME_CLOSED', 'Bridge transport closed'));
-    }
-    this.pending.clear();
+    this.rejectPending('Bridge transport closed', 'RUNTIME_CLOSED');
     this.listeners.clear();
+    this.bootstrapListeners.clear();
   }
 }
 
@@ -88,10 +116,10 @@ export class AppWebViewTransport {
     this.timeoutMs = timeoutMs;
     this.pending = new Map();
     this.listeners = new Set();
+    this.bootstrapListeners = new Set();
     this.bootstrapWaiters = [];
     globalObject.__memoPluginBootstrap = (sessionToken, runtimeGeneration) => {
-      this.bootstrapData = { sessionToken, runtimeGeneration };
-      for (const resolve of this.bootstrapWaiters.splice(0)) resolve(this.bootstrapData);
+      this.replaceBootstrap({ sessionToken, runtimeGeneration });
     };
     globalObject.__memoPluginResolve = (response) => this.resolve(response);
     globalObject.__memoPluginEmit = (event) => {
@@ -103,6 +131,27 @@ export class AppWebViewTransport {
   waitForBootstrap() {
     if (this.bootstrapData) return Promise.resolve(this.bootstrapData);
     return new Promise((resolve) => this.bootstrapWaiters.push(resolve));
+  }
+
+  replaceBootstrap(value) {
+    if (this.bootstrapData && (this.bootstrapData.sessionToken !== value.sessionToken ||
+        this.bootstrapData.runtimeGeneration !== value.runtimeGeneration)) {
+      for (const { reject, timer } of this.pending.values()) {
+        clearTimeout(timer);
+        reject(new GMPluginError('RUNTIME_REPLACED', 'Bridge runtime was replaced'));
+      }
+      this.pending.clear();
+    }
+    this.bootstrapData = value;
+    for (const resolve of this.bootstrapWaiters.splice(0)) resolve(value);
+    for (const listener of this.bootstrapListeners) listener(value);
+  }
+
+  currentBootstrap() { return this.bootstrapData; }
+
+  subscribeBootstrap(listener) {
+    this.bootstrapListeners.add(listener);
+    return () => this.bootstrapListeners.delete(listener);
   }
 
   send(request) {
@@ -137,9 +186,14 @@ export function createGMPlugin({ transport = detectTransport(), timeoutMs = 5000
   const eventListeners = new Map(EVENT_NAMES.map((name) => [name, new Set()]));
 
   const ensureBootstrap = async () => {
-    bootstrapData ??= await transport.waitForBootstrap();
+    bootstrapData = transport.currentBootstrap?.() ?? bootstrapData ??
+      await transport.waitForBootstrap();
     return bootstrapData;
   };
+
+  transport.subscribeBootstrap?.((value) => {
+    bootstrapData = value;
+  });
 
   const call = async (method, params = {}) => {
     const bootstrap = await ensureBootstrap();
@@ -255,6 +309,17 @@ function detectTransport() {
     return new ParentFrameTransport();
   }
   throw new GMPluginError('CAPABILITY_UNAVAILABLE', 'No GM Plugin host detected');
+}
+
+function inferParentOrigin(windowObject) {
+  const configured = new URLSearchParams(windowObject.location?.search ?? '')
+    .get('studioOrigin');
+  if (configured) return configured;
+  try {
+    return new URL(windowObject.document?.referrer).origin;
+  } catch {
+    return null;
+  }
 }
 
 function toPluginError(error) {

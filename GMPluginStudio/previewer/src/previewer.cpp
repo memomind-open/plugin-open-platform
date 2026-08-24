@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <exception>
 #include <fstream>
 #include <iomanip>
 #include <limits>
@@ -76,7 +77,9 @@ std::string hex32(uint32_t value)
 
 } // namespace
 
-Previewer::Previewer() : frame_(kDisplayWidth * kDisplayHeight, 0)
+Previewer::Previewer()
+    : frame_(kDisplayWidth * kDisplayHeight, 0),
+      presented_framebuffer_(320u * kDisplayHeight, 0)
 {
     cpu_.setTrapHandler([this](Rv32 &cpu, uint32_t address) {
         return handleTrap(cpu, address);
@@ -190,12 +193,23 @@ void Previewer::loadBytes(const std::vector<uint8_t> &package,
     }
 
     if (callbacks_[0]) {
-        try { result = invokeResult(callbacks_[0], {context_}); }
-        catch (const std::exception &error) {
-            throw std::runtime_error(std::string("on_load failed: ") + error.what());
+        try {
+            result = invokeResult(callbacks_[0], {context_});
+            if (result != OK)
+                throw std::runtime_error("on_load rejected activation: " + std::to_string(result));
+        } catch (...) {
+            const std::exception_ptr load_error = std::current_exception();
+            try {
+                if (callbacks_[7]) invokeVoid(callbacks_[7], {context_});
+            } catch (const std::exception &error) {
+                appendLog(std::string("[Previewer] on_unload after failed on_load also failed: ") +
+                          error.what());
+            }
+            std::fill(std::begin(callbacks_), std::end(callbacks_), 0);
+            context_ = 0;
+            allocations_.clear();
+            std::rethrow_exception(load_error);
         }
-        if (result != OK)
-            throw std::runtime_error("on_load rejected activation: " + std::to_string(result));
     }
     loaded_ = true;
     appendLog("[Previewer] Loaded " + source_name_ + " (image " +
@@ -221,6 +235,7 @@ void Previewer::initializeMemory(uint32_t plugin_memory_size)
     imu_modes_ = 0;
     auto_brightness_blocked_ = false;
     std::fill(frame_.begin(), frame_.end(), 0);
+    std::fill(presented_framebuffer_.begin(), presented_framebuffer_.end(), 0);
 }
 
 void Previewer::validateCallback(uint32_t callback) const
@@ -271,6 +286,7 @@ void Previewer::start()
     running_ = true;
     suspended_ = false;
     appendLog("[Previewer] Plugin started");
+    honorExitRequest();
 }
 
 void Previewer::stop()
@@ -292,6 +308,7 @@ void Previewer::suspend()
     if (callbacks_[5]) invokeVoid(callbacks_[5], {context_});
     suspended_ = true;
     appendLog("[Previewer] Plugin suspended");
+    honorExitRequest();
 }
 
 void Previewer::resume()
@@ -300,6 +317,7 @@ void Previewer::resume()
     suspended_ = false;
     if (callbacks_[2]) invokeVoid(callbacks_[2], {context_});
     appendLog("[Previewer] Plugin resumed");
+    honorExitRequest();
 }
 
 void Previewer::unload()
@@ -324,8 +342,15 @@ void Previewer::unload()
 void Previewer::tick(uint32_t elapsed_ms)
 {
     monotonic_ms_ += elapsed_ms;
-    if (running_ && !suspended_ && callbacks_[3])
+    if (running_ && !suspended_ && callbacks_[3]) {
         invokeVoid(callbacks_[3], {context_, elapsed_ms});
+        honorExitRequest();
+    }
+}
+
+void Previewer::honorExitRequest()
+{
+    if (exit_requested_ && running_) stop();
 }
 
 void Previewer::buildHostTables()
@@ -365,7 +390,7 @@ void Previewer::buildHostTables()
 
     cpu_.memory.write16(kLvglTable, 116);
     cpu_.memory.write16(kLvglTable + 2, ABI_1_0);
-    for (unsigned index = 0; index <= 19; ++index)
+    for (unsigned index = 0; index <= 20; ++index)
         cpu_.memory.write32(kLvglTable + 4 + index * 4, trap(LRootGet + index));
     cpu_.memory.write32(kLvglTable + 88, kFontDefault);
     cpu_.memory.write32(kLvglTable + 92, kFontLarge);
@@ -560,7 +585,9 @@ bool Previewer::dispatchEvent(uint16_t type)
     cpu_.memory.write16(kEvent, 20);
     cpu_.memory.write16(kEvent + 2, type);
     cpu_.memory.write32(kEvent + 4, monotonic_ms_);
-    return invokeResult(callbacks_[4], {context_, kEvent}) != 0;
+    const bool handled = invokeResult(callbacks_[4], {context_, kEvent}) != 0;
+    honorExitRequest();
+    return handled;
 }
 
 bool Previewer::handleTrap(Rv32 &cpu, uint32_t address)
@@ -624,6 +651,13 @@ bool Previewer::handleTrap(Rv32 &cpu, uint32_t address)
                 static_cast<uint32_t>(x) + width > kDisplayWidth ||
                 static_cast<uint32_t>(y) + height > static_cast<uint32_t>(locked_y_) + locked_height_)
                 result = GM_EINVAL;
+        }
+        if (result == OK && dirty && cpu.argument(1)) {
+            const GuestMemory::Region *framebuffer = cpu_.memory.find(kFramebufferBase);
+            if (framebuffer && framebuffer->bytes.size() >= presented_framebuffer_.size()) {
+                std::copy_n(framebuffer->bytes.begin(), presented_framebuffer_.size(),
+                            presented_framebuffer_.begin());
+            }
         }
         framebuffer_locked_ = false;
         finish(static_cast<uint32_t>(result));
@@ -1297,11 +1331,10 @@ const std::vector<uint8_t> &Previewer::renderFrame()
         std::fill(frame_.begin(), frame_.end(), 0);
         return frame_;
     }
-    const GuestMemory::Region *framebuffer = cpu_.memory.find(kFramebufferBase);
     for (int y = 0; y < kDisplayHeight; ++y) {
         for (int x = 0; x < kDisplayWidth; ++x) {
-            const uint8_t packed = framebuffer ?
-                framebuffer->bytes[static_cast<size_t>(y) * 320u + static_cast<size_t>(x / 2)] : 0;
+            const uint8_t packed = presented_framebuffer_[
+                static_cast<size_t>(y) * 320u + static_cast<size_t>(x / 2)];
             const uint8_t nibble = (x & 1) ? (packed & 0x0f) : (packed >> 4);
             frame_[y * kDisplayWidth + x] = static_cast<uint8_t>(nibble * 17);
         }

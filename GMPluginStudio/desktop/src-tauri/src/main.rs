@@ -2,11 +2,10 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use qrcode::{types::Color, QrCode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{hash_map::DefaultHasher, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::ffi::{c_char, c_int, c_uchar, c_void, CStr, CString};
 use std::fs::{self, File};
-use std::hash::{Hash, Hasher};
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, BufRead, BufReader, Cursor, Read, Write};
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream, UdpSocket};
 use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
@@ -19,9 +18,6 @@ use tiny_http::{Header, Response, Server, StatusCode};
 const DISPLAY_WIDTH: usize = 600;
 const DISPLAY_HEIGHT: usize = 350;
 const MAX_PLUGIN_PAYLOAD_BYTES: usize = 81_901;
-const MAX_WEB_PACKAGE_FILES: usize = 2_048;
-const MAX_WEB_PACKAGE_BYTES: u64 = 50 * 1024 * 1024;
-const MAX_WEB_PACKAGE_FILE_BYTES: u64 = 20 * 1024 * 1024;
 const MAX_MMPKG_BYTES: u64 = 10 * 1024 * 1024;
 const MAX_MMPKG_EXTRACTED_BYTES: u64 = 30 * 1024 * 1024;
 const MAX_MMPKG_FILES: usize = 500;
@@ -169,8 +165,31 @@ struct DiscoveredManifest {
     name: String,
     version: String,
     entry: String,
+    #[serde(default, deserialize_with = "deserialize_permissions")]
+    permissions: Vec<String>,
     #[serde(default)]
     device_requirements: DeviceRequirements,
+}
+
+fn deserialize_permissions<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let values = Vec::<serde_json::Value>::deserialize(deserializer)?;
+    values
+        .into_iter()
+        .map(|value| match value {
+            serde_json::Value::String(name) => Ok(name),
+            serde_json::Value::Object(object) => object
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+                .ok_or_else(|| serde::de::Error::custom("permission object requires a name")),
+            _ => Err(serde::de::Error::custom(
+                "permission must be a string or named object",
+            )),
+        })
+        .collect()
 }
 
 #[derive(Clone, Default, Deserialize, Serialize)]
@@ -203,6 +222,7 @@ struct DiscoveredWebPlugin {
     name: String,
     version: String,
     path: String,
+    permissions: Vec<String>,
     device_requirements: DeviceRequirements,
 }
 
@@ -429,15 +449,8 @@ fn read_discovered_manifest(directory: &Path) -> Result<DiscoveredManifest, Stri
             .map_err(|error| format!("Could not open {}: {error}", manifest_path.display()))?,
     )
     .map_err(|error| format!("Invalid {}: {error}", manifest_path.display()))?;
-    if manifest.id.trim().is_empty()
-        || manifest.name.trim().is_empty()
-        || manifest.version.trim().is_empty()
-    {
-        return Err(format!(
-            "Web manifest is missing identity fields: {}",
-            manifest_path.display()
-        ));
-    }
+    validate_manifest_identity(&manifest)
+        .map_err(|error| format!("{error}: {}", manifest_path.display()))?;
     let entry = safe_relative_entry(directory, &manifest.entry)?;
     if !entry.is_file() {
         return Err(format!("Web plugin entry not found: {}", entry.display()));
@@ -483,6 +496,7 @@ fn discover_web_plugins_in(root: &Path) -> Result<Vec<DiscoveredWebPlugin>, Stri
             name: manifest.name,
             version: manifest.version,
             path: source.to_string_lossy().into_owned(),
+            permissions: manifest.permissions,
             device_requirements: manifest.device_requirements,
         });
     }
@@ -532,6 +546,7 @@ fn inspect_web_plugin(path: String) -> Result<DiscoveredWebPlugin, String> {
         name: manifest.name,
         version: manifest.version,
         path: source.to_string_lossy().into_owned(),
+        permissions: manifest.permissions,
         device_requirements: manifest.device_requirements,
     })
 }
@@ -908,6 +923,152 @@ fn validate_mmpkg_bytes(bytes: &[u8]) -> Result<(), String> {
     }
     if !bytes.starts_with(b"PK\x03\x04") {
         return Err("Web plugin package is not a ZIP container".to_string());
+    }
+
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes))
+        .map_err(|error| format!("Invalid Web plugin package: {error}"))?;
+    if archive.len() > MAX_MMPKG_FILES {
+        return Err(format!(
+            "Web plugin package contains more than {MAX_MMPKG_FILES} entries"
+        ));
+    }
+
+    let mut seen = HashSet::new();
+    let mut payload_hashes = HashMap::new();
+    let mut manifest_bytes = None;
+    let mut extracted_bytes = 0u64;
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .map_err(|error| format!("Could not inspect package entry: {error}"))?;
+        let name = entry.name().to_string();
+        if !seen.insert(name.clone()) {
+            return Err(format!(
+                "Web plugin package contains duplicate path: {name}"
+            ));
+        }
+        if entry
+            .unix_mode()
+            .is_some_and(|mode| mode & 0o170000 == 0o120000)
+        {
+            return Err("Web plugin package must not contain symbolic links".to_string());
+        }
+        validate_archive_path(&name, entry.is_dir())?;
+        if entry.size() > MAX_MMPKG_BYTES {
+            return Err(format!("{name} exceeds the 10 MB file limit"));
+        }
+        extracted_bytes = extracted_bytes
+            .checked_add(entry.size())
+            .filter(|total| *total <= MAX_MMPKG_EXTRACTED_BYTES)
+            .ok_or_else(|| "Web plugin package expands beyond the 30 MB limit".to_string())?;
+        if entry.is_dir() {
+            continue;
+        }
+        let mut content = Vec::with_capacity(entry.size() as usize);
+        entry
+            .read_to_end(&mut content)
+            .map_err(|error| format!("Could not read package entry {name}: {error}"))?;
+        if content.len() as u64 > MAX_MMPKG_BYTES {
+            return Err(format!("{name} exceeds the 10 MB file limit"));
+        }
+        if name == "manifest.json" {
+            manifest_bytes = Some(content);
+        } else if name != "signature.sig" {
+            payload_hashes.insert(name, format!("sha256:{:x}", Sha256::digest(&content)));
+        }
+    }
+
+    let manifest_bytes = manifest_bytes
+        .ok_or_else(|| "Web plugin package does not contain manifest.json".to_string())?;
+    let manifest_value: serde_json::Value = serde_json::from_slice(&manifest_bytes)
+        .map_err(|error| format!("Invalid packaged Web manifest: {error}"))?;
+    let manifest = manifest_value
+        .as_object()
+        .ok_or_else(|| "Packaged Web manifest must be a JSON object".to_string())?;
+    if manifest
+        .get("schemaVersion")
+        .and_then(serde_json::Value::as_u64)
+        != Some(1)
+    {
+        return Err("Web plugin package requires schemaVersion 1".to_string());
+    }
+    if manifest
+        .get("bridgeVersion")
+        .and_then(serde_json::Value::as_str)
+        != Some("1.0")
+    {
+        return Err("Web plugin package requires bridgeVersion 1.0".to_string());
+    }
+    let discovered: DiscoveredManifest = serde_json::from_value(manifest_value.clone())
+        .map_err(|error| format!("Invalid packaged Web manifest: {error}"))?;
+    validate_manifest_identity(&discovered)?;
+    let declared_files = manifest
+        .get("files")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| "Web plugin package manifest requires a files object".to_string())?;
+    if declared_files.len() != payload_hashes.len() {
+        return Err(
+            "Web plugin package files table does not exactly cover its payload".to_string(),
+        );
+    }
+    for (path, actual_hash) in &payload_hashes {
+        validate_archive_path(path, false)?;
+        let declared_hash = declared_files
+            .get(path)
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| format!("Web plugin package files table is missing {path}"))?;
+        if declared_hash != actual_hash {
+            return Err(format!("Web plugin package hash mismatch for {path}"));
+        }
+    }
+    if !payload_hashes.contains_key(&discovered.entry) {
+        return Err(format!("Web plugin entry is missing: {}", discovered.entry));
+    }
+    Ok(())
+}
+
+fn validate_archive_path(path: &str, is_directory: bool) -> Result<(), String> {
+    let path = if is_directory {
+        path.strip_suffix('/').unwrap_or(path)
+    } else {
+        path
+    };
+    if path.is_empty()
+        || path.starts_with('/')
+        || path.contains('\\')
+        || path
+            .split('/')
+            .any(|component| component.is_empty() || matches!(component, "." | ".."))
+    {
+        return Err(format!("Web plugin contains an unsafe path: {path}"));
+    }
+    Ok(())
+}
+
+fn validate_manifest_identity(manifest: &DiscoveredManifest) -> Result<(), String> {
+    if manifest.id.trim().is_empty()
+        || manifest.name.trim().is_empty()
+        || manifest.version.trim().is_empty()
+        || manifest.entry.trim().is_empty()
+    {
+        return Err("Web manifest is missing identity fields".to_string());
+    }
+    validate_archive_path(&manifest.entry, false)?;
+    if !manifest.entry.to_ascii_lowercase().ends_with(".html") {
+        return Err("Web manifest entry must be an HTML file".to_string());
+    }
+    if manifest.permissions.len() > 16 {
+        return Err("Web manifest permissions must contain at most 16 items".to_string());
+    }
+    let supported = ["display", "device.events", "storage", "network"];
+    let mut seen = HashSet::new();
+    for permission in &manifest.permissions {
+        if !supported.contains(&permission.as_str()) {
+            return Err(format!("Unsupported Web plugin permission: {permission}"));
+        }
+        if !seen.insert(permission) {
+            return Err(format!("Duplicate Web plugin permission: {permission}"));
+        }
     }
     Ok(())
 }
@@ -1341,47 +1502,18 @@ fn extract_web_package(package: &Path) -> Result<PathBuf, String> {
     let canonical = package
         .canonicalize()
         .map_err(|error| format!("Could not resolve Web plugin package: {error}"))?;
-    let metadata = canonical
-        .metadata()
-        .map_err(|error| format!("Could not inspect Web plugin package: {error}"))?;
-    let mut hasher = DefaultHasher::new();
-    canonical.hash(&mut hasher);
-    metadata.len().hash(&mut hasher);
-    metadata.modified().ok().hash(&mut hasher);
+    let package_bytes = checked_mmpkg(&canonical)?;
+    let package_hash = format!("{:x}", Sha256::digest(&package_bytes));
     let output = std::env::temp_dir()
         .join("gm-plugin-studio")
         .join(std::process::id().to_string())
-        .join(format!("{:016x}", hasher.finish()));
+        .join(&package_hash[..32]);
     if output.is_dir() {
         return resolve_directory_entry(&output);
     }
 
-    let file = File::open(&canonical)
-        .map_err(|error| format!("Could not open Web plugin package: {error}"))?;
-    let mut archive = zip::ZipArchive::new(file)
+    let mut archive = zip::ZipArchive::new(Cursor::new(package_bytes))
         .map_err(|error| format!("Invalid Web plugin package: {error}"))?;
-    if archive.len() > MAX_WEB_PACKAGE_FILES {
-        return Err(format!(
-            "Web plugin package contains more than {MAX_WEB_PACKAGE_FILES} files"
-        ));
-    }
-    let total_bytes = (0..archive.len()).try_fold(0u64, |total, index| {
-        let entry = archive
-            .by_index(index)
-            .map_err(|error| format!("Could not inspect package entry: {error}"))?;
-        if entry.size() > MAX_WEB_PACKAGE_FILE_BYTES {
-            return Err(format!(
-                "Package entry is larger than {MAX_WEB_PACKAGE_FILE_BYTES} bytes"
-            ));
-        }
-        total
-            .checked_add(entry.size())
-            .filter(|value| *value <= MAX_WEB_PACKAGE_BYTES)
-            .ok_or_else(|| {
-                format!("Web plugin package expands beyond {MAX_WEB_PACKAGE_BYTES} bytes")
-            })
-    })?;
-    let _ = total_bytes;
 
     let staging = output.with_extension("partial");
     if staging.exists() {
@@ -1703,6 +1835,26 @@ mod tests {
     use std::io::Write;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    fn write_test_mmpkg(package: &Path) {
+        let source = package
+            .parent()
+            .expect("package must have a parent")
+            .join("source");
+        fs::create_dir_all(&source).expect("source directory must be created");
+        fs::write(
+            source.join("manifest.json"),
+            r#"{"id":"com.memomind.sample","name":"Sample","version":"1.0.0","entry":"web/start.html","bridgeVersion":"1.0","permissions":[]}"#,
+        )
+        .expect("manifest must be written");
+        fs::create_dir_all(source.join("web")).expect("entry directory must be created");
+        fs::write(
+            source.join("web/start.html"),
+            "<!doctype html><title>sample</title>",
+        )
+        .expect("entry must be written");
+        build_mmpkg(&source, package).expect("test package must build");
+    }
+
     #[test]
     fn extracts_manifest_entry_from_mmpkg() {
         let suffix = SystemTime::now()
@@ -1715,23 +1867,7 @@ mod tests {
         ));
         fs::create_dir_all(&test_directory).expect("test directory must be created");
         let package = test_directory.join("sample.mmpkg");
-        let file = File::create(&package).expect("test package must be created");
-        let mut archive = zip::ZipWriter::new(file);
-        let options = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated);
-        archive
-            .start_file("manifest.json", options)
-            .expect("manifest entry must start");
-        archive
-            .write_all(br#"{"entry":"web/start.html"}"#)
-            .expect("manifest must be written");
-        archive
-            .start_file("web/start.html", options)
-            .expect("Web entry must start");
-        archive
-            .write_all(b"<!doctype html><title>sample</title>")
-            .expect("Web entry must be written");
-        archive.finish().expect("test package must finish");
+        write_test_mmpkg(&package);
 
         let entry = extract_web_package(&package).expect("package must extract");
         assert_eq!(
@@ -1811,8 +1947,8 @@ mod tests {
         ));
         fs::create_dir_all(&root).expect("test directory must be created");
         let package = root.join("counter.mmpkg");
-        let expected = b"PK\x03\x04web-plugin-package";
-        fs::write(&package, expected).expect("package must be written");
+        write_test_mmpkg(&package);
+        let expected = fs::read(&package).expect("package must be readable");
 
         let (server, port) = start_mmpkg_server(package).expect("server must start");
         let mut client = TcpStream::connect((Ipv4Addr::LOCALHOST, port))
@@ -1830,7 +1966,7 @@ mod tests {
             format!(
                 "MMPKG/1 OK {} {:x}\n",
                 expected.len(),
-                Sha256::digest(expected)
+                Sha256::digest(&expected)
             )
         );
         let mut body = Vec::new();
@@ -1926,5 +2062,48 @@ mod tests {
         );
         assert_eq!(archive.len(), 2);
         fs::remove_dir_all(root).expect("test directory must be removable");
+    }
+
+    #[test]
+    fn rejects_mmpkg_payload_hash_mismatch() {
+        let html = b"<!doctype html>";
+        let manifest = serde_json::json!({
+            "schemaVersion": 1,
+            "id": "com.memomind.tampered",
+            "name": "Tampered",
+            "version": "1.0.0",
+            "entry": "index.html",
+            "bridgeVersion": "1.0",
+            "permissions": [],
+            "files": { "index.html": "sha256:0000000000000000000000000000000000000000000000000000000000000000" }
+        });
+        let cursor = Cursor::new(Vec::new());
+        let mut archive = zip::ZipWriter::new(cursor);
+        let options = zip::write::SimpleFileOptions::default();
+        archive.start_file("manifest.json", options).unwrap();
+        archive
+            .write_all(serde_json::to_string(&manifest).unwrap().as_bytes())
+            .unwrap();
+        archive.start_file("index.html", options).unwrap();
+        archive.write_all(html).unwrap();
+        let bytes = archive.finish().unwrap().into_inner();
+        assert!(validate_mmpkg_bytes(&bytes)
+            .unwrap_err()
+            .contains("hash mismatch"));
+    }
+
+    #[test]
+    fn rejects_mmpkg_duplicate_paths() {
+        let cursor = Cursor::new(Vec::new());
+        let mut archive = zip::ZipWriter::new(cursor);
+        let options = zip::write::SimpleFileOptions::default();
+        archive.start_file("manifest.json", options).unwrap();
+        archive.write_all(b"{}").unwrap();
+        archive.start_file("manifest.json", options).unwrap();
+        archive.write_all(b"{}").unwrap();
+        let bytes = archive.finish().unwrap().into_inner();
+        assert!(validate_mmpkg_bytes(&bytes)
+            .unwrap_err()
+            .contains("duplicate path"));
     }
 }

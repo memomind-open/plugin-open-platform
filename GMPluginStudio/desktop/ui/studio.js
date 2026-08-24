@@ -12,6 +12,11 @@ import {
   evaluateCompatibility,
   WEB_BRIDGE_PLUGIN_ID,
 } from './workspace-mode.js';
+import {
+  hasBridgePermission,
+  isTrustedPluginMessage,
+  storageNamespace,
+} from './bridge-security.js';
 
 const { invoke } = window.__TAURI__.core;
 
@@ -30,12 +35,14 @@ const shareDialog = document.querySelector('#share-dialog');
 const shareQr = document.querySelector('#share-qr');
 const subscriptions = new Map();
 const outboundWaiters = new Set();
-const storage = new Map();
+const storageNamespaces = new Map();
 const importedWebPlugins = new Map();
 const importedDevicePlugins = new Map();
 const deviceEventButtons = [...document.querySelectorAll('[data-button-action], [data-gesture]')];
-const sessionToken = crypto.randomUUID();
 const runtimeGeneration = 1;
+let sessionToken = crypto.randomUUID();
+let frameOrigin = null;
+let activeWebPlugin = null;
 let subscriptionSequence = 0;
 let deviceRunning = false;
 let runningDevicePath = '';
@@ -48,8 +55,6 @@ let currentCompatibility = null;
 let framePending = false;
 let renderedFrames = 0;
 let fpsWindow = performance.now();
-
-const bootstrap = { sessionToken, runtimeGeneration };
 
 document.querySelector('#refresh-web').addEventListener('click', discoverWebPlugins);
 document.querySelector('#refresh-device').addEventListener('click', discoverDevicePlugins);
@@ -298,6 +303,9 @@ function updateDeviceCompatibility() {
 
 function disableWebPlugin() {
   webActive = false;
+  activeWebPlugin = null;
+  frameOrigin = null;
+  subscriptions.clear();
   frame.hidden = true;
   webEmptyState.hidden = false;
   frame.src = 'about:blank';
@@ -379,8 +387,9 @@ async function stopWebPackageShare() {
 }
 
 window.addEventListener('message', async (message) => {
+  if (!isTrustedPluginMessage(message, frame.contentWindow, frameOrigin)) return;
   if (message.data?.type === 'gm-plugin:bootstrap-request') {
-    postBootstrap(message.source);
+    postBootstrap();
     return;
   }
   if (message.data?.type !== 'gm-plugin:request') return;
@@ -388,7 +397,7 @@ window.addEventListener('message', async (message) => {
   log('REQUEST', { method: request?.method, params: summarize(request?.params) });
   const response = await handleBridgeRequest(request);
   log(response.ok ? 'RESPONSE' : 'ERROR', response.ok ? response.result : response.error);
-  message.source?.postMessage({ type: 'gm-plugin:response', response }, '*');
+  frame.contentWindow?.postMessage({ type: 'gm-plugin:response', response }, frameOrigin);
 });
 
 async function runWebPlugin() {
@@ -397,17 +406,28 @@ async function runWebPlugin() {
     return;
   }
   try {
+    const web = selectedWebPlugin();
+    if (!web) throw new Error('Selected Web plugin is unavailable');
     const entry = await invoke('resolve_web_entry', { path: webPlugin.value });
+    activeWebPlugin = web;
+    frameOrigin = new URL(entry).origin;
+    sessionToken = crypto.randomUUID();
+    subscriptions.clear();
     webActive = true;
     frame.hidden = false;
     webEmptyState.hidden = true;
     shareButton.disabled = false;
     document.querySelector('#run-web').disabled = false;
     webState.textContent = '加载中';
-    frame.src = `${entry}?studioGeneration=${Date.now()}`;
+    const entryUrl = new URL(entry);
+    entryUrl.searchParams.set('studioGeneration', Date.now());
+    entryUrl.searchParams.set('studioOrigin', window.location.origin);
+    frame.src = entryUrl.href;
     updatePairStatus();
   } catch (error) {
     webActive = false;
+    activeWebPlugin = null;
+    frameOrigin = null;
     frame.hidden = true;
     webEmptyState.hidden = false;
     webState.textContent = '加载失败';
@@ -472,6 +492,10 @@ async function handleBridgeRequest(request) {
 }
 
 async function dispatch(method, params) {
+  if (!hasBridgePermission(method, activeWebPlugin?.permissions)) {
+    throw bridgeError('UNAUTHORIZED', `Plugin manifest does not grant ${method}`);
+  }
+  const storage = () => storageNamespace(storageNamespaces, activeWebPlugin?.id);
   switch (method) {
     case 'runtime.ready':
     case 'runtime.ping': return { ready: true, generation: runtimeGeneration };
@@ -493,10 +517,10 @@ async function dispatch(method, params) {
     case 'display.beginFrame':
     case 'display.updateFrameImageLz4': return sendDisplayMessage(method, params);
     case 'display.rebuildPage': return rebuildPage(params);
-    case 'storage.get': return { value: storage.get(requireString(params, 'key')) ?? null };
-    case 'storage.set': storage.set(requireString(params, 'key'), structuredClone(params.value)); return { stored: true };
-    case 'storage.remove': return { removed: storage.delete(requireString(params, 'key')) };
-    case 'storage.clear': storage.clear(); return { cleared: true };
+    case 'storage.get': return { value: storage().get(requireString(params, 'key')) ?? null };
+    case 'storage.set': storage().set(requireString(params, 'key'), structuredClone(params.value)); return { stored: true };
+    case 'storage.remove': return { removed: storage().delete(requireString(params, 'key')) };
+    case 'storage.clear': storage().clear(); return { cleared: true };
     default: throw bridgeError('METHOD_NOT_FOUND', `Desktop simulator does not support ${method}`);
   }
 }
@@ -602,7 +626,7 @@ function emitDeviceEvent(name, data) {
   frame.contentWindow?.postMessage({
     type: 'gm-plugin:event',
     event: { name, subscriptionIds: ids, data, runtimeGeneration },
-  }, '*');
+  }, frameOrigin);
 }
 
 function validateEnvelope(request) {
@@ -613,8 +637,11 @@ function validateEnvelope(request) {
   }
 }
 
-function postBootstrap(target = frame.contentWindow) {
-  target?.postMessage({ type: 'gm-plugin:bootstrap', bootstrap }, '*');
+function postBootstrap() {
+  frame.contentWindow?.postMessage({
+    type: 'gm-plugin:bootstrap',
+    bootstrap: { sessionToken, runtimeGeneration },
+  }, frameOrigin);
 }
 
 function drawFrame(result) {

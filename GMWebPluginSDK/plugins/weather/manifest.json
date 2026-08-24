@@ -15,7 +15,8 @@
   "deviceRequirements": {
     "preferredPluginId": "com.gm.example.web-bridge",
     "protocols": [
-      { "id": "gm.scene", "minVersion": "1.0" }
+      { "id": "gm.scene", "minVersion": "1.0" },
+      { "id": "gm.scene-lz4", "minVersion": "1.0" }
     ]
   }
 }

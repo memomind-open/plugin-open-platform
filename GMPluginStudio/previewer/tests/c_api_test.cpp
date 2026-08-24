@@ -63,6 +63,11 @@ int main(int argc, char **argv)
         assert(handled == 1);
         assert(gm_preview_tick(handle, 33) == 1);
         assert(gm_preview_copy_frame(handle, frame.data(), frame.size()) == 1);
+        assert(gm_preview_send_button(handle, 3, 1, &handled) == 1);
+        assert(handled == 1);
+        assert(gm_preview_is_running(handle) == 0);
+        assert(gm_preview_tick(handle, 33) == 1);
+        assert(gm_preview_is_running(handle) == 0);
         assert(gm_preview_stop(handle) == 1);
     }
 
@@ -86,8 +91,17 @@ int main(int argc, char **argv)
         const uint32_t frame_id = 1;
         std::vector<uint8_t> begin;
         append_be32(begin, frame_id);
-        append_be16(begin, 1);
+        append_be16(begin, 2);
         assert(gm_preview_send_bluetooth(handle, 8, begin.data(), begin.size(), &handled) == 1);
+        assert(handled == 1);
+        assert(gm_preview_outbox_count(handle) == 1);
+        assert(gm_preview_outbox_channel(handle, 0, &channel) == 1);
+        assert(channel == 0x0104);
+        assert(gm_preview_clear_outbox(handle) == 1);
+
+        const uint8_t malformed_begin[] = {0, 0, 0, 2, 0};
+        assert(gm_preview_send_bluetooth(handle, 8, malformed_begin,
+                                         sizeof(malformed_begin), &handled) == 1);
         assert(handled == 1);
         assert(gm_preview_outbox_count(handle) == 1);
         assert(gm_preview_outbox_channel(handle, 0, &channel) == 1);
@@ -116,9 +130,31 @@ int main(int argc, char **argv)
         assert(gm_preview_outbox_channel(handle, 0, &channel) == 1);
         assert(channel == 0x0104);
         assert(gm_preview_copy_frame(handle, frame.data(), frame.size()) == 1);
+        assert(frame[0] == 0);
+        assert(frame[(height - 1) * 600u + width - 1] == 0);
+        assert(gm_preview_clear_outbox(handle) == 1);
+
+        std::vector<uint8_t> final_tile;
+        append_be32(final_tile, frame_id);
+        append_be16(final_tile, 1);
+        append_be16(final_tile, width);
+        append_be16(final_tile, 0);
+        append_be16(final_tile, width);
+        append_be16(final_tile, height);
+        append_be16(final_tile, stride);
+        append_be32(final_tile, decoded_size);
+        const std::vector<uint8_t> final_compressed = lz4_literal_block(decoded_size, 0x88);
+        final_tile.insert(final_tile.end(), final_compressed.begin(), final_compressed.end());
+        assert(gm_preview_send_bluetooth(handle, 9, final_tile.data(), final_tile.size(), &handled) == 1);
+        assert(handled == 1);
+        assert(gm_preview_outbox_count(handle) == 1);
+        assert(gm_preview_outbox_channel(handle, 0, &channel) == 1);
+        assert(channel == 0x0104);
+        assert(gm_preview_copy_frame(handle, frame.data(), frame.size()) == 1);
         assert(frame[0] == 0x77);
         assert(frame[(height - 1) * 600u + width - 1] == 0x77);
-        assert(frame[width] == 0);
+        assert(frame[width] == 0x88);
+        assert(frame[(height - 1) * 600u + width * 2u - 1] == 0x88);
         assert(gm_preview_clear_outbox(handle) == 1);
 
         assert(gm_preview_send_button(handle, 1, 1, &handled) == 1);

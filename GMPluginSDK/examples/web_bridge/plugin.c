@@ -520,11 +520,8 @@ static void handle_frame_begin(web_bridge_context_t *self,
                                const uint8_t *data, uint32_t length)
 {
     uint32_t frame_id = length >= 4U ? read_u32(data) : 0U;
-    uint16_t tile_count;
+    uint16_t tile_count = 0U;
     uint8_t status = FRAME_STATUS_OK;
-    self->frame_active = false;
-    self->frame_tile_count = 0;
-    self->frame_next_tile = 0;
     if (length != 6U) {
         status = FRAME_STATUS_INVALID_PAYLOAD;
     } else if (self->lz4 == 0) {
@@ -534,6 +531,9 @@ static void handle_frame_begin(web_bridge_context_t *self,
         if (tile_count == 0U || tile_count > WEB_BRIDGE_MAX_FRAME_TILES) {
             status = FRAME_STATUS_INVALID_PAYLOAD;
         } else {
+            /* Commit the new frame only after the complete begin message has
+             * passed validation. A malformed retry must not cancel the frame
+             * that is currently receiving tiles. */
             self->frame_id = frame_id;
             self->frame_tile_count = tile_count;
             self->frame_next_tile = 0;
@@ -542,7 +542,7 @@ static void handle_frame_begin(web_bridge_context_t *self,
         }
     }
     (void)send_frame_status(self, frame_id, UINT16_MAX,
-                            self->frame_active ? 0U : self->frame_next_tile,
+                            status == FRAME_STATUS_OK ? 0U : self->frame_next_tile,
                             status, false);
 }
 

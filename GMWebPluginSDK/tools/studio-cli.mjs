@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, resolve, sep } from 'node:path';
+import { extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { resolveServedFile } from './studio-paths.mjs';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const options = parseArguments(process.argv.slice(2));
@@ -32,8 +34,8 @@ const server = createServer((request, response) => {
     let relative = decodedPath.slice(prefix.length);
     if (decodedPath === '/') relative = 'index.html';
     if (decodedPath === '/plugin/') relative = 'index.html';
-    const file = resolve(root, relative);
-    if (!inside(root, file) || !existsSync(file) || !statSync(file).isFile()) return notFound(response);
+    const file = resolveServedFile(root, relative);
+    if (!file) return notFound(response);
     response.writeHead(200, {
       'Content-Type': mimeType(file),
       'Cache-Control': 'no-store',
@@ -67,11 +69,6 @@ function parseArguments(arguments_) {
   }
   if (!Number.isInteger(result.port) || result.port < 1 || result.port > 65535) throw new Error('port must be 1..65535');
   return result;
-}
-
-function inside(root, file) {
-  const normalizedRoot = resolve(root);
-  return file === normalizedRoot || file.startsWith(`${normalizedRoot}${sep}`);
 }
 
 function notFound(response) {

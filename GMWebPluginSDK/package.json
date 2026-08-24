@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "node tools/studio-cli.mjs --plugin examples/counter",
     "build:devkit": "node tools/build-devkit.mjs",
+    "sync:vendor-sdk": "node tools/sync-vendored-sdk.mjs",
     "pack:plugin": "node tools/build-mmpkg.mjs",
     "test": "node --test packages/*/test/*.test.mjs tools/test/*.test.mjs",
     "check": "node tools/check.mjs",

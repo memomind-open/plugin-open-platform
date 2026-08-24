@@ -172,6 +172,7 @@ private:
     std::vector<std::string> logs_;
     std::vector<BluetoothMessage> bt_outbox_;
     std::vector<uint8_t> frame_;
+    std::vector<uint8_t> presented_framebuffer_;
     std::vector<TextOverlay> text_overlays_;
     std::vector<uint8_t> font_default_data_;
     std::vector<uint8_t> font_large_data_;
@@ -183,6 +184,7 @@ private:
     void invokeVoid(uint32_t callback, const std::vector<uint32_t> &arguments);
     int32_t invokeResult(uint32_t callback, const std::vector<uint32_t> &arguments);
     bool dispatchEvent(uint16_t type);
+    void honorExitRequest();
     void validateCallback(uint32_t callback) const;
 
     uint32_t allocate(uint32_t size);
