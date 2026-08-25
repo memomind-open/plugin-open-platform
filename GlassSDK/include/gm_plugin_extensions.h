@@ -10,22 +10,8 @@
  * the meaning of an existing ID. An incompatible table needs a new ID while
  * firmware continues serving the old table for already-built plugins.
  */
-#define GM_PLUGIN_EXTENSION_DEMO UINT32_C(1)
+#define GM_PLUGIN_EXTENSION_RESERVED_1 UINT32_C(1)
 #define GM_PLUGIN_EXTENSION_LZ4 UINT32_C(2)
-
-/* Minimal end-to-end example for adding a future extension. Real extensions
- * should define a descriptive table type and allocate a new ID above. Once an
- * ID is published, keep its table layout and behavior available forever. */
-typedef struct gm_plugin_demo_extension_api {
-    /**
-     * Demonstration operation that adds two signed integers.
-     * @param left Left operand.
-     * @param right Right operand.
-     * @return `left + right`. This demo assumes the sum is representable by
-     *         int32_t; callers must avoid signed overflow.
-     */
-    int32_t (*add)(int32_t left, int32_t right);
-} gm_plugin_demo_extension_api_t;
 
 /**
  * Raw LZ4 block compression services.

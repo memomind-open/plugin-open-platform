@@ -32,6 +32,10 @@ size_t gm_preview_frame_size(void);
 int gm_preview_copy_frame(gm_preview_handle *handle, uint8_t *output,
                           size_t output_size);
 size_t gm_preview_outbox_count(const gm_preview_handle *handle);
+int gm_preview_outbox_service(const gm_preview_handle *handle, size_t index,
+                              uint8_t *service);
+int gm_preview_outbox_command(const gm_preview_handle *handle, size_t index,
+                              uint8_t *command);
 int gm_preview_outbox_channel(const gm_preview_handle *handle, size_t index,
                               uint16_t *channel);
 size_t gm_preview_outbox_payload_size(const gm_preview_handle *handle,

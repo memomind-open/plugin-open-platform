@@ -18,6 +18,9 @@ use tiny_http::{Header, Response, Server, StatusCode};
 const DISPLAY_WIDTH: usize = 600;
 const DISPLAY_HEIGHT: usize = 350;
 const MAX_PLUGIN_PAYLOAD_BYTES: usize = 81_901;
+const PLUGIN_SERVICE_ID: u8 = 0x0f;
+const PLUGIN_COMMAND_PHONE_TO_GLASSES: u8 = 0x28;
+const PLUGIN_COMMAND_GLASSES_TO_PHONE: u8 = 0x29;
 const MAX_MMPKG_BYTES: u64 = 10 * 1024 * 1024;
 const MAX_MMPKG_EXTRACTED_BYTES: u64 = 30 * 1024 * 1024;
 const MAX_MMPKG_FILES: usize = 500;
@@ -69,6 +72,16 @@ extern "C" {
         output_size: usize,
     ) -> c_int;
     fn gm_preview_outbox_count(handle: *const c_void) -> usize;
+    fn gm_preview_outbox_service(
+        handle: *const c_void,
+        index: usize,
+        service: *mut c_uchar,
+    ) -> c_int;
+    fn gm_preview_outbox_command(
+        handle: *const c_void,
+        index: usize,
+        command: *mut c_uchar,
+    ) -> c_int;
     fn gm_preview_outbox_channel(handle: *const c_void, index: usize, channel: *mut u16) -> c_int;
     fn gm_preview_outbox_payload_size(handle: *const c_void, index: usize) -> usize;
     fn gm_preview_copy_outbox_payload(
@@ -393,6 +406,8 @@ struct PreviewStatus {
 struct PluginMessageResult {
     sent: bool,
     handled: bool,
+    service: u8,
+    command: u8,
     channel: u16,
     payload_bytes: usize,
 }
@@ -415,6 +430,8 @@ struct FrameResult {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct OutboundMessage {
+    service: u8,
+    command: u8,
     channel: u16,
     data_base64: String,
 }
@@ -1642,6 +1659,8 @@ fn send_plugin_message(
     Ok(PluginMessageResult {
         sent: true,
         handled: handled != 0,
+        service: PLUGIN_SERVICE_ID,
+        command: PLUGIN_COMMAND_PHONE_TO_GLASSES,
         channel,
         payload_bytes: payload.len(),
     })
@@ -1748,6 +1767,21 @@ fn drain_outbox(previewer: &NativePreviewer) -> Result<Vec<OutboundMessage>, Str
     let count = unsafe { gm_preview_outbox_count(previewer.handle.as_ptr()) };
     let mut messages = Vec::with_capacity(count);
     for index in 0..count {
+        let mut service = 0u8;
+        let service_read = unsafe {
+            gm_preview_outbox_service(previewer.handle.as_ptr(), index, &mut service)
+        };
+        previewer.require(service_read)?;
+        let mut command = 0u8;
+        let command_read = unsafe {
+            gm_preview_outbox_command(previewer.handle.as_ptr(), index, &mut command)
+        };
+        previewer.require(command_read)?;
+        if service != PLUGIN_SERVICE_ID || command != PLUGIN_COMMAND_GLASSES_TO_PHONE {
+            return Err(format!(
+                "unexpected plugin uplink service=0x{service:02x} command=0x{command:02x}"
+            ));
+        }
         let mut channel = 0u16;
         let channel_read =
             unsafe { gm_preview_outbox_channel(previewer.handle.as_ptr(), index, &mut channel) };
@@ -1764,6 +1798,8 @@ fn drain_outbox(previewer: &NativePreviewer) -> Result<Vec<OutboundMessage>, Str
         };
         previewer.require(copied)?;
         messages.push(OutboundMessage {
+            service,
+            command,
             channel,
             data_base64: BASE64.encode(payload),
         });

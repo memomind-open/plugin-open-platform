@@ -23,10 +23,14 @@ test('Bridge v1 contract contains unique methods and events', () => {
   assert.equal(isMethodName('display.beginFrame'), true);
   assert.equal(isMethodName('display.updateFrameImageLz4'), true);
   assert.equal(isMethodName('private.method'), false);
+  assert.equal(EVENT_NAMES.includes('plugin.message'), true);
 });
 
 test('Plugin message transport exposes the firmware payload limit', () => {
-  assert.deepEqual(PLUGIN_MESSAGE_PROFILE, { maxPayloadBytes: 81901 });
+  assert.deepEqual(PLUGIN_MESSAGE_PROFILE, {
+    maxPayloadBytes: 81901,
+    uplinkEvent: 'plugin.message',
+  });
   assert.equal(CAPABILITIES.pluginMessaging, PLUGIN_MESSAGE_PROFILE);
 });
 

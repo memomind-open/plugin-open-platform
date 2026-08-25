@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createGMPlugin, GMPluginError, ParentFrameTransport } from '../src/index.js';
+import {
+  AppWebViewTransport,
+  createGMPlugin,
+  GMPluginError,
+  ParentFrameTransport,
+} from '../src/index.js';
 
 class FakeTransport {
   constructor() {
@@ -65,6 +70,126 @@ test('SDK filters stale events and exposes typed helpers', async () => {
   transport.emit({ name: 'device.imuGesture', data: { gesture: 'headRaise' }, runtimeGeneration: 6 });
   transport.emit({ name: 'device.imuGesture', data: { gesture: 'headLower' }, runtimeGeneration: 7 });
   assert.deepEqual(gestures, ['headLower']);
+});
+
+test('SDK exposes glasses-to-Web plugin messages as Uint8Array values', async () => {
+  const transport = new FakeTransport();
+  const gm = createGMPlugin({ transport });
+  await gm.ready();
+  const messages = [];
+  const offMessage = gm.plugin.onMessage((message) => messages.push(message));
+
+  transport.emit({
+    name: 'plugin.message',
+    data: { channel: 0x4648, dataBase64: 'AQIDBA==' },
+    runtimeGeneration: 6,
+  });
+  transport.emit({
+    name: 'plugin.message',
+    data: { channel: 0x4648, dataBase64: 'AQIDBA==' },
+    runtimeGeneration: 7,
+  });
+
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].channel, 0x4648);
+  assert.deepEqual(messages[0].data, Uint8Array.of(1, 2, 3, 4));
+
+  offMessage();
+  transport.emit({
+    name: 'plugin.message',
+    data: { channel: 0x4648, dataBase64: 'BQ==' },
+    runtimeGeneration: 7,
+  });
+  assert.equal(messages.length, 1);
+});
+
+test('SDK isolates invalid plugin message event payloads', async () => {
+  const transport = new FakeTransport();
+  const gm = createGMPlugin({ transport });
+  await gm.ready();
+  const messages = [];
+  gm.plugin.onMessage((message) => messages.push(message));
+
+  const invalidEvents = [
+    { channel: 0x10000, dataBase64: 'AQ==' },
+    { channel: 0x4648, dataBase64: 'not-base64!' },
+    { channel: 0x4648, dataBase64: '' },
+  ];
+  for (const data of invalidEvents) {
+    assert.doesNotThrow(() => transport.emit({
+      name: 'plugin.message',
+      data,
+      runtimeGeneration: 7,
+    }));
+  }
+
+  const oversizedBase64 = Buffer.alloc(81902).toString('base64');
+  const originalBuffer = globalThis.Buffer;
+  let decodeAttempted = false;
+  globalThis.Buffer = { from: () => { decodeAttempted = true; return Uint8Array.of(); } };
+  try {
+    assert.doesNotThrow(() => transport.emit({
+      name: 'plugin.message',
+      data: { channel: 0x4648, dataBase64: oversizedBase64 },
+      runtimeGeneration: 7,
+    }));
+  } finally {
+    globalThis.Buffer = originalBuffer;
+  }
+  assert.equal(decodeAttempted, false);
+  assert.equal(messages.length, 0);
+
+  const boundaryPayload = Uint8Array.from(
+    { length: 81901 },
+    (_, index) => (index * 37 + 11) & 0xff,
+  );
+  transport.emit({
+    name: 'plugin.message',
+    data: { channel: 0x4648, dataBase64: Buffer.from(boundaryPayload).toString('base64') },
+    runtimeGeneration: 7,
+  });
+  assert.equal(messages.length, 1);
+  assert.deepEqual(messages[0].data, boundaryPayload);
+
+  assert.throws(
+    () => gm.plugin.onMessage(null),
+    (error) => error instanceof GMPluginError && error.code === 'INVALID_REQUEST',
+  );
+});
+
+test('App WebView bridge delivers native plugin.message events', () => {
+  const globalObject = {
+    MemoPluginBridge: { postMessage: () => {} },
+  };
+  const transport = new AppWebViewTransport({ globalObject });
+  const gm = createGMPlugin({ transport });
+  const messages = [];
+  gm.plugin.onMessage((message) => messages.push(message));
+
+  globalObject.__memoPluginEmit({
+    name: 'plugin.message',
+    data: { channel: 0x4648, dataBase64: 'AQ==' },
+    runtimeGeneration: 3,
+  });
+  assert.equal(messages.length, 0);
+
+  globalObject.__memoPluginBootstrap('app-session', 3);
+  globalObject.__memoPluginEmit({
+    name: 'plugin.message',
+    data: { channel: 0x4648, dataBase64: 'CQgHBg==' },
+    runtimeGeneration: 2,
+  });
+  globalObject.__memoPluginEmit({
+    name: 'plugin.message',
+    data: { channel: 0x4648, dataBase64: 'CQgHBg==' },
+    runtimeGeneration: 3,
+  });
+
+  assert.equal(messages.length, 1);
+  assert.deepEqual(messages[0], {
+    channel: 0x4648,
+    data: Uint8Array.of(9, 8, 7, 6),
+  });
 });
 
 test('SDK uses refreshed bootstrap credentials after a runtime replacement', async () => {

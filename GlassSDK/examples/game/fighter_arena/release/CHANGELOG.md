@@ -2,6 +2,8 @@
 
 ## 0.1.0-beta.22
 
+- Corrected hurt-sheet orientation metadata so each fighter's head and torso
+  fall away from the attacker during recoil, knockdown, and KO animations.
 - Replaced both human fighter identities with original music-and-cosmos mascot
   characters while keeping the existing 12 combat poses, four reaction poses,
   collision spacing, and 112 x 98 runtime frame format.

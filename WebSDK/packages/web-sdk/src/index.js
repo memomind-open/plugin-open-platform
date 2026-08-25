@@ -1,5 +1,8 @@
 import { BRIDGE_VERSION, EVENT_NAMES, PLUGIN_MESSAGE_PROFILE } from '@memomind/gm-plugin-bridge-contract';
 
+const MAX_PLUGIN_MESSAGE_BASE64_CHARACTERS =
+  Math.ceil(PLUGIN_MESSAGE_PROFILE.maxPayloadBytes / 3) * 4;
+
 export class GMPluginError extends Error {
   constructor(code, message) {
     super(message);
@@ -224,7 +227,7 @@ export function createGMPlugin({ transport = detectTransport(), timeoutMs = 5000
   };
 
   transport.subscribe((event) => {
-    if (bootstrapData && event.runtimeGeneration !== bootstrapData.runtimeGeneration) return;
+    if (!bootstrapData || event.runtimeGeneration !== bootstrapData.runtimeGeneration) return;
     const listeners = eventListeners.get(event.name);
     if (!listeners) return;
     for (const listener of listeners) listener(event.data, event);
@@ -289,6 +292,21 @@ export function createGMPlugin({ transport = detectTransport(), timeoutMs = 5000
         }
         return call('plugin.sendMessage', { channel, dataBase64: encodeBytes(data) });
       },
+      onMessage: (listener) => {
+        if (typeof listener !== 'function') {
+          throw new GMPluginError('INVALID_REQUEST', 'plugin message listener must be a function');
+        }
+        return on('plugin.message', (data, event) => {
+          let message;
+          try {
+            message = decodePluginMessage(data);
+          } catch (error) {
+            if (error instanceof GMPluginError) return;
+            throw error;
+          }
+          listener(message, event);
+        });
+      },
     },
     close: () => transport.close?.(),
   };
@@ -301,6 +319,50 @@ function encodeBytes(value) {
     binary += String.fromCharCode(...value.subarray(offset, offset + 0x8000));
   }
   return globalThis.btoa(binary);
+}
+
+function decodePluginMessage(value) {
+  const channel = value?.channel;
+  if (!Number.isInteger(channel) || channel < 0 || channel > 0xffff) {
+    throw new GMPluginError('INVALID_REQUEST', 'plugin message event channel must be uint16');
+  }
+  const encoded = value?.dataBase64;
+  if (typeof encoded !== 'string' || encoded.length === 0 || encoded.length % 4 !== 0) {
+    throw new GMPluginError('INVALID_REQUEST', 'plugin message event dataBase64 must be non-empty valid base64');
+  }
+  if (encoded.length > MAX_PLUGIN_MESSAGE_BASE64_CHARACTERS) {
+    throw new GMPluginError(
+      'PAYLOAD_TOO_LARGE',
+      `plugin message event data exceeds ${PLUGIN_MESSAGE_PROFILE.maxPayloadBytes} bytes`,
+    );
+  }
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) {
+    throw new GMPluginError('INVALID_REQUEST', 'plugin message event dataBase64 must be non-empty valid base64');
+  }
+  const paddingBytes = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0;
+  const decodedLength = encoded.length / 4 * 3 - paddingBytes;
+  if (decodedLength > PLUGIN_MESSAGE_PROFILE.maxPayloadBytes) {
+    throw new GMPluginError(
+      'PAYLOAD_TOO_LARGE',
+      `plugin message event data exceeds ${PLUGIN_MESSAGE_PROFILE.maxPayloadBytes} bytes`,
+    );
+  }
+  try {
+    const data = typeof Buffer !== 'undefined'
+      ? Uint8Array.from(Buffer.from(encoded, 'base64'))
+      : Uint8Array.from(globalThis.atob(encoded), (character) => character.charCodeAt(0));
+    if (data.length === 0) throw new Error('empty');
+    if (data.length > PLUGIN_MESSAGE_PROFILE.maxPayloadBytes) {
+      throw new GMPluginError(
+        'PAYLOAD_TOO_LARGE',
+        `plugin message event data exceeds ${PLUGIN_MESSAGE_PROFILE.maxPayloadBytes} bytes`,
+      );
+    }
+    return { channel, data };
+  } catch (error) {
+    if (error instanceof GMPluginError) throw error;
+    throw new GMPluginError('INVALID_REQUEST', 'plugin message event dataBase64 must be non-empty valid base64');
+  }
 }
 
 function detectTransport() {

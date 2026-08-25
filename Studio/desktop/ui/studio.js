@@ -1,9 +1,11 @@
 import {
   decodeBase64,
-  decodeDeviceMessage,
+  decodeGlassesMessage,
   DISPLAY_CAPABILITIES,
+  encodePluginBridgeEventData,
   encodeSceneMessage,
   EVENT_CAPABILITIES,
+  PLUGIN_TRANSPORT,
   SCENE_CHANNELS,
 } from './scene-protocol.js';
 import {
@@ -596,6 +598,10 @@ async function rebuildPage(params) {
 async function sendNativeMessage(channel, payload) {
   if (!deviceRunning) throw bridgeError('DEVICE_DISCONNECTED', 'Device plugin is not running');
   const result = await invoke('send_plugin_message', { channel, payload: [...payload] });
+  if (result.service !== PLUGIN_TRANSPORT.service ||
+      result.command !== PLUGIN_TRANSPORT.phoneToGlassesCommand) {
+    throw bridgeError('INTERNAL_ERROR', 'Studio returned an invalid phone-to-glasses route');
+  }
   if (!result.handled) throw bridgeError('CAPABILITY_UNAVAILABLE', `Device plugin did not handle channel ${channel}`);
   return result;
 }
@@ -626,6 +632,18 @@ function emitDeviceEvent(name, data) {
   frame.contentWindow?.postMessage({
     type: 'gm-plugin:event',
     event: { name, subscriptionIds: ids, data, runtimeGeneration },
+  }, frameOrigin);
+}
+
+function emitPluginMessage(message) {
+  if (!webActive) return;
+  frame.contentWindow?.postMessage({
+    type: 'gm-plugin:event',
+    event: {
+      name: 'plugin.message',
+      data: encodePluginBridgeEventData(message),
+      runtimeGeneration,
+    },
   }, frameOrigin);
 }
 
@@ -692,7 +710,7 @@ setInterval(async () => {
 
 function consumeOutboundMessage(encoded) {
   try {
-    const message = decodeDeviceMessage(encoded.channel, decodeBase64(encoded.dataBase64));
+    const message = decodeGlassesMessage(encoded);
     for (const waiter of outboundWaiters) {
       if (!waiter.predicate(message)) continue;
       outboundWaiters.delete(waiter);
@@ -707,6 +725,7 @@ function consumeOutboundMessage(encoded) {
       });
     } else if (message.kind === 'plugin') {
       log('DEVICE MESSAGE', { channel: message.channel, payloadBytes: message.payload.length });
+      emitPluginMessage(message);
     }
   } catch (error) {
     log('DEVICE MESSAGE ERROR', normalizeBridgeError(error));

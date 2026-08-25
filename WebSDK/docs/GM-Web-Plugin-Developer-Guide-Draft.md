@@ -662,6 +662,23 @@ console.log(result.sent);
 console.log(result.payloadBytes);
 ```
 
+To receive a generic binary message from the currently running glasses plugin:
+
+```js
+const offMessage = gm.plugin.onMessage(({ channel, data }) => {
+  if (channel === 0x4648) {
+    console.log([...data]);
+  }
+});
+```
+
+The corresponding Bridge v1 event is `plugin.message`, with wire data
+`{ channel, dataBase64 }`. The SDK validates the event and decodes `dataBase64`
+to `Uint8Array`. This event is delivered independently of
+`device.subscribeEvents` and does not require a manifest permission. The host
+must attach the active `runtimeGeneration`; stale-generation events are
+discarded by the SDK.
+
 `channel` 必须是 `0..65535` 的整数，payload 必须为非空 `Uint8Array`，最大 81901 字节。
 此方法不要求 manifest 权限，也不会安装或切换 GMP；消息只发送给当前运行的设备插件。
 成功返回只表示底层 GM 命令已收到 ACK，不表示设备插件的业务逻辑已经处理完成。

@@ -395,7 +395,8 @@ typedef struct gm_plugin_host_api {
      * @param channel Application-defined channel delivered unchanged to the
      *        phone. Channel allocation is part of the plugin/phone contract.
      * @param data Non-NULL payload bytes; ownership remains with the plugin.
-     * @param length Non-zero payload length that fits one Host transport packet.
+     * @param length Non-zero payload length that fits one logical GM message;
+     *        the transport fragments larger payloads automatically.
      * @return GM_PLUGIN_OK on success, GM_PLUGIN_EINVAL for an invalid pointer,
      *         zero/oversized message, GM_PLUGIN_ENOMEM if packet construction
      *         fails, or GM_PLUGIN_EIO if the transport rejects the packet.

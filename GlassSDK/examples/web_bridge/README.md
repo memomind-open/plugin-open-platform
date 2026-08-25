@@ -80,7 +80,8 @@ must be presented immediately.
 
 ## Uplink event protocol
 
-The channels below are the new glasses-to-phone event protocol.
+The channels below use GM plugin service `0x0F`, glasses-to-phone command
+`0x29`. Phone-to-glasses scene messages continue to use command `0x28`.
 
 ## Event header
 

@@ -31,9 +31,12 @@ if(BUILD_TESTING)
     endif()
     set(GM_PREVIEW_FIGHTER_GMP "${CMAKE_CURRENT_SOURCE_DIR}/../../GlassSDK/build-host/game/fighter_arena/fighter_arena.gmp")
     set(GM_PREVIEW_WEB_BRIDGE_GMP "${CMAKE_CURRENT_SOURCE_DIR}/../../GlassSDK/build-host/web_bridge/web_bridge.gmp")
-    if(EXISTS "${GM_PREVIEW_FIGHTER_GMP}" AND EXISTS "${GM_PREVIEW_WEB_BRIDGE_GMP}")
+    set(GM_PREVIEW_EXTENSION_GMP "${CMAKE_CURRENT_SOURCE_DIR}/../../GlassSDK/build-host/extension/extension.gmp")
+    if(EXISTS "${GM_PREVIEW_FIGHTER_GMP}" AND EXISTS "${GM_PREVIEW_WEB_BRIDGE_GMP}" AND
+       EXISTS "${GM_PREVIEW_EXTENSION_GMP}")
         add_test(NAME gmplugin-preview-c-api COMMAND gmplugin-preview-c-api-test
-            "${GM_PREVIEW_FIGHTER_GMP}" "${GM_PREVIEW_WEB_BRIDGE_GMP}")
+            "${GM_PREVIEW_FIGHTER_GMP}" "${GM_PREVIEW_WEB_BRIDGE_GMP}"
+            "${GM_PREVIEW_EXTENSION_GMP}")
     else()
         add_test(NAME gmplugin-preview-c-api COMMAND gmplugin-preview-c-api-test)
     endif()

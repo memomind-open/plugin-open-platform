@@ -1,11 +1,18 @@
 import { createGMPlugin } from './vendor/gm-plugin-web-sdk.esm.js';
-import { FighterInputAudio } from './audio.js';
-import { INPUT_CHANNEL, bytesToBase64, encodeInput } from './protocol.js';
+import { FighterAudio } from './audio.js';
+import {
+  EVENT_CHANNEL,
+  INPUT_CHANNEL,
+  bytesToBase64,
+  decodeFightEvent,
+  encodeInput,
+} from './protocol.js';
 
 const SEND_INTERVAL_MS = 50;
 
 const gm = createGMPlugin();
-const inputAudio = new FighterInputAudio();
+const gameAudio = new FighterAudio();
+gameAudio.setMusicPaused(true);
 const status = document.querySelector('#status');
 const statusText = status.querySelector('span');
 const telemetry = document.querySelector('#telemetry');
@@ -25,6 +32,13 @@ let pending = false;
 let stopped = false;
 const frameQueue = [];
 
+const offFightMessages = gm.plugin.onMessage((message) => {
+  const event = decodeFightEvent(message);
+  if (!event) return;
+  gameAudio.playGameEvent(event);
+  telemetry.dataset.lastEvent = `${EVENT_CHANNEL.toString(16)}:${event.sequence}:${event.type}`;
+});
+
 async function requestLandscape() {
   try {
     await screen.orientation?.lock?.('landscape');
@@ -40,6 +54,10 @@ document.addEventListener('pointerdown', requestLandscape, { once: true });
 function setStatus(text, state = '') {
   statusText.textContent = text;
   status.className = `status ${state}`.trim();
+}
+
+function syncMusicPlayback() {
+  gameAudio.setMusicPaused(paused || !connected || document.hidden);
 }
 
 function recomputeButtons() {
@@ -133,7 +151,7 @@ for (const control of controls) {
   control.addEventListener('pointerdown', (event) => {
     event.preventDefault();
     replayPressFeedback(control);
-    inputAudio.playInput(Number(control.dataset.bit));
+    gameAudio.playInput(Number(control.dataset.bit));
     control.setPointerCapture(event.pointerId);
     pointers.set(event.pointerId, Number(control.dataset.bit));
     if (recomputeButtons()) queueCurrentFrame();
@@ -146,13 +164,14 @@ for (const control of controls) {
 }
 
 pauseButton.addEventListener('click', () => {
-  inputAudio.playPause();
+  gameAudio.playPause();
   paused = !paused;
   pointers.clear();
   resetJoystick();
   recomputeButtons();
   pauseButton.classList.toggle('active', paused);
   pauseButton.textContent = paused ? 'RESUME' : 'PAUSE';
+  syncMusicPlayback();
   queueCurrentFrame();
 });
 
@@ -162,6 +181,7 @@ function pauseForLifecycle() {
   paused = true;
   pauseButton.classList.add('active');
   pauseButton.textContent = 'RESUME';
+  syncMusicPlayback();
   for (const control of controls) control.classList.remove('active');
   queueCurrentFrame();
 }
@@ -170,6 +190,7 @@ window.addEventListener('blur', pauseForLifecycle);
 window.addEventListener('pagehide', pauseForLifecycle);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) pauseForLifecycle();
+  else syncMusicPlayback();
 });
 
 function inputFrame() {
@@ -224,10 +245,12 @@ async function start() {
     await gm.ready();
     const info = await gm.device.getInfo();
     connected = Boolean(info.connected);
+    syncMusicPlayback();
     setStatus(connected ? 'Glasses connected' : 'Glasses disconnected', connected ? 'ready' : 'error');
     const subscription = await gm.device.subscribeEvents(['connection']);
     gm.device.onConnection((event) => {
       connected = Boolean(event.connected);
+      syncMusicPlayback();
       setStatus(connected ? 'Glasses connected' : 'Glasses disconnected', connected ? 'ready' : 'error');
       if (connected) queueCurrentFrame();
       else frameQueue.length = 0;
@@ -240,6 +263,8 @@ async function start() {
 
 window.addEventListener('pagehide', () => {
   stopped = true;
+  offFightMessages();
+  gameAudio.destroy();
   gm.close();
 });
 

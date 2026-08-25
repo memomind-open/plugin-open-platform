@@ -618,6 +618,14 @@ static uint8_t fighter_render_frame(const fighter_t *fighter)
     return (uint8_t)(0x80U | hurt_sprite_frame(fighter));
 }
 
+static bool hurt_uses_source_direction(uint8_t character, bool hurt_right)
+{
+    /* Source direction follows the head and torso, not the feet: Zen falls
+     * left in its hurt sheet, while Rival falls right. */
+    bool source_falls_right = character != 0U;
+    return hurt_right == source_falls_right;
+}
+
 static uint8_t tint_gray(uint8_t gray, uint8_t maximum)
 {
     if (gray == 0U) return 0U;
@@ -651,10 +659,9 @@ static void draw_fighter(gm_plugin_framebuffer_surface_t *surface,
                                    target_height);
     int16_t center = (int16_t)(fighter->x + FIGHTER_W * scale / 2 + camera_x);
     int16_t left = (int16_t)(center - target_width / 2);
-    if (hurt) {
-        bool source_falls_right = fighter->character == 0U;
-        draw_source_direction = fighter->hurt_right == source_falls_right;
-    }
+    if (hurt)
+        draw_source_direction = hurt_uses_source_direction(
+            fighter->character, fighter->hurt_right);
     for (source_y = 0; source_y < PF_SPRITE_HEIGHT; ++source_y) {
         uint8_t start = sprite_data[offset++];
         uint8_t length = sprite_data[offset++];

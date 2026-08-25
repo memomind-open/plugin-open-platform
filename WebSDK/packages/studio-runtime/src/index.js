@@ -209,6 +209,28 @@ export class StudioRuntime {
     this.emit('device.imuGesture', { gesture, active: Boolean(active), source: 'studio' });
   }
 
+  emitPluginMessage(channel, data) {
+    this.requireConnection();
+    if (!Number.isInteger(channel) || channel < 0 || channel > 0xffff) {
+      throw new StudioBridgeError('INVALID_REQUEST', 'channel must be uint16');
+    }
+    if (!(data instanceof Uint8Array) || data.length === 0) {
+      throw new StudioBridgeError('INVALID_REQUEST', 'data must be a non-empty Uint8Array');
+    }
+    if (data.length > PLUGIN_MESSAGE_PROFILE.maxPayloadBytes) {
+      throw new StudioBridgeError(
+        'PAYLOAD_TOO_LARGE',
+        `plugin message payload is ${data.length} bytes; max ${PLUGIN_MESSAGE_PROFILE.maxPayloadBytes}`,
+      );
+    }
+    const event = {
+      name: 'plugin.message',
+      data: { channel, dataBase64: encodeBytes(data) },
+      runtimeGeneration: this.runtimeGeneration,
+    };
+    for (const listener of this.eventListeners) listener(event);
+  }
+
   requireConnection() {
     if (!this.connected) throw new StudioBridgeError('DEVICE_DISCONNECTED', 'Device is disconnected');
   }
@@ -360,6 +382,15 @@ function decodePluginMessageBase64(value) {
   } catch {
     throw new StudioBridgeError('INVALID_REQUEST', 'dataBase64 must be non-empty valid base64');
   }
+}
+
+function encodeBytes(value) {
+  if (typeof Buffer !== 'undefined') return Buffer.from(value).toString('base64');
+  let binary = '';
+  for (let offset = 0; offset < value.length; offset += 0x8000) {
+    binary += String.fromCharCode(...value.subarray(offset, offset + 0x8000));
+  }
+  return globalThis.btoa(binary);
 }
 
 function imageGeometry(values) {
