@@ -1,6 +1,7 @@
 #include "previewer_c_api.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstdio>
 #include <cstdint>
@@ -36,6 +37,15 @@ std::vector<uint8_t> lz4_literal_block(size_t size, uint8_t value)
     }
     output.insert(output.end(), size, value);
     return output;
+}
+
+std::vector<uint8_t> plugin_message_payload(size_t size)
+{
+    std::vector<uint8_t> payload(size);
+    for (size_t index = 0; index < payload.size(); ++index) {
+        payload[index] = static_cast<uint8_t>((index * 37u + 11u) & 0xffu);
+    }
+    return payload;
 }
 
 } // namespace
@@ -93,6 +103,25 @@ int main(int argc, char **argv)
         assert(gm_preview_copy_outbox_payload(handle, 0, echo.data(), echo.size()) == 1);
         assert(echo == std::vector<uint8_t>(nonce, nonce + sizeof(nonce)));
         assert(gm_preview_clear_outbox(handle) == 1);
+
+        constexpr std::array<size_t, 3> boundary_sizes = {65535u, 65536u, 81901u};
+        for (const size_t payload_size : boundary_sizes) {
+            const std::vector<uint8_t> payload = plugin_message_payload(payload_size);
+            assert(gm_preview_send_bluetooth(handle, 0x7ffe, payload.data(), payload.size(), &handled) == 1);
+            assert(handled == 1);
+            assert(gm_preview_outbox_count(handle) == 1);
+            assert(gm_preview_outbox_service(handle, 0, &service) == 1);
+            assert(gm_preview_outbox_command(handle, 0, &command) == 1);
+            assert(service == 0x0f);
+            assert(command == 0x29);
+            assert(gm_preview_outbox_channel(handle, 0, &channel) == 1);
+            assert(channel == 0x7ffe);
+            assert(gm_preview_outbox_payload_size(handle, 0) == payload.size());
+            std::vector<uint8_t> echoed(payload.size());
+            assert(gm_preview_copy_outbox_payload(handle, 0, echoed.data(), echoed.size()) == 1);
+            assert(echoed == payload);
+            assert(gm_preview_clear_outbox(handle) == 1);
+        }
 
         const uint32_t frame_id = 1;
         std::vector<uint8_t> begin;
@@ -176,6 +205,12 @@ int main(int argc, char **argv)
         assert(gm_preview_outbox_channel(handle, 0, &channel) == 1);
         assert(channel == 0x0101);
         assert(gm_preview_clear_outbox(handle) == 1);
+        assert(gm_preview_stop(handle) == 1);
+    }
+
+    if (argc > 3) {
+        assert(gm_preview_load(handle, argv[3]) == 1);
+        assert(gm_preview_start(handle) == 1);
         assert(gm_preview_stop(handle) == 1);
     }
 

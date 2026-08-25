@@ -35,6 +35,26 @@ test('desktop routes glasses plugin messages only on uplink command 0x29', () =>
   });
 });
 
+test('desktop preserves supported plugin message boundary payloads', () => {
+  for (const size of [65535, 65536, 81901]) {
+    const payload = Uint8Array.from(
+      { length: size },
+      (_, index) => (index * 37 + 11) & 0xff,
+    );
+    const dataBase64 = Buffer.from(payload).toString('base64');
+    const decoded = decodeGlassesMessage({
+      service: 0x0f,
+      command: 0x29,
+      channel: 0x4648,
+      dataBase64,
+    });
+
+    assert.equal(decoded.payload.length, size);
+    assert.equal(Buffer.compare(Buffer.from(decoded.payload), Buffer.from(payload)), 0);
+    assert.deepEqual(encodePluginBridgeEventData(decoded), { channel: 0x4648, dataBase64 });
+  }
+});
+
 test('desktop Scene codec matches Aphrodite LZ4 Channel 7 framing', () => {
   const encoded = encodeSceneMessage('display.updateImageLz4', {
     x: 304, y: 16, width: 4, height: 2, stride: 2, decodedSize: 4,

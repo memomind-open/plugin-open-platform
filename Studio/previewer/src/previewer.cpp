@@ -28,7 +28,6 @@ enum TrapId : unsigned {
     LLineCreate, LLineSetPoints, LFontLineHeight, LTextGetSize,
     LTextGetNextLine, LSelectionStart, LSelectionEnd,
 
-    XDemoAdd = 200,
     XLz4Bound = 210, XLz4Compress, XLz4Decompress,
 };
 
@@ -397,7 +396,6 @@ void Previewer::buildHostTables()
     for (unsigned index = 0; index < 5; ++index)
         cpu_.memory.write32(kLvglTable + 96 + index * 4, trap(LFontLineHeight + index));
 
-    cpu_.memory.write32(kDemoExtension, trap(XDemoAdd));
     cpu_.memory.write32(kLz4Extension, trap(XLz4Bound));
     cpu_.memory.write32(kLz4Extension + 4, trap(XLz4Compress));
     cpu_.memory.write32(kLz4Extension + 8, trap(XLz4Decompress));
@@ -561,7 +559,9 @@ bool Previewer::simulateDirectionGesture(uint16_t gesture)
 
 bool Previewer::sendBluetooth(uint16_t channel, const std::vector<uint8_t> &payload)
 {
-    if (payload.size() > 81901u) throw std::runtime_error("simulated Bluetooth payload is too large");
+    if (payload.size() > kPluginMessageMaxPayloadBytes) {
+        throw std::runtime_error("simulated Bluetooth payload is too large");
+    }
     for (uint32_t i = 0; i < 20; ++i) cpu_.memory.write8(kEvent + i, 0);
     if (!payload.empty()) cpu_.memory.write(kEventPayload, payload.data(), payload.size());
     cpu_.memory.write16(kEvent + 8, channel);
@@ -684,7 +684,10 @@ bool Previewer::handleTrap(Rv32 &cpu, uint32_t address)
     case HBtSend: {
         const uint16_t channel = static_cast<uint16_t>(cpu.argument(0));
         const uint32_t data = cpu.argument(1), length = cpu.argument(2);
-        if (!data || length == 0 || length > 65535) { finish(static_cast<uint32_t>(GM_EINVAL)); return true; }
+        if (!data || length == 0 || length > kPluginMessageMaxPayloadBytes) {
+            finish(static_cast<uint32_t>(GM_EINVAL));
+            return true;
+        }
         if (!device_.connected) { finish(static_cast<uint32_t>(GM_EIO)); return true; }
         BluetoothMessage message;
         message.channel = channel;
@@ -736,8 +739,7 @@ bool Previewer::handleTrap(Rv32 &cpu, uint32_t address)
         const uint32_t extension_id = cpu.argument(0), output = cpu.argument(1);
         if (!output) { finish(static_cast<uint32_t>(GM_EINVAL)); return true; }
         uint32_t table = 0;
-        if (extension_id == 1) table = kDemoExtension;
-        else if (extension_id == 2) table = kLz4Extension;
+        if (extension_id == 2) table = kLz4Extension;
         cpu.memory.write32(output, table);
         finish(table ? OK : static_cast<uint32_t>(GM_ENOTSUP));
         return true;
@@ -847,7 +849,6 @@ bool Previewer::handleTrap(Rv32 &cpu, uint32_t address)
     case LSelectionStart: requireLvgl(); if (Node *o = node(cpu.argument(0))) o->selection_start = cpu.argument(1); finish(); return true;
     case LSelectionEnd: requireLvgl(); if (Node *o = node(cpu.argument(0))) o->selection_end = cpu.argument(1); finish(); return true;
 
-    case XDemoAdd: finish(cpu.argument(0) + cpu.argument(1)); return true;
     case XLz4Bound: {
         const int32_t size = static_cast<int32_t>(cpu.argument(0));
         finish(size > 0 && size <= 0x7e000000 ? static_cast<uint32_t>(size + size / 255 + 16) : 0);

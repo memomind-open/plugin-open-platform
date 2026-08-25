@@ -18,7 +18,7 @@ static gm_plugin_result_t extension_load(void *context)
 gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
                                    gm_plugin_descriptor_t *plugin)
 {
-    const void *api = 0;
+    const void *api = (const void *)(uintptr_t)1;
     gm_plugin_result_t result;
 
     if (host == 0 || plugin == 0 || host->log == 0 ||
@@ -28,6 +28,9 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         host->struct_size < GM_PLUGIN_HOST_API_MIN_SIZE ||
         plugin->struct_size < GM_PLUGIN_DESCRIPTOR_MIN_SIZE)
         return GM_PLUGIN_EVERSION;
+
+    result = host->extension_get(GM_PLUGIN_EXTENSION_RESERVED_1, &api);
+    if (result != GM_PLUGIN_ENOTSUP || api != 0) return GM_PLUGIN_EVERSION;
 
     result = host->extension_get(GM_PLUGIN_EXTENSION_LZ4, &api);
     if (result != GM_PLUGIN_OK) return result;

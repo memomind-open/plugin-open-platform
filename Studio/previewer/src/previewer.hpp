@@ -12,6 +12,7 @@ namespace gmpreview {
 inline constexpr uint8_t kPluginServiceId = 0x0f;
 inline constexpr uint8_t kPluginCommandPhoneToGlasses = 0x28;
 inline constexpr uint8_t kPluginCommandGlassesToPhone = 0x29;
+inline constexpr uint32_t kPluginMessageMaxPayloadBytes = 81901u;
 
 struct PackageInfo {
     uint16_t format_version = 0;
@@ -147,7 +148,6 @@ private:
     static constexpr uint32_t kLvglTable = kSystemBase + 0x100;
     static constexpr uint32_t kDescriptor = kSystemBase + 0x200;
     static constexpr uint32_t kEvent = kSystemBase + 0x300;
-    static constexpr uint32_t kDemoExtension = kSystemBase + 0x800;
     static constexpr uint32_t kLz4Extension = kSystemBase + 0x900;
     // Keep the maximum Bluetooth payload clear of all Host ABI tables.
     static constexpr uint32_t kEventPayload = kSystemBase + 0x1000;

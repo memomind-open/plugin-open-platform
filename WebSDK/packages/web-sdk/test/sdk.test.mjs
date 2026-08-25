@@ -103,20 +103,54 @@ test('SDK exposes glasses-to-Web plugin messages as Uint8Array values', async ()
   assert.equal(messages.length, 1);
 });
 
-test('SDK validates plugin message event payloads', async () => {
+test('SDK isolates invalid plugin message event payloads', async () => {
   const transport = new FakeTransport();
   const gm = createGMPlugin({ transport });
   await gm.ready();
-  gm.plugin.onMessage(() => {});
+  const messages = [];
+  gm.plugin.onMessage((message) => messages.push(message));
 
-  assert.throws(
-    () => transport.emit({
+  const invalidEvents = [
+    { channel: 0x10000, dataBase64: 'AQ==' },
+    { channel: 0x4648, dataBase64: 'not-base64!' },
+    { channel: 0x4648, dataBase64: '' },
+  ];
+  for (const data of invalidEvents) {
+    assert.doesNotThrow(() => transport.emit({
       name: 'plugin.message',
-      data: { channel: 0x10000, dataBase64: 'AQ==' },
+      data,
       runtimeGeneration: 7,
-    }),
-    (error) => error instanceof GMPluginError && error.code === 'INVALID_REQUEST',
+    }));
+  }
+
+  const oversizedBase64 = Buffer.alloc(81902).toString('base64');
+  const originalBuffer = globalThis.Buffer;
+  let decodeAttempted = false;
+  globalThis.Buffer = { from: () => { decodeAttempted = true; return Uint8Array.of(); } };
+  try {
+    assert.doesNotThrow(() => transport.emit({
+      name: 'plugin.message',
+      data: { channel: 0x4648, dataBase64: oversizedBase64 },
+      runtimeGeneration: 7,
+    }));
+  } finally {
+    globalThis.Buffer = originalBuffer;
+  }
+  assert.equal(decodeAttempted, false);
+  assert.equal(messages.length, 0);
+
+  const boundaryPayload = Uint8Array.from(
+    { length: 81901 },
+    (_, index) => (index * 37 + 11) & 0xff,
   );
+  transport.emit({
+    name: 'plugin.message',
+    data: { channel: 0x4648, dataBase64: Buffer.from(boundaryPayload).toString('base64') },
+    runtimeGeneration: 7,
+  });
+  assert.equal(messages.length, 1);
+  assert.deepEqual(messages[0].data, boundaryPayload);
+
   assert.throws(
     () => gm.plugin.onMessage(null),
     (error) => error instanceof GMPluginError && error.code === 'INVALID_REQUEST',
@@ -131,6 +165,13 @@ test('App WebView bridge delivers native plugin.message events', () => {
   const gm = createGMPlugin({ transport });
   const messages = [];
   gm.plugin.onMessage((message) => messages.push(message));
+
+  globalObject.__memoPluginEmit({
+    name: 'plugin.message',
+    data: { channel: 0x4648, dataBase64: 'AQ==' },
+    runtimeGeneration: 3,
+  });
+  assert.equal(messages.length, 0);
 
   globalObject.__memoPluginBootstrap('app-session', 3);
   globalObject.__memoPluginEmit({
