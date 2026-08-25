@@ -1,4 +1,4 @@
-# Bridge v1 API 概览
+# Bridge v1 API Overview
 
 ## Runtime
 
@@ -26,11 +26,25 @@
 - `display.updateFrameImageLz4`
 - `display.closePage`
 
-当前设备 profile 是 600×350、GRAY_4、30 Hz。文本、坐标和图片参数必须通过 SDK 校验；设备逻辑 ACK 不等于人眼已确认显示。
+The current device profile is 600×350, GRAY_4, at 30 Hz. Text, coordinate, and
+image parameters must pass SDK validation. A logical device acknowledgement
+does not mean that a user has visually confirmed the result.
 
-Scene Bridge 单次 payload 最大 81,901 B：Channel 6 原始 GRAY_4 使用 10 B 头，像素最多 81,891 B；Channel 7 raw LZ4 使用 14 B 头，压缩数据最多 81,887 B，并且解压后位图也不能超过 81,901 B。超限画面必须先拆成多个独立区块；LZ4 必须对每个区块分别压缩，不能压缩整屏后切割压缩数据。
+The Scene Bridge accepts at most 81,901 bytes in one payload. A Channel 6 raw
+GRAY_4 message uses a 10-byte header and may contain up to 81,891 image bytes.
+A Channel 7 raw LZ4 message uses a 14-byte header and may contain up to 81,887
+compressed bytes; its decoded bitmap must also be no larger than 81,901 bytes.
+Split larger images into independent tiles and compress each LZ4 tile
+separately. Do not compress a full screen and then split the compressed stream.
 
-需要一次性显示多个区块时，先调用 `display.beginFrame({ frameId, tileCount })`，再按 `tileIndex` 从 0 开始顺序调用 `display.updateFrameImageLz4`。宿主会在 Channel 8 Begin 和每个 Channel 9 Tile 后等待设备的 Channel `0x0104` 状态 ACK；中间 Tile 只写后台帧，最后一个 Tile 成功后才整体显示。传输失败后必须用新的 `frameId` 重建整帧，不能跳过失败分块。
+To present multiple tiles atomically, call
+`display.beginFrame({ frameId, tileCount })`, then call
+`display.updateFrameImageLz4` in ascending `tileIndex` order starting at zero.
+The Host waits for the device's Channel `0x0104` status acknowledgement after
+the Channel 8 Begin and every Channel 9 Tile. Intermediate tiles update only
+the back buffer, and the final successful tile presents the complete frame. If
+transmission fails, rebuild the entire frame with a new `frameId`; do not skip
+the failed tile.
 
 ## Device
 
@@ -38,14 +52,17 @@ Scene Bridge 单次 payload 最大 81,901 B：Channel 6 原始 GRAY_4 使用 10 
 - `device.subscribeEvents`
 - `device.unsubscribeEvents`
 
-事件包括 `device.button`、`device.imuGesture`、`device.rawImu` 和 `device.connection`。
+Events include `device.button`, `device.imuGesture`, `device.rawImu`, and
+`device.connection`.
 
-`device.getInfo` 是无需权限的只读连接信息查询；订阅和取消订阅设备事件需要在 manifest
-声明 `device.events`。
+`device.getInfo` is a permission-free, read-only connection query. Subscribing
+to or unsubscribing from device events requires the `device.events` manifest
+permission.
 
 ## Plugin Message
 
-使用 `plugin.sendMessage` 向眼镜上当前运行的设备插件发送自定义二进制消息：
+Use `plugin.sendMessage` to send a custom binary message to the device plugin
+currently running on the glasses:
 
 ```js
 const frame = Uint8Array.of(2, sequence, buttons >> 8, buttons & 0xff);
@@ -70,7 +87,7 @@ payload and exposes the decoded payload as `Uint8Array`. The event uses the
 active `runtimeGeneration`, is not part of `device.subscribeEvents`, and does
 not require a manifest permission.
 
-An App host forwards an uplink by invoking the WebView callback with the same
+An App Host forwards an uplink by invoking the WebView callback with the same
 event envelope:
 
 ```js
@@ -81,7 +98,9 @@ window.__memoPluginEmit({
 });
 ```
 
-- `channel` 必须是 `0..65535` 的整数。
-- `data` 必须是非空 `Uint8Array`，最大 81,901 B。
-- 此能力默认可用，不需要 manifest 权限。
-- 返回成功表示设备已 ACK 且消息已送达当前运行的 GMP，不表示 GMP 的业务逻辑或显示结果已完成。
+- `channel` must be an integer from `0` through `65535`.
+- `data` must be a non-empty `Uint8Array` no larger than 81,901 bytes.
+- Plugin messaging is available by default and requires no manifest permission.
+- A successful send means that the device acknowledged the message and
+  delivered it to the running GMP. It does not mean that the GMP completed its
+  business logic or display update.

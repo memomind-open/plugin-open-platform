@@ -1,6 +1,8 @@
-# 最终插件包 `.mmpkg`
+# Final `.mmpkg` Plugin Package
 
-Web 插件交付给 App 时必须打包为 `.mmpkg`。`.mmpkg v1` 是 ZIP 容器，插件文件直接位于压缩包根目录，不能再额外套一层项目目录。
+A Web plugin must be delivered to the App as an `.mmpkg`. The `.mmpkg v1`
+format is a ZIP container whose plugin files live directly at the archive root;
+do not wrap them in an additional project directory.
 
 ```text
 example-1.0.0.mmpkg
@@ -11,16 +13,20 @@ example-1.0.0.mmpkg
     └── index.css
 ```
 
-`.mmpkg` 与安装到眼镜设备的 `.gmp` 不是同一种格式：`.mmpkg` 由手机 App 安装并在 WebView 中运行；`.gmp` 属于眼镜端原生插件。
+An `.mmpkg` is not the same format as the `.gmp` installed on the glasses. The
+phone App installs an `.mmpkg` and runs it in a WebView; a `.gmp` is a native
+glasses plugin.
 
-## 构建前的 manifest
+## Source manifest
 
-H5 构建输出目录根部必须有 `manifest.json`。开发者维护业务字段，`schemaVersion` 和 `files` 由打包器生成：
+The H5 output directory must contain `manifest.json` at its root. Developers
+maintain the business fields; the packager generates `schemaVersion` and
+`files`:
 
 ```json
 {
   "id": "com.example.weather",
-  "name": "天气插件",
+  "name": "Weather Plugin",
   "version": "1.0.0",
   "entry": "index.html",
   "bridgeVersion": "1.0",
@@ -28,33 +34,41 @@ H5 构建输出目录根部必须有 `manifest.json`。开发者维护业务字�
 }
 ```
 
-字段约束：
+Field constraints:
 
-- `id`：反向域名形式，最大 128 字符，例如 `com.example.weather`。
-- `name`：非空展示名称，最大 80 字符。
-- `version`：语义化版本，例如 `1.0.0` 或 `1.0.0-beta.1`。
-- `entry`：包内相对 HTML 路径，最大 256 字符；不能包含空路径段、`.`、`..`、反斜杠或绝对路径。
-- `bridgeVersion`：当前固定为 `1.0`。
-- `permissions`：最多 16 项，不能重复；当前只允许 `display`、`device.events`、`storage`、`network`。
+- `id`: reverse-domain identifier, at most 128 characters, for example
+  `com.example.weather`.
+- `name`: non-empty display name, at most 80 characters.
+- `version`: semantic version such as `1.0.0` or `1.0.0-beta.1`.
+- `entry`: package-relative HTML path, at most 256 characters. It must not
+  contain empty path segments, `.`, `..`, backslashes, or an absolute path.
+- `bridgeVersion`: currently fixed at `1.0`.
+- `permissions`: at most 16 unique entries. The allowed values are `display`,
+  `device.events`, `storage`, and `network`.
 
-权限含义：
+Permission meanings:
 
-| 权限 | 能力 |
+| Permission | Capability |
 | --- | --- |
-| `display` | 创建、更新和关闭眼镜显示页面 |
-| `device.events` | 订阅按钮、头部动作、连接状态及 IMU 事件；只读 `device.getInfo` 不需要此权限 |
-| `storage` | 使用当前插件隔离的 App 键值存储 |
-| `network` | 声明插件需要网络；当前 Debug App 尚未按域名执行网络沙箱 |
+| `display` | Create, update, and close glasses display pages |
+| `device.events` | Subscribe to button, head-motion, connection, and IMU events; read-only `device.getInfo` does not require this permission |
+| `storage` | Use App key-value storage isolated to the current plugin |
+| `network` | Declare that the plugin needs network access; the current Debug App does not yet enforce a domain sandbox |
 
-App 会在 Bridge 调用时检查 `display`、`device.events` 和 `storage`。插件不应声明未使用的权限。使用网络的插件仍需配置严格的 CSP；不能把 `network` 声明视为 App 已完成网络隔离。
+The App checks `display`, `device.events`, and `storage` permissions for the
+corresponding Bridge calls. Do not declare unused permissions. A networked
+plugin must still configure a strict CSP; the `network` declaration does not
+mean that the App has completed network isolation.
 
-`plugin.sendMessage` 使用 App 已安装并启动的当前设备插件，默认不需要 manifest 权限；
-它不会替插件安装或选择 `.gmp`，也不会绕过设备连接状态和协议 ACK。
+`plugin.sendMessage` uses the device plugin currently installed and running by
+the App. It requires no manifest permission by default. It does not install or
+select a `.gmp`, and it does not bypass device connection state or protocol
+acknowledgements.
 
-## 设备插件依赖
+## Device plugin requirements
 
-Web 插件可通过 `deviceRequirements` 声明所需设备协议，供 Studio 在运行前自动配对和
-检查兼容性：
+A Web plugin may use `deviceRequirements` to declare required device protocols.
+Studio uses these declarations to pair compatible plugins before launch:
 
 ```json
 {
@@ -68,18 +82,23 @@ Web 插件可通过 `deviceRequirements` 声明所需设备协议，供 Studio �
 }
 ```
 
-- `protocols`：必需协议列表，最多 16 项；设备端提供的版本必须不低于 `minVersion`。
-- `preferredPluginId`：协议兼容时优先自动选择的设备插件，不是强制 ID 绑定。
-- `requiredPluginId`：严格要求的设备插件 ID，仅用于不能被兼容实现替换的配对。
-- `minPluginVersion`：`requiredPluginId` 的最低数字版本。
+- `protocols`: required protocol list, with at most 16 entries. Every version
+  provided by the device plugin must be at least its `minVersion`.
+- `preferredPluginId`: preferred device plugin when multiple compatible
+  implementations exist; it is not a strict ID binding.
+- `requiredPluginId`: strict device plugin ID for pairings that cannot use a
+  compatible replacement.
+- `minPluginVersion`: minimum numeric version for `requiredPluginId`.
 
-协议 ID 使用小写字母、数字、点和连字符；版本为一到四段数字。设备 `.gmp` manifest
-通过 `provides.protocols` 声明提供的协议。公共协议及设备端格式见
-[`../../../GlassSDK/PROTOCOL_COMPATIBILITY.md`](../../../GlassSDK/PROTOCOL_COMPATIBILITY.md)。
+Protocol IDs use lowercase letters, digits, periods, and hyphens. Versions
+contain one to four numeric components. A device `.gmp` manifest declares its
+protocols through `provides.protocols`. See
+[`../../../GlassSDK/PROTOCOL_COMPATIBILITY.md`](../../../GlassSDK/PROTOCOL_COMPATIBILITY.md)
+for public protocols and the device-side format.
 
-## 打包命令
+## Packaging commands
 
-先用 H5 工具链生成可部署目录，再运行 SDK 仓库提供的打包器：
+Build a deployable directory with the H5 toolchain, then run the SDK packager:
 
 ```sh
 npm run build
@@ -89,7 +108,7 @@ node /path/to/WebSDK/tools/build-mmpkg.mjs \
   ./release/weather-1.0.0.mmpkg
 ```
 
-在本 SDK 仓库中也可以使用：
+Inside this SDK repository, you may also run:
 
 ```sh
 npm run pack:plugin -- \
@@ -97,48 +116,60 @@ npm run pack:plugin -- \
   /absolute/path/to/release/plugin.mmpkg
 ```
 
-输入目录必须是最终 H5 产物，而不是包含 `src`、测试、`node_modules` 的工程根目录。输出文件不能放在输入目录内部，扩展名必须为 `.mmpkg`。
+The input must be the final H5 output, not a project root containing `src`,
+tests, or `node_modules`. The output must not be inside the input directory and
+must use the `.mmpkg` extension.
 
-打包器会：
+The packager:
 
-1. 校验 manifest、入口文件、权限和路径。
-2. 拒绝符号链接及超限文件。
-3. 对除 `manifest.json`、`signature.sig` 外的全部普通文件计算 SHA-256。
-4. 写入 `schemaVersion: 1` 和完整 `files` 哈希表。
-5. 生成确定性 ZIP 结构并原子写出 `.mmpkg`。
+1. Validates the manifest, entry file, permissions, and paths.
+2. Rejects symbolic links and files that exceed resource limits.
+3. Computes SHA-256 for every regular file except `manifest.json` and
+   `signature.sig`.
+4. Writes `schemaVersion: 1` and the complete `files` hash table.
+5. Produces a deterministic ZIP and writes the `.mmpkg` atomically.
 
-最终包内 manifest 类似：
+The final manifest resembles:
 
 ```json
 {
   "schemaVersion": 1,
   "id": "com.example.weather",
-  "name": "天气插件",
+  "name": "Weather Plugin",
   "version": "1.0.0",
   "entry": "index.html",
   "bridgeVersion": "1.0",
   "permissions": ["display", "device.events", "storage"],
   "files": {
-    "assets/index.css": "sha256:<64 位小写十六进制>",
-    "assets/index.js": "sha256:<64 位小写十六进制>",
-    "index.html": "sha256:<64 位小写十六进制>"
+    "assets/index.css": "sha256:<64 lowercase hexadecimal characters>",
+    "assets/index.js": "sha256:<64 lowercase hexadecimal characters>",
+    "index.html": "sha256:<64 lowercase hexadecimal characters>"
   }
 }
 ```
 
-`files` 必须完整覆盖包内载荷文件，不能缺失或多报。App 安装时会重新计算哈希，任何内容不一致都会拒绝安装。
+`files` must cover every payload file exactly. During installation, the App
+recomputes each hash and rejects any mismatch.
 
-## 包限制和安全边界
+## Package limits and security boundary
 
-- `.mmpkg` 最大 10 MB。
-- 解压后总大小最大 30 MB。
-- 单文件最大 10 MB。
-- 包内普通文件最多 500 个。
-- 禁止符号链接、重复路径、绝对路径和路径穿越。
-- `signature.sig` 是保留签名文件，不进入 `files` 哈希表。
+- Maximum `.mmpkg` size: 10 MB.
+- Maximum total extracted size: 30 MB.
+- Maximum individual file size: 10 MB.
+- Maximum regular files: 500.
+- Symbolic links, duplicate paths, absolute paths, and path traversal are
+  forbidden.
+- `signature.sig` is reserved for signatures and is excluded from `files`.
 
-当前 App 只在 Debug 环境支持未签名本地侧载。Release 的可信公钥、审核签名、插件市场、在线升级和撤回尚未完成；未签名包不能作为正式 Release 分发方式。
+The current App supports unsigned local sideloading only in Debug builds.
+Trusted Release keys, review signatures, the plugin marketplace, online
+updates, and revocation are not yet complete. Unsigned packages must not be
+distributed as production releases.
 
-## 安装后的 App 行为
+## App behavior after installation
 
-App 选择 `.mmpkg` 后会校验 ZIP、manifest、资源限制和全部文件哈希，随后原子安装到 App 私有目录。相同 `id` 和 `version` 会替换该安装版本；已安装的同 ID 插件优先于 App 内置 Demo，卸载后回退到内置版本。
+After an `.mmpkg` is selected, the App validates the ZIP, manifest, resource
+limits, and every file hash, then installs it atomically into private App
+storage. The same `id` and `version` replace that installed version. An
+installed plugin takes precedence over an App-bundled demo with the same ID;
+uninstalling it restores the bundled version.
