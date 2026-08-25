@@ -1,56 +1,65 @@
-# 通过局域网安装 `.mmpkg`
+# Install an `.mmpkg` over a LAN
 
-桌面 Studio 可以将当前选择的 Web 插件打包为 `.mmpkg`，并生成供手机 App 调试入口
-扫描的二维码。该通道用于开发阶段的局域网侧载，不提供服务端身份认证。
+Desktop Studio can package the selected Web plugin as an `.mmpkg` and display
+a QR code for the phone App's debugging entry point. This channel is intended
+for development-time LAN sideloading and does not provide server
+authentication.
 
-## 二维码内容
+## QR code payload
 
-二维码是紧凑 JSON，字段如下：
+The QR code contains compact JSON:
 
 ```json
 {"v":1,"scheme":"mmpkg+tcp","host":"192.168.1.8","port":18765,"name":"counter-0.1.0.mmpkg"}
 ```
 
-- `v`：协议版本，当前为 `1`；
-- `scheme`：固定为 `mmpkg+tcp`，不得按固件插件的 `gmp+tcp` 处理；
-- `host`、`port`：Studio 的局域网 TCP 地址；
-- `name`：建议的下载文件名。
+- `v`: protocol version, currently `1`.
+- `scheme`: always `mmpkg+tcp`; do not treat it as the firmware plugin scheme
+  `gmp+tcp`.
+- `host` and `port`: Studio's LAN TCP address.
+- `name`: suggested download filename.
 
-Studio 优先监听 TCP 端口 `18765`；端口被占用时使用随机可用端口，并把实际端口写入
-二维码。
+Studio prefers TCP port `18765`. If that port is busy, it selects a random
+available port and writes the actual value into the QR code.
 
-## 下载协议
+## Download protocol
 
-App 连接二维码指定的 TCP 地址后发送：
+After connecting to the TCP address in the QR code, the App sends:
 
 ```text
 MMPKG/1 GET\n
 ```
 
-成功响应为一行 ASCII 元数据，随后紧接包体：
+A successful response is one ASCII metadata line followed immediately by the
+package body:
 
 ```text
 MMPKG/1 OK <size> <sha256>\n<mmpkg bytes>
 ```
 
-`size` 是十进制字节数，`sha256` 是 64 位小写十六进制摘要。App 必须限制包体为最多
-10 MB，读取准确的 `size` 字节，校验 SHA-256，然后再交给正常的 `.mmpkg` manifest、
-文件哈希和安装校验流程。
+`size` is a decimal byte count and `sha256` is a 64-character lowercase
+hexadecimal digest. The App must enforce the 10 MB package limit, read exactly
+`size` bytes, verify SHA-256, and then run the normal `.mmpkg` manifest, file
+hash, and installation validation.
 
-无效请求返回：
+An invalid request returns:
 
 ```text
 MMPKG/1 ERROR invalid-request\n
 ```
 
-包在下载前被删除、损坏或超过限制时返回：
+If the package was deleted, corrupted, or exceeds the limit before download,
+the server returns:
 
 ```text
 MMPKG/1 ERROR invalid-package\n
 ```
 
-## 安全边界
+## Security boundary
 
-该协议没有 TLS、鉴权或签名，只适用于可信局域网中的 Debug 安装。大小和 SHA-256
-能够发现截断或传输不一致，但不能抵抗可同时替换包体和摘要的主动攻击。Release 安装
-是否允许该通道，以及 `.mmpkg` 是否必须签名，由 App 的产品安全策略决定。
+This protocol has no TLS, authentication, or signature and is suitable only
+for Debug installation on a trusted LAN. Size and SHA-256 checks detect
+truncation or transmission inconsistency, but they do not prevent an active
+attacker from replacing both the package and digest. The App's product security
+policy determines whether Release builds may use this channel and whether
+`.mmpkg` packages must be signed.

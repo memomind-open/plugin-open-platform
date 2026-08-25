@@ -1,42 +1,63 @@
-# 浮光 OS · GM 设备优先插件
+# Fuguang OS · GM Device-First Plugin
 
-浮光 OS 是围绕 600×350 GRAY_4 眼镜屏幕设计的轻量设备系统。H5 页面仅承担城市、便签和设备状态配置，完整桌面与应用交互均显示在眼镜端。
+Fuguang OS is a lightweight device system designed around the 600×350 GRAY_4
+glasses display. The H5 page is used only to configure the city, notes, and
+device state; the complete desktop and application interaction appear on the
+glasses.
 
-## 设备应用
+## Device applications
 
-- 桌面：时间、日期、天气摘要与六个应用入口
-- 天气：当前天气、六小时温度趋势、降水、风速和湿度
-- 台风：GDACS 全球活跃热带气旋、警报等级、坐标与雷达视图
-- 计算器：设备端二维键盘与完整四则运算
-- 专注：25、5、50 分钟模式和环形进度
-- 世界时钟：上海、东京、伦敦、纽约
-- 便签：读取手机控制台保存的快捷内容
+- Desktop: time, date, weather summary, and six application entries.
+- Weather: current conditions, six-hour temperature trend, precipitation, wind
+  speed, and humidity.
+- Cyclones: active tropical cyclones from GDACS, with alert level, coordinates,
+  and radar view.
+- Calculator: a two-dimensional device keyboard and the four basic arithmetic
+  operations.
+- Focus: 25-, 5-, and 50-minute modes with circular progress.
+- World clock: Shanghai, Tokyo, London, and New York.
+- Notes: quick content saved from the phone console.
 
-## 设备交互
+## Device controls
 
-- 左右转头：水平选择、切换时间轴或模式
-- 抬头 / 低头：换行选择或切换台风
-- 单击：打开应用、确认按键、开始或暂停
-- 双击：从任意页面返回桌面
-- 长按：刷新数据、清除计算器、重置计时器
-- 点头：等同于确认；摇头：返回桌面（真机支持时）
+- Turn left or right: move horizontally, change the timeline, or select a mode.
+- Head up or down: move between rows or change the selected cyclone.
+- Single click: open an application, confirm a key, start, or pause.
+- Double click: return to the desktop from any page.
+- Long press: refresh data, clear the calculator, or reset the timer.
+- Nod: confirm. Shake: return to the desktop when supported by the device.
 
-## Studio 运行
+## Run in Studio
 
 ```sh
-# 在 WebSDK 工作区根目录执行
+# Run from the WebSDK workspace root.
 node tools/studio-cli.mjs --plugin plugins/gm-life-desk
 ```
 
-## 打包
+## Package
 
 ```sh
-# 在 WebSDK 工作区根目录执行
+# Run from the WebSDK workspace root.
 npm run pack:plugin -- plugins/gm-life-desk dist/gm-life-desk.mmpkg
 ```
 
-## 技术实现
+## Implementation
 
-设备画面通过离屏 Canvas 绘制，再量化为 GRAY_4。画面使用 6 个 200×175 的 raw LZ4 小块传输，并逐块比较前后内容，只提交发生变化的块。支持原子帧的宿主会为本次变更创建同一个 `frameId`，等待每块设备状态 ACK，并在最后一块完成后整体显示，避免画面逐块出现。60ms 内的连续操作会自动合并；原子帧开始后会完整发送当前帧，新状态留到下一帧处理。旧宿主仍使用 Channel 7/6 兼容路径。专注计时每秒更新数字；倒计时被限制在单个传输分块内，环形进度按 5 秒粒度推进，避免秒级刷新造成多块蓝牙请求积压。所有图标、卡片、折线图、环形进度和选中状态均实际运行于设备画面，不依赖 H5 DOM 显示。
+The device image is drawn on an offscreen Canvas and quantized to GRAY_4. It is
+transmitted as six 200×175 raw LZ4 tiles. Each tile is compared with its
+previous content, and only changed tiles are submitted. A Host with atomic-frame
+support creates one `frameId` for the update, waits for every device status
+acknowledgement, and presents the full image only after the final tile, avoiding
+tile-by-tile appearance. Consecutive operations within 60 ms are coalesced.
+After an atomic frame begins, its current image is sent completely and later
+state is deferred to the next frame. Older Hosts continue to use the compatible
+Channel 7/6 path.
 
-天气使用 Open-Meteo；全球热带气旋使用 GDACS。灾害信息仅供参考，请以当地官方预警为准。
+The focus timer updates its digits every second. The countdown is kept within a
+single transport tile, while circular progress advances every five seconds, so
+per-second updates do not accumulate Bluetooth requests across multiple tiles.
+All icons, cards, line charts, circular progress, and selection states are
+rendered on the device display rather than in the H5 DOM.
+
+Weather data comes from Open-Meteo and global tropical-cyclone data from GDACS.
+Disaster information is for reference only; follow official local warnings.

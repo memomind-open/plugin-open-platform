@@ -1,52 +1,67 @@
-# Aphrodite 中文井字棋插件
+# Aphrodite Chinese Tic-Tac-Toe Plugin
 
-独立运行的 TypeScript/Vite Web 插件，通过 Aphrodite Bridge v1 与 App 通信。插件不直接访问蓝牙；设备绘制和按钮/IMU 事件均由 App 转接。
+This standalone TypeScript/Vite Web plugin communicates with the App through
+Aphrodite Bridge v1. It does not access Bluetooth directly; the App forwards
+device drawing and button/IMU events.
 
-## 玩法
+## Gameplay
 
-- 玩家执 X，电脑执 O，玩家先手。
-- 抬头、低头在同一列向上、向下选择空格。
-- 向左、向右转头在同一行选择空格。
-- 单击主按钮落子，双击主按钮重新开始。
-- 每局结束后，网页和设备会明确提示“你赢了”“你输了”或“打平了”。
-- 网页上的按钮和棋盘也可以直接操作。
+- The player uses X, the computer uses O, and the player moves first.
+- Move the head up or down to select an empty cell in the same column.
+- Turn left or right to select an empty cell in the same row.
+- Single-click the primary button to place a mark; double-click to restart.
+- At the end of a game, the Web page and device clearly report a win, loss, or
+  draw.
+- The controls and board on the Web page can also be used directly.
 
-## 设备画面
+## Device display
 
-- 设备按 576×288 横屏布局绘制。
-- 左侧为中文规则、操作说明和当前状态。
-- 右侧为 256×256 的 GRAY_4 位图棋盘，包含 X/O、当前选中框和获胜连线。
-- 左侧中文规则先更新，右侧 256×256 棋盘作为最后一次绘制提交，避免后续文本覆盖棋盘刷新。
-- Web 端将整张 GRAY_4 棋盘编码为严格 raw LZ4 block，通过 `display.updateImageLz4` 交给 App；压缩无收益时回退为一张完整的未压缩图，不再拆成四块，避免部分分块成功造成破图。
-- 高频操作采用 latest-wins：只保留一张在途棋盘和一张最新待发送棋盘，避免旧帧在蓝牙队列中堆积并连续超时。
+- The device uses a 576×288 landscape layout.
+- The left side contains Chinese rules, controls, and current status.
+- The right side contains a 256×256 GRAY_4 board with X/O marks, the current
+  selection, and the winning line.
+- The Chinese rules on the left are updated first, and the 256×256 board on the
+  right is submitted as the final drawing operation so later text does not
+  overwrite the board refresh.
+- The Web plugin encodes the complete GRAY_4 board as a strict raw LZ4 block and
+  sends it through `display.updateImageLz4`. If compression does not reduce its
+  size, it falls back to one complete uncompressed image instead of four tiles,
+  avoiding a damaged image after a partial tile failure.
+- High-frequency operations use latest-wins scheduling: at most one board is in
+  flight and one newest board waits to be sent, preventing old frames from
+  accumulating and timing out in the Bluetooth queue.
 
-## 开发
+## Development
 
 ```bash
-# 在 plugins/tictactoe 目录执行
+# Run from plugins/tictactoe.
 npm ci
 npm test
 npm run typecheck
 npm run build
 ```
 
-构建产物位于 `dist/`。`vite.config.ts` 使用相对资源路径，产物可以由 Aphrodite 的本地插件资源服务器直接加载。
+Build output is written to `dist/`. `vite.config.ts` uses relative asset paths,
+so Aphrodite's local plugin resource server can load the output directly.
 
-在 WebSDK Browser Studio 中验证构建产物：
+Validate the build in WebSDK Browser Studio:
 
 ```bash
-# 在 WebSDK 工作区根目录执行
+# Run from the WebSDK workspace root.
 node tools/studio-cli.mjs --plugin plugins/tictactoe/dist
 ```
 
-打包：
+Package the plugin:
 
 ```bash
 npm run pack:plugin -- plugins/tictactoe/dist dist/tictactoe.mmpkg
 ```
 
-## App 接入
+## App integration
 
-生产构建产物需要完整同步到 Aphrodite 的 `assets/plugin_tictactoe/`。源码、测试、Node 依赖和 `node_modules` 不进入 App 仓库。
+Copy the complete production build into Aphrodite's
+`assets/plugin_tictactoe/`. Do not copy source files, tests, Node dependencies,
+or `node_modules` into the App repository.
 
-设备真机运行的前提是已安装支持 Scene channel、Ping、按钮和 IMU 事件的统一设备插件。
+Running on physical glasses requires the unified device plugin that supports
+Scene channels, Ping, button events, and IMU events.

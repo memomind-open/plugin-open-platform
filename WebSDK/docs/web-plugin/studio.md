@@ -1,12 +1,22 @@
-# Studio 调试
+# Debugging with Studio
 
-Studio 同时展示 Web 页面和虚拟眼镜屏幕，并允许注入：
+Studio displays the Web page and virtual glasses screen together and can
+inject:
 
-- 单击、双击、长按；
-- 抬头、低头、向左转头、向右转头；
-- 连接/断开；
-- running/suspended 生命周期。
+- single-click, double-click, and long-press actions;
+- head up, head down, turn left, and turn right gestures;
+- connection and disconnection events; and
+- `running` and `suspended` lifecycle states.
 
-Studio 会显示 Bridge 请求日志。模拟错误和延迟属于后续切片；插件当前仍应处理 SDK 暴露的结构化错误。
+Studio shows the Bridge request log. Error and latency simulation are planned
+for a later release; plugins must already handle the structured errors exposed
+by the SDK.
 
-Studio 同时模拟 Scene Bridge 的真实传输限制：单次 payload 最大 81,901 B。Channel 6 原始图片、Channel 7 raw LZ4 或 Channel 9 原子帧 raw LZ4 的压缩/解压尺寸超限时，请求返回 `PAYLOAD_TOO_LARGE` 且不会绘制。Channel 8 开始原子帧后，中间分块只写入后台帧，最后一块才刷新设备预览。设备预览上方会显示最近一次绘图使用的通道和字节数；超限时提示插件按区块拆分，并对每个 LZ4 区块独立压缩。
+Studio also enforces the real Scene Bridge transport limit of 81,901 bytes per
+payload. Requests fail with `PAYLOAD_TOO_LARGE` and do not render when the
+compressed or decoded size of a Channel 6 raw image, Channel 7 raw LZ4 image,
+or Channel 9 atomic-frame raw LZ4 tile exceeds that limit. After Channel 8
+starts an atomic frame, intermediate tiles update only the back buffer; the
+last tile refreshes the device preview. The preview header reports the channel
+and byte count of the most recent drawing operation. If a payload is too large,
+split the image into tiles and compress each LZ4 tile independently.

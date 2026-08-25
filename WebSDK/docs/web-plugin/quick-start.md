@@ -1,17 +1,20 @@
-# 快速开始
+# Quick Start
 
-当前内部体验版通过 `gm-web-plugin-devkit-<version>.zip` 分发。解压后包含浏览器 SDK、Studio、打包器、示例和本开发文档，不需要连接 npm 仓库。
+The current preview release is distributed as
+`gm-web-plugin-devkit-<version>.zip`. It includes the browser SDK, Studio,
+packager, examples, and this documentation, so it does not require access to an
+npm registry.
 
-## 1. 引入本地 SDK
+## 1. Add the local SDK
 
-把 DevKit 中的 SDK 文件复制进插件工程：
+Copy the SDK file from the DevKit into your plugin project:
 
 ```sh
 mkdir -p ./vendor
 cp /path/to/gm-web-plugin-devkit/sdk/gm-plugin-web-sdk.esm.js ./vendor/
 ```
 
-插件代码通过相对路径引入：
+Import it with a relative path:
 
 ```js
 import { createGMPlugin } from './vendor/gm-plugin-web-sdk.esm.js';
@@ -31,18 +34,20 @@ await gm.display.updateText({
 });
 ```
 
-SDK 会自动识别真实 App WebView 或 Studio 模拟宿主，插件业务代码不需要维护两套实现。
+The SDK automatically detects a real App WebView or the simulated Studio Host,
+so plugin business logic does not need separate implementations.
 
-## 2. 使用 Studio 调试
+## 2. Debug with Studio
 
-如果项目是纯静态 H5，插件目录根部有 `index.html`：
+For a static H5 project with `index.html` at its root:
 
 ```sh
 node /path/to/gm-web-plugin-devkit/studio/gm-plugin-studio.mjs \
   --plugin /absolute/path/to/my-plugin
 ```
 
-如果项目使用 Vite、Webpack 等构建工具，先构建，再加载最终产物目录：
+For a project built with Vite, Webpack, or a similar tool, build it first and
+load the final output directory:
 
 ```sh
 npm run build
@@ -51,11 +56,13 @@ node /path/to/gm-web-plugin-devkit/studio/gm-plugin-studio.mjs \
   --plugin /absolute/path/to/my-plugin/dist
 ```
 
-默认打开地址是 `http://127.0.0.1:4173`。可追加 `--port 4174` 修改端口。
+The default URL is `http://127.0.0.1:4173`. Add `--port 4174` to use another
+port.
 
-## 3. 生成 App 插件包
+## 3. Build an App plugin package
 
-确保构建目录根部有 `manifest.json`，然后生成 `.mmpkg`：
+Make sure the build directory contains `manifest.json` at its root, then build
+the `.mmpkg`:
 
 ```sh
 node /path/to/gm-web-plugin-devkit/tools/build-mmpkg.mjs \
@@ -63,11 +70,13 @@ node /path/to/gm-web-plugin-devkit/tools/build-mmpkg.mjs \
   /absolute/path/to/release/my-plugin-1.0.0.mmpkg
 ```
 
-完整格式和安全限制见[最终插件包 `.mmpkg`](package-format.md)。
+See [Final `.mmpkg` package](package-format.md) for the complete format and
+security limits.
 
-## 未来 npm 使用方式
+## Future npm workflow
 
-ZIP 是内部体验阶段的临时分发方式。正式发布 npm 包后，SDK import 将改为：
+The ZIP is a temporary distribution method for the preview phase. After the
+npm packages are published, install them with:
 
 ```sh
 npm install @memomind/gm-plugin-web-sdk
@@ -78,10 +87,11 @@ npm install --save-dev @memomind/gm-plugin-studio
 import { createGMPlugin } from '@memomind/gm-plugin-web-sdk';
 ```
 
-Studio 将通过包内命令启动：
+Start Studio through the package command:
 
 ```sh
 npx gm-plugin-studio --plugin ./dist
 ```
 
-从 ZIP 迁移到 npm 不改变 Bridge API、manifest 或 `.mmpkg` 格式。
+Migrating from the ZIP to npm does not change the Bridge API, manifest, or
+`.mmpkg` format.
