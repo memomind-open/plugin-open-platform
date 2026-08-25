@@ -30,7 +30,8 @@ done < <(find "$sdk_build" -type f -name '*.gmp' -print0 | sort -z)
 
 "$cli" "$sdk_build/bluetooth/bluetooth.gmp" --bt 1 "smoke test" \
   >"$temporary_dir/bluetooth-event.log" 2>&1
-rg -q '\[Bluetooth out\] channel=1' "$temporary_dir/bluetooth-event.log"
+rg -q '\[Bluetooth out\] service=0x0f command=0x29 channel=1' \
+  "$temporary_dir/bluetooth-event.log"
 
 "$cli" "$sdk_build/input/input.gmp" --button 1 \
   >"$temporary_dir/button-event.log" 2>&1
