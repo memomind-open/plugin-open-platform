@@ -9,6 +9,22 @@ extern "C" {
 
 typedef struct gm_preview_handle gm_preview_handle;
 
+typedef struct gm_preview_text_overlay {
+    int32_t x;
+    int32_t y;
+    int32_t width;
+    int32_t height;
+    int32_t font_height;
+    int32_t alignment;
+    int32_t letter_space;
+    int32_t line_space;
+    uint8_t gray;
+    uint8_t opacity;
+    uint8_t wrap;
+    uint8_t reserved;
+    size_t utf8_size;
+} gm_preview_text_overlay;
+
 gm_preview_handle *gm_preview_create(void);
 void gm_preview_destroy(gm_preview_handle *handle);
 
@@ -31,6 +47,12 @@ int gm_preview_is_running(const gm_preview_handle *handle);
 size_t gm_preview_frame_size(void);
 int gm_preview_copy_frame(gm_preview_handle *handle, uint8_t *output,
                           size_t output_size);
+size_t gm_preview_text_overlay_count(const gm_preview_handle *handle);
+int gm_preview_get_text_overlay(const gm_preview_handle *handle, size_t index,
+                                gm_preview_text_overlay *output);
+int gm_preview_copy_text_overlay_utf8(const gm_preview_handle *handle,
+                                      size_t index, char *output,
+                                      size_t output_size);
 size_t gm_preview_outbox_count(const gm_preview_handle *handle);
 int gm_preview_outbox_service(const gm_preview_handle *handle, size_t index,
                               uint8_t *service);

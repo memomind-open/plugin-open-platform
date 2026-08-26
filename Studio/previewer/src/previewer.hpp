@@ -47,7 +47,11 @@ struct TextOverlay {
     int height = 0;
     int font_height = 17;
     int alignment = 1; // 1 left, 2 center, 3 right
+    int letter_space = 0;
+    int line_space = 0;
     uint8_t gray = 255;
+    uint8_t opacity = 255;
+    bool wrap = true;
     std::string utf8;
 };
 

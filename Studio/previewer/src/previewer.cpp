@@ -1283,7 +1283,11 @@ void Previewer::renderNode(const Node &object)
             overlay.height = text_height;
             overlay.font_height = fontHeight(font);
             overlay.alignment = alignment;
+            overlay.letter_space = static_cast<int32_t>(style(object, 88, 0, 0));
+            overlay.line_space = static_cast<int32_t>(style(object, 89, 0, 0));
             overlay.gray = text_gray;
+            overlay.opacity = text_opacity;
+            overlay.wrap = object.label_mode == 0;
             overlay.utf8 = object.text;
             text_overlays_.push_back(std::move(overlay));
         }

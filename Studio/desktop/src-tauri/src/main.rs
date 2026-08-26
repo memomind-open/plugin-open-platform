@@ -31,6 +31,24 @@ const MIN_GMP_BYTES: u64 = 28;
 const GMP_SHARE_PORT: u16 = 18_766;
 const GMP_REQUEST_LINE: &[u8] = b"GMP/1 GET\n";
 
+#[repr(C)]
+#[derive(Default)]
+struct NativeTextOverlay {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    font_height: i32,
+    alignment: i32,
+    letter_space: i32,
+    line_space: i32,
+    gray: u8,
+    opacity: u8,
+    wrap: u8,
+    reserved: u8,
+    utf8_size: usize,
+}
+
 #[link(name = "gmplugin_previewer_core", kind = "static")]
 extern "C" {
     fn gm_preview_create() -> *mut c_void;
@@ -69,6 +87,18 @@ extern "C" {
     fn gm_preview_copy_frame(
         handle: *mut c_void,
         output: *mut c_uchar,
+        output_size: usize,
+    ) -> c_int;
+    fn gm_preview_text_overlay_count(handle: *const c_void) -> usize;
+    fn gm_preview_get_text_overlay(
+        handle: *const c_void,
+        index: usize,
+        output: *mut NativeTextOverlay,
+    ) -> c_int;
+    fn gm_preview_copy_text_overlay_utf8(
+        handle: *const c_void,
+        index: usize,
+        output: *mut c_char,
         output_size: usize,
     ) -> c_int;
     fn gm_preview_outbox_count(handle: *const c_void) -> usize;
@@ -423,8 +453,26 @@ struct FrameResult {
     width: usize,
     height: usize,
     gray4_base64: String,
+    text_overlays: Vec<FrameTextOverlay>,
     running: bool,
     messages: Vec<OutboundMessage>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FrameTextOverlay {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    font_height: i32,
+    alignment: i32,
+    letter_space: i32,
+    line_space: i32,
+    gray: u8,
+    opacity: u8,
+    wrap: bool,
+    text: String,
 }
 
 #[derive(Serialize)]
@@ -1758,9 +1806,48 @@ fn tick_frame(
         width: DISPLAY_WIDTH,
         height: DISPLAY_HEIGHT,
         gray4_base64: BASE64.encode(gray4),
+        text_overlays: read_text_overlays(&previewer)?,
         running,
         messages: drain_outbox(&previewer)?,
     })
+}
+
+fn read_text_overlays(previewer: &NativePreviewer) -> Result<Vec<FrameTextOverlay>, String> {
+    let count = unsafe { gm_preview_text_overlay_count(previewer.handle.as_ptr()) };
+    let mut overlays = Vec::with_capacity(count);
+    for index in 0..count {
+        let mut native = NativeTextOverlay::default();
+        let read =
+            unsafe { gm_preview_get_text_overlay(previewer.handle.as_ptr(), index, &mut native) };
+        previewer.require(read)?;
+        let mut utf8 = vec![0u8; native.utf8_size];
+        let copied = unsafe {
+            gm_preview_copy_text_overlay_utf8(
+                previewer.handle.as_ptr(),
+                index,
+                utf8.as_mut_ptr().cast(),
+                utf8.len(),
+            )
+        };
+        previewer.require(copied)?;
+        let text = String::from_utf8(utf8)
+            .map_err(|_| format!("text overlay {index} is not valid UTF-8"))?;
+        overlays.push(FrameTextOverlay {
+            x: native.x,
+            y: native.y,
+            width: native.width,
+            height: native.height,
+            font_height: native.font_height,
+            alignment: native.alignment,
+            letter_space: native.letter_space,
+            line_space: native.line_space,
+            gray: native.gray,
+            opacity: native.opacity,
+            wrap: native.wrap != 0,
+            text,
+        });
+    }
+    Ok(overlays)
 }
 
 fn drain_outbox(previewer: &NativePreviewer) -> Result<Vec<OutboundMessage>, String> {
@@ -1768,14 +1855,12 @@ fn drain_outbox(previewer: &NativePreviewer) -> Result<Vec<OutboundMessage>, Str
     let mut messages = Vec::with_capacity(count);
     for index in 0..count {
         let mut service = 0u8;
-        let service_read = unsafe {
-            gm_preview_outbox_service(previewer.handle.as_ptr(), index, &mut service)
-        };
+        let service_read =
+            unsafe { gm_preview_outbox_service(previewer.handle.as_ptr(), index, &mut service) };
         previewer.require(service_read)?;
         let mut command = 0u8;
-        let command_read = unsafe {
-            gm_preview_outbox_command(previewer.handle.as_ptr(), index, &mut command)
-        };
+        let command_read =
+            unsafe { gm_preview_outbox_command(previewer.handle.as_ptr(), index, &mut command) };
         previewer.require(command_read)?;
         if service != PLUGIN_SERVICE_ID || command != PLUGIN_COMMAND_GLASSES_TO_PHONE {
             return Err(format!(
