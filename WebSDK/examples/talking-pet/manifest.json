@@ -1,10 +1,10 @@
 {
   "id": "com.memomind.example.talking-pet",
   "name": "Momo Talking Pet",
-  "version": "0.3.2",
+  "version": "0.4.1",
   "entry": "index.html",
   "bridgeVersion": "1.0",
-  "permissions": ["display", "device.events", "storage"],
+  "permissions": ["display", "device.events", "storage", "audio.capture"],
   "deviceRequirements": {
     "preferredPluginId": "com.gm.example.web-bridge",
     "protocols": [

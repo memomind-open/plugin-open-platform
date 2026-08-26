@@ -331,3 +331,51 @@ test('SDK rejects invalid plugin message inputs before transport', async () => {
   });
   assert.equal(transport.requests.length, 0);
 });
+
+test('SDK exposes native audio calls and decodes Opus frame batches', async () => {
+  const transport = new FakeTransport();
+  const gm = createGMPlugin({ transport });
+  const batches = [];
+  gm.audio.onFrames((batch) => batches.push(batch));
+
+  await gm.audio.configure({ noiseReduction: true, pickupMode: 'frontFocus' });
+  await gm.audio.startRecording();
+  transport.emit({
+    name: 'audio.frames',
+    data: {
+      recordingId: 'recording-7-1',
+      firstSequence: 0,
+      frameCount: 2,
+      droppedFrameCount: 0,
+      framesBase64: ['AQID', 'BAUG'],
+    },
+    runtimeGeneration: 7,
+  });
+
+  assert.equal(transport.requests[0].method, 'audio.configure');
+  assert.deepEqual(transport.requests[0].params, {
+    noiseReduction: true,
+    pickupMode: 'frontFocus',
+  });
+  assert.equal(transport.requests[1].method, 'audio.startRecording');
+  assert.equal(batches.length, 1);
+  assert.deepEqual(batches[0].frames, [
+    Uint8Array.of(1, 2, 3),
+    Uint8Array.of(4, 5, 6),
+  ]);
+});
+
+test('SDK isolates malformed native audio frame events', async () => {
+  const transport = new FakeTransport();
+  const gm = createGMPlugin({ transport });
+  await gm.ready();
+  const batches = [];
+  gm.audio.onFrames((batch) => batches.push(batch));
+
+  assert.doesNotThrow(() => transport.emit({
+    name: 'audio.frames',
+    data: { framesBase64: ['not-base64!'] },
+    runtimeGeneration: 7,
+  }));
+  assert.equal(batches.length, 0);
+});

@@ -317,6 +317,15 @@ struct PackageShareResult {
 
 impl WebPluginServer {
     fn new() -> Result<Self, String> {
+        let web_sdk_root = sdk_root()?;
+        let sdk_mount = web_sdk_root
+            .join("packages/web-sdk/src")
+            .canonicalize()
+            .map_err(|error| format!("Could not resolve Web SDK mount: {error}"))?;
+        let contract_mount = web_sdk_root
+            .join("packages/bridge-contract/src")
+            .canonicalize()
+            .map_err(|error| format!("Could not resolve bridge contract mount: {error}"))?;
         let server = Server::http("127.0.0.1:0")
             .map_err(|error| format!("Could not start Web plugin server: {error}"))?;
         let port = server
@@ -332,7 +341,7 @@ impl WebPluginServer {
             .name("gm-web-plugin-server".to_string())
             .spawn(move || {
                 for request in server.incoming_requests() {
-                    serve_web_request(request, &prefix, &thread_root);
+                    serve_web_request(request, &prefix, &thread_root, &sdk_mount, &contract_mount);
                 }
             })
             .map_err(|error| format!("Could not start Web plugin server thread: {error}"))?;
@@ -368,16 +377,26 @@ fn serve_web_request(
     request: tiny_http::Request,
     prefix: &str,
     root_state: &RwLock<Option<PathBuf>>,
+    sdk_mount: &Path,
+    contract_mount: &Path,
 ) {
-    let path = request.url().split('?').next().unwrap_or_default();
+    let path = request
+        .url()
+        .split('?')
+        .next()
+        .unwrap_or_default()
+        .to_string();
+    if let Some(relative) = path.strip_prefix("/sdk/") {
+        serve_web_file(request, sdk_mount, relative);
+        return;
+    }
+    if let Some(relative) = path.strip_prefix("/contract/") {
+        serve_web_file(request, contract_mount, relative);
+        return;
+    }
     let Some(encoded_relative) = path.strip_prefix(prefix) else {
         let _ =
             request.respond(Response::from_string("Not found").with_status_code(StatusCode(404)));
-        return;
-    };
-    let Ok(decoded) = urlencoding::decode(encoded_relative) else {
-        let _ =
-            request.respond(Response::from_string("Bad path").with_status_code(StatusCode(400)));
         return;
     };
     let Ok(root_guard) = root_state.read() else {
@@ -389,6 +408,15 @@ fn serve_web_request(
         let _ = request.respond(
             Response::from_string("No Web plugin selected").with_status_code(StatusCode(404)),
         );
+        return;
+    };
+    serve_web_file(request, root, encoded_relative);
+}
+
+fn serve_web_file(request: tiny_http::Request, root: &Path, encoded_relative: &str) {
+    let Ok(decoded) = urlencoding::decode(encoded_relative) else {
+        let _ =
+            request.respond(Response::from_string("Bad path").with_status_code(StatusCode(400)));
         return;
     };
     let Ok(candidate) = safe_relative_entry(root, &decoded) else {
@@ -1150,7 +1178,13 @@ fn validate_manifest_identity(manifest: &DiscoveredManifest) -> Result<(), Strin
     if manifest.permissions.len() > 16 {
         return Err("Web manifest permissions must contain at most 16 items".to_string());
     }
-    let supported = ["display", "device.events", "storage", "network"];
+    let supported = [
+        "display",
+        "device.events",
+        "storage",
+        "network",
+        "audio.capture",
+    ];
     let mut seen = HashSet::new();
     for permission in &manifest.permissions {
         if !supported.contains(&permission.as_str()) {

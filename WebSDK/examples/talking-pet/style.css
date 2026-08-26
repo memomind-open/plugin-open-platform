@@ -153,6 +153,11 @@ h1 span { color: #8a829e; font-size: .53em; font-weight: 650; letter-spacing: 0;
 .pet.eating { animation: munch .22s ease-in-out 4 alternate; }
 .pet.playing { animation: bounce .55s ease-in-out 3; }
 .pet.sleeping { animation: breathe 2.3s ease-in-out infinite; }
+.pet.listening { animation: listen-in .9s ease-in-out infinite alternate; }
+.pet.listening .pet-glow {
+  background: radial-gradient(circle, #d8f8ffaa, #7acff055 45%, transparent 72%);
+  animation: listen-glow .9s ease-in-out infinite alternate;
+}
 .pet.talking img { animation: talk .18s ease-in-out infinite alternate; transform-origin: 50% 34%; }
 
 .particles { position: absolute; z-index: 5; inset: 0; pointer-events: none; }
@@ -187,6 +192,8 @@ footer { display: flex; align-items: center; gap: 7px; min-height: 42px; padding
 @keyframes bounce { 30% { transform: translateX(-50%) translateY(-40px) rotate(-4deg); } 65% { transform: translateX(-50%) translateY(0) rotate(4deg) scaleY(.96); } }
 @keyframes munch { to { transform: translateX(-50%) scaleY(.96) scaleX(1.025); } }
 @keyframes talk { to { transform: scaleY(1.025) scaleX(.975) rotate(.7deg); } }
+@keyframes listen-in { to { transform: translateX(-50%) translateY(-5px) scale(1.012); } }
+@keyframes listen-glow { to { opacity: .62; transform: translateX(-50%) scale(1.1); } }
 @keyframes breathe { 50% { transform: translateX(-50%) scaleY(.97) scaleX(1.015); } }
 @keyframes float-up { from { opacity: 1; transform: translateY(0) scale(.7) rotate(-10deg); } to { opacity: 0; transform: translateY(-115px) scale(1.3) rotate(18deg); } }
 @keyframes record-pulse { to { filter: brightness(1.15); } }

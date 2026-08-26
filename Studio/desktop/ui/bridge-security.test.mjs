@@ -24,6 +24,8 @@ test('maps protected bridge methods to declared permissions', () => {
   assert.equal(hasBridgePermission('device.unsubscribeEvents', []), false);
   assert.equal(hasBridgePermission('storage.set', ['storage']), true);
   assert.equal(hasBridgePermission('storage.get', []), false);
+  assert.equal(hasBridgePermission('audio.startRecording', ['audio.capture']), true);
+  assert.equal(hasBridgePermission('audio.playRecording', []), false);
   assert.equal(hasBridgePermission('plugin.sendMessage', []), true);
 });
 

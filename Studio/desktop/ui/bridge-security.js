@@ -6,6 +6,7 @@ const PERMISSION_BY_METHOD = new Map([
 export function requiredPermission(method) {
   if (method.startsWith('display.')) return 'display';
   if (method.startsWith('storage.')) return 'storage';
+  if (method.startsWith('audio.')) return 'audio.capture';
   return PERMISSION_BY_METHOD.get(method) ?? null;
 }
 

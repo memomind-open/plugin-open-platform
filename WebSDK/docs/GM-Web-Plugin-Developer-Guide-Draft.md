@@ -190,8 +190,9 @@ Supported permissions:
 | `device.events` | Subscribe to button, head-motion, connection, and IMU events |
 | `storage` | Use App key-value storage isolated to the current plugin |
 | `network` | Declare that the plugin needs network access |
+| `audio.capture` | Capture bounded Opus audio from the glasses and play an allowlisted local voice effect |
 
-The App checks `display`, `device.events`, and `storage` at the corresponding
+The App checks `display`, `device.events`, `storage`, and `audio.capture` at the corresponding
 Bridge calls. `device.getInfo()` and `plugin.sendMessage()` require no manifest
 permission. Do not declare unused permissions.
 
@@ -562,6 +563,8 @@ try {
 | `METHOD_NOT_FOUND` | Method is unknown or unsupported by the Host |
 | `RATE_LIMITED` | Request rate exceeds a limit |
 | `BUSY` | Device or runtime is busy |
+| `AUDIO_BUSY` | Another App audio business owns the glasses recording channel |
+| `NO_AUDIO` | Recording stopped without receiving an audio frame |
 | `QUOTA_EXCEEDED` | Storage, subscription, or another quota was exceeded |
 | `TIMEOUT` | SDK or Bridge request timed out |
 | `DEVICE_DISCONNECTED` | Device is not connected |

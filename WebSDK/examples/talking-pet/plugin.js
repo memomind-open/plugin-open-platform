@@ -2,6 +2,7 @@ import { createGMPlugin } from './vendor/gm-plugin-web-sdk.esm.js';
 
 const gm = createGMPlugin();
 const pet = document.querySelector('#pet');
+const petImage = document.querySelector('#pet-image');
 const speech = document.querySelector('#speech');
 const status = document.querySelector('#status');
 const connectionDot = document.querySelector('#connection-dot');
@@ -12,6 +13,15 @@ const deviceCanvas = document.createElement('canvas');
 const deviceContext = deviceCanvas.getContext('2d', { willReadFrequently: true });
 const DEVICE_WIDTH = 600;
 const DEVICE_HEIGHT = 350;
+const petVisuals = {
+  idle: './assets/momo-festive.png',
+  listening: './assets/momo-listening-v2.png',
+  talking: './assets/momo-talking-v2.png',
+};
+Object.values(petVisuals).forEach((source) => {
+  const image = new Image();
+  image.src = source;
+});
 deviceCanvas.width = DEVICE_WIDTH;
 deviceCanvas.height = DEVICE_HEIGHT;
 
@@ -43,6 +53,117 @@ let devicePageCreated = false;
 let deviceMood = 'idle';
 let deviceMoodTimer;
 let presentedDeviceTiles = new Map();
+let mouthAnimationTimer;
+let nativeAudioAvailable = false;
+let nativeAudioState = 'idle';
+let nativeAudioConfigurePromise;
+let nativeStartRequestInFlight = false;
+let nativePressGeneration = 0;
+let nativeRecordingId;
+let observedNativeFrames = 0;
+
+gm.audio.onFrames((batch) => {
+  observedNativeFrames += batch.frames.length;
+});
+
+gm.audio.onState((audioState) => {
+  nativeAudioState = audioState.state;
+  if (audioState.state === 'recording') {
+    nativeRecordingId = audioState.recordingId;
+    observedNativeFrames = 0;
+    showListeningState();
+  } else if (audioState.state === 'stopped') {
+    nativeRecordingId = audioState.latestRecordingId ?? audioState.recordingId;
+    resetTalkButton();
+    if (nativeRecordingId) {
+      void gm.audio.playRecording({ recordingId: nativeRecordingId, voice: 'cute' }).catch(showNativeAudioError);
+    }
+  } else if (audioState.state === 'error') {
+    resetTalkButton();
+    stopMouthAnimation();
+    const detail = audioState.errorCode === 'NO_AUDIO'
+      ? '没有收到声音，再试一次吧。'
+      : `眼镜录音失败：${audioState.message ?? audioState.errorCode ?? '未知错误'}`;
+    say(detail);
+  }
+});
+
+gm.audio.onPlaybackState((playback) => {
+  if (playback.state === 'playing') {
+    say('Momo 用眼镜听到后学你说：');
+    startMouthAnimation();
+    setDeviceMood('talking', 4000);
+    burst('♪', 6);
+    change({ happy: 10, energy: -2 }, 15);
+  } else if (playback.state === 'completed' || playback.state === 'stopped') {
+    stopMouthAnimation();
+  } else if (playback.state === 'error') {
+    stopMouthAnimation();
+    showNativeAudioError(playback);
+  }
+});
+
+function resetTalkButton() {
+  talkButton.classList.remove('recording');
+  talkButton.querySelector('strong').textContent = '按住说话';
+  pet.classList.remove('listening');
+}
+
+function showListeningState() {
+  talkButton.classList.add('recording');
+  talkButton.querySelector('strong').textContent = '松开让我学';
+  stopMouthAnimation('listening');
+  pet.classList.add('listening');
+  setDeviceMood('listening', 15000);
+  say('眼镜耳朵竖起来啦，我在认真听…');
+}
+
+function showNativeAudioError(error) {
+  resetTalkButton();
+  stopMouthAnimation();
+  say(`眼镜音频暂时用不了：${error?.message ?? error?.errorCode ?? '未知错误'}`);
+}
+
+function ensureNativeAudioConfigured() {
+  if (!nativeAudioConfigurePromise) {
+    nativeAudioConfigurePromise = gm.audio
+      .configure({ noiseReduction: true, pickupMode: 'frontFocus' })
+      .catch((error) => {
+        nativeAudioConfigurePromise = undefined;
+        throw error;
+      });
+  }
+  return nativeAudioConfigurePromise;
+}
+
+function requestNativeRecordingStop() {
+  if (nativeAudioState === 'stopping') return;
+  nativeAudioState = 'stopping';
+  void gm.audio.stopRecording().catch((error) => {
+    nativeAudioState = 'error';
+    showNativeAudioError(error);
+  });
+}
+
+function setPetVisual(stateName) {
+  petImage.src = petVisuals[stateName] ?? petVisuals.idle;
+}
+
+function stopMouthAnimation(nextState = 'idle') {
+  window.clearInterval(mouthAnimationTimer);
+  mouthAnimationTimer = undefined;
+  pet.classList.remove('listening');
+  setPetVisual(nextState);
+}
+
+function startMouthAnimation() {
+  stopMouthAnimation('talking');
+  let mouthOpen = true;
+  mouthAnimationTimer = window.setInterval(() => {
+    mouthOpen = !mouthOpen;
+    setPetVisual(mouthOpen ? 'talking' : 'listening');
+  }, 135);
+}
 
 const clamp = (value) => Math.max(0, Math.min(100, Math.round(value)));
 const randomLine = (type) => lines[type][Math.floor(Math.random() * lines[type].length)];
@@ -386,6 +507,31 @@ async function startRecording(event) {
   event?.preventDefault();
   talkInputActive = true;
   if (event?.pointerId !== undefined) talkButton.setPointerCapture?.(event.pointerId);
+  if (nativeAudioAvailable) {
+    if (nativeAudioState !== 'idle' && nativeAudioState !== 'stopped' && nativeAudioState !== 'error') return;
+    const pressGeneration = ++nativePressGeneration;
+    try {
+      nativeAudioState = 'starting';
+      observedNativeFrames = 0;
+      await ensureNativeAudioConfigured();
+      if (!talkInputActive || pressGeneration !== nativePressGeneration) {
+        if (pressGeneration === nativePressGeneration) {
+          nativeAudioState = 'idle';
+          resetTalkButton();
+        }
+        return;
+      }
+      nativeStartRequestInFlight = true;
+      await gm.audio.startRecording();
+      nativeStartRequestInFlight = false;
+      if (!talkInputActive || pressGeneration !== nativePressGeneration) requestNativeRecordingStop();
+    } catch (error) {
+      nativeStartRequestInFlight = false;
+      nativeAudioState = 'error';
+      showNativeAudioError(error);
+    }
+    return;
+  }
   if (recorder?.state === 'recording') return;
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
     say('当前浏览器不支持录音，可以摸摸我！');
@@ -404,13 +550,12 @@ async function startRecording(event) {
     });
     recorder.addEventListener('stop', repeatRecording, { once: true });
     recorder.start();
-    talkButton.classList.add('recording');
-    talkButton.querySelector('strong').textContent = '松开让我学';
-    animate('talking', 6000);
+    showListeningState();
     setDeviceMood('listening', 6000);
-    say('我在认真听…');
+    say('耳朵竖起来啦，我在认真听…');
     recordingTimer = window.setTimeout(stopRecording, 5000);
   } catch (error) {
+    stopMouthAnimation();
     say(error.name === 'NotAllowedError' ? '需要麦克风权限才能学你说话。' : '麦克风暂时用不了。');
   }
 }
@@ -419,27 +564,52 @@ function stopRecording(event) {
   event?.preventDefault();
   talkInputActive = false;
   window.clearTimeout(recordingTimer);
+  if (nativeAudioAvailable) {
+    nativePressGeneration += 1;
+    resetTalkButton();
+    if (nativeAudioState === 'recording') {
+      requestNativeRecordingStop();
+    } else if (nativeAudioState === 'starting') {
+      if (nativeStartRequestInFlight) {
+        // The bridge has accepted START (or is about to); stop it as soon as
+        // that request settles so a quick release cannot leave capture active.
+        return;
+      }
+      // The user released while only local configuration was pending. No
+      // native recording exists yet, so restore the state for the next press.
+      nativeAudioState = 'idle';
+    }
+    return;
+  }
   if (recorder?.state === 'recording') recorder.stop();
-  talkButton.classList.remove('recording');
-  talkButton.querySelector('strong').textContent = '按住说话';
-  pet.classList.remove('talking');
+  resetTalkButton();
 }
 
 function repeatRecording() {
   recordingStream?.getTracks().forEach((track) => track.stop());
-  if (!recordingChunks.length) return;
+  if (!recordingChunks.length) {
+    stopMouthAnimation();
+    return;
+  }
   const audioUrl = URL.createObjectURL(new Blob(recordingChunks, { type: recorder.mimeType }));
   const audio = new Audio(audioUrl);
   audio.playbackRate = 1.3;
   audio.preservesPitch = false;
   audio.addEventListener('play', () => {
     say('Momo 学你说：');
+    startMouthAnimation();
     animate('talking', Math.max(800, (audio.duration || 2) * 770));
     setDeviceMood('talking', Math.max(800, (audio.duration || 2) * 770));
     burst('♪', 6);
   });
-  audio.addEventListener('ended', () => URL.revokeObjectURL(audioUrl), { once: true });
-  audio.play().catch(() => say('点一下屏幕后再让我学说话吧。'));
+  audio.addEventListener('ended', () => {
+    stopMouthAnimation();
+    URL.revokeObjectURL(audioUrl);
+  }, { once: true });
+  audio.play().catch(() => {
+    stopMouthAnimation();
+    say('点一下屏幕后再让我学说话吧。');
+  });
   change({ happy: 10, energy: -2 }, 15);
 }
 
@@ -466,6 +636,9 @@ async function initialize() {
   render();
   try {
     await gm.ready();
+    const capabilities = await gm.runtime.getCapabilities();
+    nativeAudioAvailable = Boolean(capabilities?.audio);
+    if (nativeAudioAvailable) await ensureNativeAudioConfigured();
     const saved = await gm.storage.get('talking-pet-state');
     if (saved.value && typeof saved.value === 'object') Object.assign(state, saved.value);
     render();
@@ -490,7 +663,10 @@ async function initialize() {
     const deviceInfo = await gm.device.getInfo();
     glassesConnected = deviceInfo.connected;
     connectionDot.classList.toggle('connected', glassesConnected);
-    status.textContent = glassesConnected ? 'Bridge v1 已就绪 · 正在同步画面' : 'Bridge v1 已就绪 · 等待眼镜连接';
+    const audioMode = nativeAudioAvailable ? '眼镜麦克风已就绪' : '使用手机麦克风';
+    status.textContent = glassesConnected
+      ? `Bridge v1 已就绪 · ${audioMode} · 正在同步画面`
+      : `Bridge v1 已就绪 · ${audioMode} · 等待眼镜连接`;
     if (glassesConnected) await syncToGlasses();
   } catch (error) {
     status.textContent = `独立试玩模式 · ${error.code ?? 'Bridge 未连接'}`;
@@ -505,7 +681,9 @@ window.addEventListener('pagehide', () => {
   window.clearInterval(decayTimer);
   window.clearTimeout(glassesSyncTimer);
   window.clearTimeout(deviceMoodTimer);
+  stopMouthAnimation();
   stopRecording();
+  if (nativeAudioAvailable) void gm.audio.stopPlayback();
   recordingStream?.getTracks().forEach((track) => track.stop());
 });
 

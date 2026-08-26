@@ -134,6 +134,15 @@ export class StudioRuntime {
         return { removed: this.subscriptions.delete(requireString(params, 'subscriptionId')) };
       case 'plugin.sendMessage':
         return this.sendPluginMessage(params);
+      case 'audio.configure':
+      case 'audio.startRecording':
+      case 'audio.stopRecording':
+      case 'audio.playRecording':
+      case 'audio.stopPlayback':
+        throw new StudioBridgeError(
+          'CAPABILITY_UNAVAILABLE',
+          'Native glasses audio is unavailable in Studio',
+        );
       default:
         throw new StudioBridgeError('METHOD_NOT_FOUND', 'Bridge method is not supported');
     }
