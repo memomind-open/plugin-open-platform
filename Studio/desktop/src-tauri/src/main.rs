@@ -45,7 +45,9 @@ struct NativeTextOverlay {
     gray: u8,
     opacity: u8,
     wrap: u8,
-    reserved: u8,
+    auto_size: u8,
+    object_alignment: u8,
+    reserved: [u8; 3],
     utf8_size: usize,
 }
 
@@ -472,6 +474,8 @@ struct FrameTextOverlay {
     gray: u8,
     opacity: u8,
     wrap: bool,
+    auto_size: bool,
+    object_alignment: u8,
     text: String,
 }
 
@@ -1844,6 +1848,8 @@ fn read_text_overlays(previewer: &NativePreviewer) -> Result<Vec<FrameTextOverla
             gray: native.gray,
             opacity: native.opacity,
             wrap: native.wrap != 0,
+            auto_size: native.auto_size != 0,
+            object_alignment: native.object_alignment,
             text,
         });
     }

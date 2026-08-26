@@ -21,7 +21,9 @@ typedef struct gm_preview_text_overlay {
     uint8_t gray;
     uint8_t opacity;
     uint8_t wrap;
-    uint8_t reserved;
+    uint8_t auto_size;
+    uint8_t object_alignment;
+    uint8_t reserved[3];
     size_t utf8_size;
 } gm_preview_text_overlay;
 
