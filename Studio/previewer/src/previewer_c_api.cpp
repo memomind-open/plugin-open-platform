@@ -141,6 +141,43 @@ int gm_preview_copy_frame(gm_preview_handle *handle, uint8_t *output,
     });
 }
 
+size_t gm_preview_text_overlay_count(const gm_preview_handle *handle)
+{
+    return handle ? handle->previewer.textOverlays().size() : 0;
+}
+
+int gm_preview_get_text_overlay(const gm_preview_handle *handle, size_t index,
+                                gm_preview_text_overlay *output)
+{
+    if (!handle || !output || index >= handle->previewer.textOverlays().size()) return 0;
+    const gmpreview::TextOverlay &overlay = handle->previewer.textOverlays()[index];
+    output->x = overlay.x;
+    output->y = overlay.y;
+    output->width = overlay.width;
+    output->height = overlay.height;
+    output->font_height = overlay.font_height;
+    output->alignment = overlay.alignment;
+    output->letter_space = overlay.letter_space;
+    output->line_space = overlay.line_space;
+    output->gray = overlay.gray;
+    output->opacity = overlay.opacity;
+    output->wrap = overlay.wrap ? 1 : 0;
+    output->reserved = 0;
+    output->utf8_size = overlay.utf8.size();
+    return 1;
+}
+
+int gm_preview_copy_text_overlay_utf8(const gm_preview_handle *handle,
+                                      size_t index, char *output,
+                                      size_t output_size)
+{
+    if (!handle || index >= handle->previewer.textOverlays().size()) return 0;
+    const std::string &text = handle->previewer.textOverlays()[index].utf8;
+    if ((!output && !text.empty()) || output_size < text.size()) return 0;
+    if (!text.empty()) std::copy(text.begin(), text.end(), output);
+    return 1;
+}
+
 size_t gm_preview_outbox_count(const gm_preview_handle *handle)
 {
     return handle ? handle->previewer.bluetoothOutbox().size() : 0;

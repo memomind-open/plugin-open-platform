@@ -214,6 +214,23 @@ int main(int argc, char **argv)
         assert(gm_preview_stop(handle) == 1);
     }
 
+    if (argc > 4) {
+        assert(gm_preview_load(handle, argv[4]) == 1);
+        assert(gm_preview_start(handle) == 1);
+        assert(gm_preview_tick(handle, 33) == 1);
+        assert(gm_preview_copy_frame(handle, frame.data(), frame.size()) == 1);
+        assert(gm_preview_text_overlay_count(handle) > 0);
+        gm_preview_text_overlay overlay{};
+        assert(gm_preview_get_text_overlay(handle, 0, &overlay) == 1);
+        assert(overlay.width > 0);
+        assert(overlay.height > 0);
+        assert(overlay.utf8_size > 0);
+        std::vector<char> text(overlay.utf8_size);
+        assert(gm_preview_copy_text_overlay_utf8(handle, 0, text.data(), text.size()) == 1);
+        assert(!text.empty());
+        assert(gm_preview_stop(handle) == 1);
+    }
+
     gm_preview_destroy(handle);
     return 0;
 }

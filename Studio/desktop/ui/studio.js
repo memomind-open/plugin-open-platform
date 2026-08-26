@@ -19,6 +19,7 @@ import {
   isTrustedPluginMessage,
   storageNamespace,
 } from './bridge-security.js';
+import { drawTextOverlays } from './text-overlay.js';
 
 const { invoke } = window.__TAURI__.core;
 
@@ -671,6 +672,7 @@ function drawFrame(result) {
     writeGreenPixel(image.data, index * 2 + 1, packed & 0x0f);
   }
   context.putImageData(image, 0, 0);
+  drawTextOverlays(context, result.textOverlays, result.width, result.height);
   renderedFrames += 1;
   const now = performance.now();
   if (now - fpsWindow >= 1000) {
