@@ -10,9 +10,13 @@ const packageJson = JSON.parse(await readFile(resolve(repositoryRoot, 'package.j
 
 test('plugin SDK vendor copies match the formal standalone SDK', async () => {
   const expected = await bundleWebSdk(repositoryRoot, packageJson.version);
-  for (const plugin of ['fighter-controller', 'gm-life-desk']) {
+  for (const plugin of [
+    'plugins/fighter-controller',
+    'plugins/gm-life-desk',
+    'examples/talking-pet',
+  ]) {
     const actual = await readFile(
-      resolve(repositoryRoot, `plugins/${plugin}/vendor/gm-plugin-web-sdk.esm.js`),
+      resolve(repositoryRoot, plugin, 'vendor/gm-plugin-web-sdk.esm.js'),
       'utf8',
     );
     assert.equal(actual, expected, `${plugin} vendor SDK is stale`);
