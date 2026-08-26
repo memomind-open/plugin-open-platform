@@ -1238,14 +1238,19 @@ void Previewer::renderNode(const Node &object)
     int x, y, width, height;
     absoluteBox(object, x, y, width, height);
     const uint8_t overall_opacity = static_cast<uint8_t>(style(object, 96, 0, 255));
+    const bool has_box = object.type == NodeType::Object || object.type == NodeType::Label;
+    const int border = has_box
+        ? std::max(0, static_cast<int32_t>(style(object, 50, 0, 0)))
+        : 0;
+    const bool border_visible = border > 0 && style(object, 49, 0, 255);
+    const bool border_post = style(object, 52, 0, 0) != 0;
 
-    if (object.type == NodeType::Object || object.type == NodeType::Label) {
+    if (has_box) {
         uint8_t bg_opacity = static_cast<uint8_t>(style(object, 33, 0, 0));
         bg_opacity = static_cast<uint8_t>(static_cast<unsigned>(bg_opacity) * overall_opacity / 255);
         if (bg_opacity) fillRect(x, y, width, height,
                                  nativeColorToGray(style(object, 32, 0, 0)), bg_opacity);
-        const int border = std::max(0, static_cast<int32_t>(style(object, 50, 0, 0)));
-        if (border && style(object, 49, 0, 255))
+        if (border_visible && !border_post)
             strokeRect(x, y, width, height, border,
                        nativeColorToGray(style(object, 48, 0, 255)));
         const int outline = std::max(0, static_cast<int32_t>(style(object, 53, 0, 0)));
@@ -1328,6 +1333,10 @@ void Previewer::renderNode(const Node &object)
 
     for (const auto &entry : nodes_)
         if (entry.second.parent == object.handle) renderNode(entry.second);
+
+    if (border_visible && border_post)
+        strokeRect(x, y, width, height, border,
+                   nativeColorToGray(style(object, 48, 0, 255)));
 }
 
 const std::vector<uint8_t> &Previewer::renderFrame()
