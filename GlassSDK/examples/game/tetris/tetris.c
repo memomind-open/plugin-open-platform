@@ -386,6 +386,8 @@ static gm_plugin_result_t create_ui(tetris_t *self)
     self->ui->obj_set_size(self->board_obj, self->board_width,
                            self->board_height);
     style_box(self, self->board_obj, 0, 1);
+    set_style(self, self->board_obj, GM_PLUGIN_LVGL_STYLE_BORDER_POST,
+              number(1));
     set_style(self, self->board_obj, GM_PLUGIN_LVGL_STYLE_BG_COLOR, color(0x10));
     set_style(self, self->board_obj, GM_PLUGIN_LVGL_STYLE_BG_OPA, number(255));
     self->ui->obj_clear_flag(self->board_obj, GM_PLUGIN_LVGL_FLAG_SCROLLABLE);
