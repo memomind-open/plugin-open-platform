@@ -52,6 +52,8 @@ struct TextOverlay {
     uint8_t gray = 255;
     uint8_t opacity = 255;
     bool wrap = true;
+    bool auto_size = false;
+    uint8_t object_alignment = 0;
     std::string utf8;
 };
 
@@ -212,7 +214,11 @@ private:
     void absoluteBox(const Node &node, int &x, int &y, int &width, int &height) const;
     void renderNode(const Node &node);
     void fillRect(int x, int y, int width, int height, uint8_t gray, uint8_t opacity = 255);
+    void fillRoundedRect(int x, int y, int width, int height, int radius,
+                         uint8_t gray, uint8_t opacity = 255);
     void strokeRect(int x, int y, int width, int height, int stroke, uint8_t gray);
+    void strokeRoundedRect(int x, int y, int width, int height, int radius,
+                           int stroke, uint8_t gray);
     void drawLine(int x0, int y0, int x1, int y1, int width, uint8_t gray);
     void drawArc(int cx, int cy, int radius, int width, double start, double end, uint8_t gray);
     uint8_t nativeColorToGray(uint32_t color) const;

@@ -43,6 +43,56 @@ function drawLine(context, text, x, y, letterSpace) {
   }
 }
 
+function isHorizontallyCentered(alignment) {
+  return alignment === 2 || alignment === 5 || alignment === 9;
+}
+
+function isRightAligned(alignment) {
+  return alignment === 3 || alignment === 6 || alignment === 8;
+}
+
+export function layoutOverlayText(context, overlay) {
+  const characterHeight = overlay.fontHeight >= 40 ? 30 : 24;
+  const letterSpace = Number.isFinite(overlay.letterSpace) ? overlay.letterSpace : 0;
+  const lineSpace = Number.isFinite(overlay.lineSpace) ? overlay.lineSpace : 0;
+  const lineHeight = Math.max(1, overlay.fontHeight + lineSpace);
+  const lines = wrapOverlayText(
+    context,
+    overlay.text,
+    overlay.width,
+    overlay.autoSize ? false : overlay.wrap,
+    letterSpace,
+  );
+  const measured = lines.map((line) => ({
+    text: line,
+    width: measureLine(context, line, letterSpace),
+  }));
+  const contentWidth = measured.reduce((width, line) => Math.max(width, line.width), 0);
+  let x = overlay.x;
+  let width = overlay.width;
+  if (overlay.autoSize) {
+    if (isHorizontallyCentered(overlay.objectAlignment)) {
+      x += (width - contentWidth) / 2;
+    } else if (isRightAligned(overlay.objectAlignment)) {
+      x += width - contentWidth;
+    }
+    width = contentWidth;
+  }
+  const visibleLines = [];
+  for (let index = 0; index < measured.length; index += 1) {
+    const y = overlay.y + index * lineHeight;
+    if (y + characterHeight > overlay.y + overlay.height) break;
+    visibleLines.push({ ...measured[index], y });
+  }
+  return {
+    x,
+    width,
+    characterHeight,
+    letterSpace,
+    visibleLines,
+  };
+}
+
 export function drawTextOverlays(context, overlays, canvasWidth, canvasHeight) {
   context.save();
   context.beginPath();
@@ -53,31 +103,24 @@ export function drawTextOverlays(context, overlays, canvasWidth, canvasHeight) {
   for (const overlay of overlays ?? []) {
     if (!overlay.text || overlay.width <= 0 || overlay.height <= 0) continue;
     const characterHeight = overlay.fontHeight >= 40 ? 30 : 24;
-    const letterSpace = Number.isFinite(overlay.letterSpace) ? overlay.letterSpace : 0;
-    const lineSpace = Number.isFinite(overlay.lineSpace) ? overlay.lineSpace : 0;
-    const lineHeight = Math.max(1, overlay.fontHeight + lineSpace);
     const gray = Math.max(0, Math.min(255, overlay.gray));
     context.font = `${characterHeight}px "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif`;
     context.fillStyle = `rgb(${Math.round(gray / 12)}, ${gray}, ${Math.round(gray / 5)})`;
     context.globalAlpha = Math.max(0, Math.min(255, overlay.opacity)) / 255;
+    const layout = layoutOverlayText(context, overlay);
+    if (layout.width <= 0) continue;
 
-    const lines = wrapOverlayText(
-      context,
-      overlay.text,
-      overlay.width,
-      overlay.wrap,
-      letterSpace,
-    );
-    for (let index = 0; index < lines.length; index += 1) {
-      const y = overlay.y + index * lineHeight;
-      if (y >= overlay.y + overlay.height) break;
-      const line = lines[index];
-      const lineWidth = measureLine(context, line, letterSpace);
-      let x = overlay.x;
-      if (overlay.alignment === 2) x += (overlay.width - lineWidth) / 2;
-      else if (overlay.alignment === 3) x += overlay.width - lineWidth;
-      drawLine(context, line, x, y, letterSpace);
+    context.save();
+    context.beginPath();
+    context.rect(layout.x, overlay.y, layout.width, overlay.height);
+    context.clip();
+    for (const line of layout.visibleLines) {
+      let x = layout.x;
+      if (overlay.alignment === 2) x += (layout.width - line.width) / 2;
+      else if (overlay.alignment === 3) x += layout.width - line.width;
+      drawLine(context, line.text, x, line.y, layout.letterSpace);
     }
+    context.restore();
   }
   context.restore();
 }

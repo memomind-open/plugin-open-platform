@@ -162,7 +162,9 @@ int gm_preview_get_text_overlay(const gm_preview_handle *handle, size_t index,
     output->gray = overlay.gray;
     output->opacity = overlay.opacity;
     output->wrap = overlay.wrap ? 1 : 0;
-    output->reserved = 0;
+    output->auto_size = overlay.auto_size ? 1 : 0;
+    output->object_alignment = overlay.object_alignment;
+    std::fill_n(output->reserved, 3, 0);
     output->utf8_size = overlay.utf8.size();
     return 1;
 }

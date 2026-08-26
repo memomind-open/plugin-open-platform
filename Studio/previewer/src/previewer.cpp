@@ -74,6 +74,24 @@ std::string hex32(uint32_t value)
     return out.str();
 }
 
+bool roundedRectContains(int pixel_x, int pixel_y,
+                         int width, int height, int radius)
+{
+    if (pixel_x < 0 || pixel_y < 0 || pixel_x >= width || pixel_y >= height)
+        return false;
+    radius = std::max(0, std::min(radius, std::min(width, height) / 2));
+    if (radius == 0 ||
+        (pixel_x >= radius && pixel_x < width - radius) ||
+        (pixel_y >= radius && pixel_y < height - radius))
+        return true;
+
+    const double center_x = pixel_x < radius ? radius : width - radius;
+    const double center_y = pixel_y < radius ? radius : height - radius;
+    const double dx = pixel_x + 0.5 - center_x;
+    const double dy = pixel_y + 0.5 - center_y;
+    return dx * dx + dy * dy <= static_cast<double>(radius * radius);
+}
+
 } // namespace
 
 Previewer::Previewer()
@@ -1067,7 +1085,10 @@ void Previewer::absoluteBox(const Node &object, int &x, int &y,
         const int font = fontHeight(style(object, 87, 0, kFontDefault));
         width = textWidth(object.text, font,
                           static_cast<int32_t>(style(object, 88, 0, 0)));
-        height = font;
+        const int line_space = static_cast<int32_t>(style(object, 89, 0, 0));
+        const int lines = 1 + static_cast<int>(std::count(object.text.begin(),
+                                                          object.text.end(), '\n'));
+        height = lines * font + (lines - 1) * line_space;
     }
     width = std::max(0, width);
     height = std::max(0, height);
@@ -1106,7 +1127,9 @@ void Previewer::absoluteBox(const Node &object, int &x, int &y,
 
 uint8_t Previewer::nativeColorToGray(uint32_t color) const
 {
-    return static_cast<uint8_t>(color & 0xff);
+    // Firmware stores the display intensity in the high green nibble of its
+    // native R2B2G4 LVGL color. Expand that nibble before GRAY_4 packing.
+    return static_cast<uint8_t>(((color >> 4) & 0x0f) * 17u);
 }
 
 void Previewer::fillRect(int x, int y, int width, int height,
@@ -1124,6 +1147,27 @@ void Previewer::fillRect(int x, int y, int width, int height,
     }
 }
 
+void Previewer::fillRoundedRect(int x, int y, int width, int height,
+                                int radius, uint8_t gray, uint8_t opacity)
+{
+    radius = std::max(0, std::min(radius, std::min(width, height) / 2));
+    if (radius == 0) {
+        fillRect(x, y, width, height, gray, opacity);
+        return;
+    }
+    const int left = std::max(0, x), top = std::max(0, y);
+    const int right = std::min(kDisplayWidth, x + width);
+    const int bottom = std::min(kDisplayHeight, y + height);
+    for (int py = top; py < bottom; ++py) {
+        for (int px = left; px < right; ++px) {
+            if (!roundedRectContains(px - x, py - y, width, height, radius)) continue;
+            uint8_t &pixel = frame_[py * kDisplayWidth + px];
+            pixel = static_cast<uint8_t>((static_cast<unsigned>(pixel) * (255 - opacity) +
+                                          static_cast<unsigned>(gray) * opacity) / 255);
+        }
+    }
+}
+
 void Previewer::strokeRect(int x, int y, int width, int height,
                            int stroke, uint8_t gray)
 {
@@ -1132,6 +1176,32 @@ void Previewer::strokeRect(int x, int y, int width, int height,
     fillRect(x, y + height - stroke, width, stroke, gray);
     fillRect(x, y, stroke, height, gray);
     fillRect(x + width - stroke, y, stroke, height, gray);
+}
+
+void Previewer::strokeRoundedRect(int x, int y, int width, int height,
+                                  int radius, int stroke, uint8_t gray)
+{
+    if (stroke <= 0 || width <= 0 || height <= 0) return;
+    radius = std::max(0, std::min(radius, std::min(width, height) / 2));
+    if (radius == 0) {
+        strokeRect(x, y, width, height, stroke, gray);
+        return;
+    }
+    const int inner_width = width - stroke * 2;
+    const int inner_height = height - stroke * 2;
+    const int inner_radius = std::max(0, radius - stroke);
+    const int left = std::max(0, x), top = std::max(0, y);
+    const int right = std::min(kDisplayWidth, x + width);
+    const int bottom = std::min(kDisplayHeight, y + height);
+    for (int py = top; py < bottom; ++py) {
+        for (int px = left; px < right; ++px) {
+            if (!roundedRectContains(px - x, py - y, width, height, radius)) continue;
+            const bool inside = inner_width > 0 && inner_height > 0 &&
+                roundedRectContains(px - x - stroke, py - y - stroke,
+                                    inner_width, inner_height, inner_radius);
+            if (!inside) frame_[py * kDisplayWidth + px] = gray;
+        }
+    }
 }
 
 void Previewer::drawLine(int x0, int y0, int x1, int y1, int width, uint8_t gray)
@@ -1239,25 +1309,31 @@ void Previewer::renderNode(const Node &object)
     absoluteBox(object, x, y, width, height);
     const uint8_t overall_opacity = static_cast<uint8_t>(style(object, 96, 0, 255));
     const bool has_box = object.type == NodeType::Object || object.type == NodeType::Label;
+    const int radius = has_box
+        ? std::max(0, static_cast<int32_t>(style(object, 11, 0, 0)))
+        : 0;
     const int border = has_box
         ? std::max(0, static_cast<int32_t>(style(object, 50, 0, 0)))
         : 0;
     const bool border_visible = border > 0 && style(object, 49, 0, 255);
-    const bool border_post = style(object, 52, 0, 0) != 0;
+    // Match the device compositor when a plugin leaves the draw order unset:
+    // keep parent borders visible after child content is rendered.
+    const bool border_post = style(object, 52, 0, 1) != 0;
 
     if (has_box) {
         uint8_t bg_opacity = static_cast<uint8_t>(style(object, 33, 0, 0));
         bg_opacity = static_cast<uint8_t>(static_cast<unsigned>(bg_opacity) * overall_opacity / 255);
-        if (bg_opacity) fillRect(x, y, width, height,
-                                 nativeColorToGray(style(object, 32, 0, 0)), bg_opacity);
+        if (bg_opacity) fillRoundedRect(x, y, width, height, radius,
+                                        nativeColorToGray(style(object, 32, 0, 0)),
+                                        bg_opacity);
         if (border_visible && !border_post)
-            strokeRect(x, y, width, height, border,
-                       nativeColorToGray(style(object, 48, 0, 255)));
+            strokeRoundedRect(x, y, width, height, radius, border,
+                              nativeColorToGray(style(object, 48, 0, 255)));
         const int outline = std::max(0, static_cast<int32_t>(style(object, 53, 0, 0)));
         if (outline && style(object, 55, 0, 255))
-            strokeRect(x - outline, y - outline, width + outline * 2,
-                       height + outline * 2, outline,
-                       nativeColorToGray(style(object, 54, 0, 128)));
+            strokeRoundedRect(x - outline, y - outline, width + outline * 2,
+                              height + outline * 2, radius + outline, outline,
+                              nativeColorToGray(style(object, 54, 0, 128)));
     }
 
     if (object.type == NodeType::Label && !object.text.empty()) {
@@ -1293,6 +1369,10 @@ void Previewer::renderNode(const Node &object)
             overlay.gray = text_gray;
             overlay.opacity = text_opacity;
             overlay.wrap = object.label_mode == 0;
+            overlay.auto_size = !object.size_set &&
+                object.styles.find(static_cast<uint64_t>(1) << 32) == object.styles.end();
+            overlay.object_alignment = static_cast<uint8_t>(
+                style(object, 9, 0, object.alignment));
             overlay.utf8 = object.text;
             text_overlays_.push_back(std::move(overlay));
         }
@@ -1335,8 +1415,8 @@ void Previewer::renderNode(const Node &object)
         if (entry.second.parent == object.handle) renderNode(entry.second);
 
     if (border_visible && border_post)
-        strokeRect(x, y, width, height, border,
-                   nativeColorToGray(style(object, 48, 0, 255)));
+        strokeRoundedRect(x, y, width, height, radius, border,
+                          nativeColorToGray(style(object, 48, 0, 255)));
 }
 
 const std::vector<uint8_t> &Previewer::renderFrame()
