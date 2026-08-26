@@ -34,10 +34,16 @@ if(BUILD_TESTING)
     set(GM_PREVIEW_EXTENSION_GMP "${CMAKE_CURRENT_SOURCE_DIR}/../../GlassSDK/build-host/extension/extension.gmp")
     set(GM_PREVIEW_LVGL_GMP "${CMAKE_CURRENT_SOURCE_DIR}/../../GlassSDK/build-host/lvgl_ui/lvgl_ui.gmp")
     if(EXISTS "${GM_PREVIEW_FIGHTER_GMP}" AND EXISTS "${GM_PREVIEW_WEB_BRIDGE_GMP}" AND
-       EXISTS "${GM_PREVIEW_EXTENSION_GMP}" AND EXISTS "${GM_PREVIEW_LVGL_GMP}")
+       EXISTS "${GM_PREVIEW_EXTENSION_GMP}")
+        set(GM_PREVIEW_TEST_GMPS
+            "${GM_PREVIEW_FIGHTER_GMP}"
+            "${GM_PREVIEW_WEB_BRIDGE_GMP}"
+            "${GM_PREVIEW_EXTENSION_GMP}")
+        if(EXISTS "${GM_PREVIEW_LVGL_GMP}")
+            list(APPEND GM_PREVIEW_TEST_GMPS "${GM_PREVIEW_LVGL_GMP}")
+        endif()
         add_test(NAME gmplugin-preview-c-api COMMAND gmplugin-preview-c-api-test
-            "${GM_PREVIEW_FIGHTER_GMP}" "${GM_PREVIEW_WEB_BRIDGE_GMP}"
-            "${GM_PREVIEW_EXTENSION_GMP}" "${GM_PREVIEW_LVGL_GMP}")
+            ${GM_PREVIEW_TEST_GMPS})
     else()
         add_test(NAME gmplugin-preview-c-api COMMAND gmplugin-preview-c-api-test)
     endif()
