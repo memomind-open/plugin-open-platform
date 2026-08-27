@@ -24,10 +24,22 @@ const petVisuals = {
   listening: './assets/momo-listening-v2.png',
   talking: './assets/momo-talking-v2.png',
 };
-Object.values(petVisuals).forEach((source) => {
-  const image = new Image();
-  image.src = source;
-});
+function preloadActionVisuals() {
+  Object.entries(petVisuals).forEach(([state, source]) => {
+    if (state === 'idle' || state === 'blink') return;
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = source;
+  });
+}
+
+window.addEventListener('load', () => {
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(preloadActionVisuals, { timeout: 3000 });
+  } else {
+    setTimeout(preloadActionVisuals, 1000);
+  }
+}, { once: true });
 deviceCanvas.width = DEVICE_WIDTH;
 deviceCanvas.height = DEVICE_HEIGHT;
 

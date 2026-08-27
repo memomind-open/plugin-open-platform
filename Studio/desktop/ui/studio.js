@@ -10,6 +10,7 @@ import {
 } from './scene-protocol.js';
 import {
   chooseDevicePlugin,
+  chooseWebPlugin,
   describeWorkspace,
   evaluateCompatibility,
   WEB_BRIDGE_PLUGIN_ID,
@@ -33,9 +34,18 @@ const devicePlugin = document.querySelector('#device-plugin');
 const webState = document.querySelector('#web-state');
 const deviceState = document.querySelector('#device-state');
 const pairStatus = document.querySelector('#pair-status');
-const shareButton = document.querySelector('#share-web');
-const shareDialog = document.querySelector('#share-dialog');
-const shareQr = document.querySelector('#share-qr');
+const webShareQr = document.querySelector('#web-share-qr');
+const webSharePlaceholder = document.querySelector('#web-share-placeholder');
+const webShareStatus = document.querySelector('#web-share-status');
+const webShareAddress = document.querySelector('#web-share-address');
+const webShareName = document.querySelector('#web-share-name');
+const deviceShareQr = document.querySelector('#device-share-qr');
+const deviceSharePlaceholder = document.querySelector('#device-share-placeholder');
+const deviceShareStatus = document.querySelector('#device-share-status');
+const deviceShareAddress = document.querySelector('#device-share-address');
+const deviceShareName = document.querySelector('#device-share-name');
+const qrZoom = document.querySelector('#qr-zoom');
+const qrZoomCanvas = document.querySelector('#qr-zoom-canvas');
 const subscriptions = new Map();
 const outboundWaiters = new Set();
 const storageNamespaces = new Map();
@@ -66,23 +76,36 @@ let pendingJoystickVector = null;
 let joystickAnimationFrame = null;
 let directionCommand = Promise.resolve();
 let directionInputGeneration = 0;
+let webPackageGeneration = 0;
+let webPackageQueue = Promise.resolve();
+let pendingWebPackagePath = '';
+let devicePackageGeneration = 0;
+let devicePackageQueue = Promise.resolve();
 
 document.querySelector('#refresh-web').addEventListener('click', discoverWebPlugins);
 document.querySelector('#refresh-device').addEventListener('click', discoverDevicePlugins);
 webPlugin.addEventListener('change', handleWebSelectionChange);
 devicePlugin.addEventListener('change', handleDeviceSelectionChange);
-document.querySelector('#import-web-workspace').addEventListener('click', () => importWebPlugin('pick_web_directory', '外部工作区'));
 document.querySelector('#import-web-file').addEventListener('click', () => importWebPlugin('pick_web_package', '外部包'));
-document.querySelector('#import-device-workspace').addEventListener('click', importDeviceWorkspace);
 document.querySelector('#import-device-file').addEventListener('click', importDeviceFile);
-document.querySelector('#run-web').addEventListener('click', runWebPlugin);
-shareButton.addEventListener('click', buildAndShareWebPlugin);
-document.querySelector('#run-device').addEventListener('click', runDevicePlugin);
-document.querySelector('#share-device').addEventListener('click', shareDevicePlugin);
-document.querySelector('#stop-device').addEventListener('click', stopDevicePlugin);
-document.querySelector('#close-share').addEventListener('click', () => shareDialog.close());
-document.querySelector('#stop-share').addEventListener('click', stopWebPackageShare);
 document.querySelector('#clear-log').addEventListener('click', () => logs.replaceChildren());
+for (const qr of [webShareQr, deviceShareQr]) {
+  qr.addEventListener('click', () => openQrZoom(qr));
+  qr.addEventListener('dblclick', (event) => event.preventDefault());
+  qr.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openQrZoom(qr);
+  });
+}
+qrZoom.addEventListener('click', (event) => {
+  if (event.target === qrZoomCanvas) return;
+  if (performance.now() - Number(qrZoom.dataset.openedAt || 0) < 400) return;
+  closeQrZoom();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !qrZoom.hidden) closeQrZoom();
+});
 for (const button of document.querySelectorAll('[data-button-action]')) {
   button.addEventListener('click', () => simulateDeviceEvent('simulate_button', {
     action: Number(button.dataset.buttonAction),
@@ -107,6 +130,9 @@ frame.addEventListener('load', () => {
   if (!webActive) return;
   webState.textContent = '运行中';
   postBootstrap();
+  const path = pendingWebPackagePath;
+  pendingWebPackagePath = '';
+  if (path) queueWebPackageShareWhenIdle(path);
 });
 
 async function discoverWebPlugins() {
@@ -130,7 +156,7 @@ async function discoverWebPlugins() {
     await handleWebSelectionChange();
   } catch (error) {
     webPlugin.replaceChildren(new Option('不加载 Web 插件（识别失败）', ''));
-    shareButton.disabled = true;
+    clearWebPackageShare('识别失败');
     webState.textContent = '识别失败';
     log('WEB DISCOVERY ERROR', String(error));
   } finally {
@@ -166,8 +192,9 @@ async function discoverDevicePlugins() {
     availableDevicePlugins = mergeDevicePlugins(plugins, [...importedDevicePlugins.values()]);
     if (availableDevicePlugins.length === 0) {
       devicePlugin.add(new Option('尚未构建设备插件，请导入 .gmp', ''));
-      document.querySelector('#share-device').disabled = true;
       deviceState.textContent = '缺少设备插件';
+      clearDevicePackageShare('等待选择');
+      void stopDevicePackageShare();
       updateDeviceControls();
       updatePairStatus();
       return;
@@ -178,7 +205,6 @@ async function discoverDevicePlugins() {
       webEnabled: Boolean(webPlugin.value),
       webPlugin: selectedWebPlugin(),
     });
-    document.querySelector('#share-device').disabled = false;
     updateDeviceCompatibility();
     await runDevicePlugin();
   } catch (error) {
@@ -186,24 +212,6 @@ async function discoverDevicePlugins() {
     log('DEVICE DISCOVERY ERROR', String(error));
   } finally {
     devicePlugin.disabled = false;
-  }
-}
-
-async function importDeviceWorkspace() {
-  try {
-    const path = await invoke('pick_device_directory');
-    if (!path) return;
-    const plugins = await invoke('import_device_workspace', { path });
-    addDeviceOptions(plugins, true);
-    if (plugins[0]) {
-      availableDevicePlugins = mergeDevicePlugins(availableDevicePlugins, plugins);
-      deviceSelectionExplicit = true;
-      devicePlugin.value = plugins[0].path;
-      updateDeviceCompatibility();
-      await runDevicePlugin();
-    }
-  } catch (error) {
-    log('DEVICE WORKSPACE IMPORT ERROR', String(error));
   }
 }
 
@@ -259,27 +267,42 @@ function fileName(path) {
 async function handleWebSelectionChange() {
   if (!webPlugin.value) {
     disableWebPlugin();
+    void stopWebPackageShare();
     updateDeviceCompatibility();
     return;
   }
   const web = selectedWebPlugin();
-  if (!deviceSelectionExplicit && availableDevicePlugins.length > 0) {
+  if (availableDevicePlugins.length > 0) {
     const fallback = chooseDevicePlugin(availableDevicePlugins, {
       previousPath: devicePlugin.value,
       webEnabled: true,
       webPlugin: web,
     });
-    if (fallback) devicePlugin.value = fallback;
+    if (fallback) {
+      devicePlugin.value = fallback;
+      deviceSelectionExplicit = false;
+    }
   }
   updateDeviceCompatibility();
   if (devicePlugin.value && (!deviceRunning || runningDevicePath !== devicePlugin.value)) {
     await runDevicePlugin();
   }
+  pendingWebPackagePath = webPlugin.value;
   await runWebPlugin();
 }
 
 async function handleDeviceSelectionChange() {
   deviceSelectionExplicit = true;
+  const device = availableDevicePlugins.find((plugin) => plugin.path === devicePlugin.value);
+  const matchingWebPath = chooseWebPlugin(availableWebPlugins, device);
+  if (matchingWebPath) {
+    webPlugin.value = matchingWebPath;
+    await handleWebSelectionChange();
+    return;
+  }
+  webPlugin.value = '';
+  disableWebPlugin();
+  void stopWebPackageShare();
   updateDeviceCompatibility();
   await runDevicePlugin();
 }
@@ -331,61 +354,130 @@ function disableWebPlugin() {
   webEmptyState.hidden = false;
   frame.src = 'about:blank';
   webState.textContent = '未启用 · 仅设备调试';
-  shareButton.disabled = true;
-  document.querySelector('#run-web').disabled = true;
+  pendingWebPackagePath = '';
+  clearWebPackageShare('等待选择');
   updatePairStatus();
 }
 
-async function buildAndShareWebPlugin() {
-  if (!webPlugin.value) return;
-  shareButton.disabled = true;
-  shareButton.textContent = '正在打包…';
-  try {
-    const result = await invoke('build_and_share_web_plugin', { path: webPlugin.value });
-    showPackageShare(result, '扫码安装 Web 插件', '请在支持 Web 插件安装的 App 调试入口扫码。');
-    log('WEB PACKAGE READY', { name: result.name, address: `${result.host}:${result.port}` });
-  } catch (error) {
-    log('WEB PACKAGE ERROR', String(error));
-  } finally {
-    shareButton.disabled = false;
-    shareButton.textContent = '打包 / 扫码安装';
+function queueWebPackageShare() {
+  const path = webPlugin.value;
+  const generation = ++webPackageGeneration;
+  webShareStatus.textContent = '正在打包…';
+  webShareAddress.textContent = '';
+  webShareName.textContent = '';
+  webShareQr.hidden = true;
+  webSharePlaceholder.hidden = false;
+  webSharePlaceholder.textContent = '正在生成';
+  webPackageQueue = webPackageQueue.catch(() => {}).then(async () => {
+    if (generation !== webPackageGeneration || path !== webPlugin.value) return;
+    try {
+      const result = await invoke('build_and_share_web_plugin', { path });
+      if (generation !== webPackageGeneration || path !== webPlugin.value) return;
+      showWebPackageShare(result);
+      log('WEB PACKAGE READY', { name: result.name, address: `${result.host}:${result.port}` });
+    } catch (error) {
+      if (generation !== webPackageGeneration) return;
+      clearWebPackageShare('打包失败');
+      log('WEB PACKAGE ERROR', String(error));
+    }
+  });
+  return webPackageQueue;
+}
+
+function queueWebPackageShareWhenIdle(path) {
+  const startPackaging = () => {
+    if (path !== webPlugin.value) return;
+    void queueWebPackageShare();
+  };
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(startPackaging, { timeout: 1500 });
+  } else {
+    setTimeout(startPackaging, 300);
   }
 }
 
-async function shareDevicePlugin() {
-  if (!devicePlugin.value) return;
-  const button = document.querySelector('#share-device');
-  button.disabled = true;
-  button.textContent = '正在生成…';
-  try {
-    const result = await invoke('share_device_plugin', { path: devicePlugin.value });
-    showPackageShare(result, '扫码安装设备插件', '请在支持设备插件安装的 App 调试入口扫码，App 将通过局域网下载该 .gmp。');
-    log('DEVICE PACKAGE READY', { name: result.name, address: `${result.host}:${result.port}` });
-  } catch (error) {
-    log('DEVICE PACKAGE ERROR', String(error));
-  } finally {
-    button.disabled = false;
-    button.textContent = '扫码安装';
-  }
+function showWebPackageShare(result) {
+  drawQrCode(webShareQr, result.qrSize, result.qrModules);
+  webShareQr.hidden = false;
+  webSharePlaceholder.hidden = true;
+  webShareStatus.textContent = '扫码安装';
+  webShareAddress.textContent = `${result.host}:${result.port}`;
+  webShareName.textContent = `路径：${result.packagePath}`;
+  webShareName.title = result.packagePath;
 }
 
-function showPackageShare(result, title, help) {
-  drawQrCode(result.qrSize, result.qrModules);
-  document.querySelector('#share-title').textContent = title;
-  document.querySelector('#share-help').textContent = `手机与电脑需连接同一局域网。${help}`;
-  document.querySelector('#share-name').textContent = result.name;
-  document.querySelector('#share-address').textContent = `${result.host}:${result.port}`;
-  document.querySelector('#share-path').textContent = result.packagePath;
-  document.querySelector('#share-payload').textContent = result.qrPayload;
-  if (!shareDialog.open) shareDialog.showModal();
+function clearWebPackageShare(status) {
+  webPackageGeneration += 1;
+  closeQrZoom(webShareQr);
+  webShareQr.hidden = true;
+  webSharePlaceholder.hidden = false;
+  webSharePlaceholder.textContent = '选择插件后\n自动生成';
+  webShareStatus.textContent = status;
+  webShareAddress.textContent = '';
+  webShareName.textContent = '';
+  webShareName.removeAttribute('title');
 }
 
-function drawQrCode(size, modules) {
+function queueDevicePackageShare() {
+  const path = devicePlugin.value;
+  const generation = ++devicePackageGeneration;
+  deviceShareStatus.textContent = '正在生成…';
+  deviceShareAddress.textContent = '';
+  deviceShareName.textContent = '';
+  deviceShareQr.hidden = true;
+  deviceSharePlaceholder.hidden = false;
+  deviceSharePlaceholder.textContent = '正在生成';
+  devicePackageQueue = devicePackageQueue.catch(() => {}).then(async () => {
+    if (generation !== devicePackageGeneration || path !== devicePlugin.value) return;
+    try {
+      const result = await invoke('share_device_plugin', { path });
+      if (generation !== devicePackageGeneration || path !== devicePlugin.value) return;
+      showDevicePackageShare(result);
+      log('DEVICE PACKAGE READY', { name: result.name, address: `${result.host}:${result.port}` });
+    } catch (error) {
+      if (generation !== devicePackageGeneration) return;
+      clearDevicePackageShare('生成失败');
+      log('DEVICE PACKAGE ERROR', String(error));
+    }
+  });
+  return devicePackageQueue;
+}
+
+function queueDevicePackageShareAfterPaint(path) {
+  requestAnimationFrame(() => {
+    if (path !== devicePlugin.value) return;
+    void queueDevicePackageShare();
+  });
+}
+
+function showDevicePackageShare(result) {
+  drawQrCode(deviceShareQr, result.qrSize, result.qrModules);
+  deviceShareQr.hidden = false;
+  deviceSharePlaceholder.hidden = true;
+  deviceShareStatus.textContent = '扫码安装';
+  deviceShareAddress.textContent = `${result.host}:${result.port}`;
+  deviceShareName.textContent = `路径：${result.packagePath}`;
+  deviceShareName.title = result.packagePath;
+}
+
+function clearDevicePackageShare(status) {
+  devicePackageGeneration += 1;
+  closeQrZoom(deviceShareQr);
+  deviceShareQr.hidden = true;
+  deviceSharePlaceholder.hidden = false;
+  deviceSharePlaceholder.textContent = '选择插件后\n自动生成';
+  deviceShareStatus.textContent = status;
+  deviceShareAddress.textContent = '';
+  deviceShareName.textContent = '';
+  deviceShareName.removeAttribute('title');
+}
+
+function drawQrCode(target, size, modules) {
   const border = 4;
-  const canvasSize = shareQr.width;
+  const canvasSize = target.width;
   const scale = Math.floor(canvasSize / (size + border * 2));
   const offset = Math.floor((canvasSize - (size + border * 2) * scale) / 2);
-  const qrContext = shareQr.getContext('2d', { alpha: false });
+  const qrContext = target.getContext('2d', { alpha: false });
   qrContext.fillStyle = '#fff';
   qrContext.fillRect(0, 0, canvasSize, canvasSize);
   qrContext.fillStyle = '#000';
@@ -397,13 +489,41 @@ function drawQrCode(size, modules) {
   }
 }
 
+function openQrZoom(source) {
+  if (source.hidden) return;
+  const zoomContext = qrZoomCanvas.getContext('2d', { alpha: false });
+  zoomContext.imageSmoothingEnabled = false;
+  zoomContext.fillStyle = '#fff';
+  zoomContext.fillRect(0, 0, qrZoomCanvas.width, qrZoomCanvas.height);
+  zoomContext.drawImage(source, 0, 0, qrZoomCanvas.width, qrZoomCanvas.height);
+  qrZoom.dataset.source = source.id;
+  qrZoom.dataset.openedAt = String(performance.now());
+  qrZoom.hidden = false;
+}
+
+function closeQrZoom(source) {
+  if (source && qrZoom.dataset.source !== source.id) return;
+  qrZoom.hidden = true;
+  delete qrZoom.dataset.source;
+  delete qrZoom.dataset.openedAt;
+}
+
 async function stopWebPackageShare() {
   try {
+    await webPackageQueue.catch(() => {});
     await invoke('stop_web_package_share');
-    shareDialog.close();
-    log('PACKAGE SHARE', '局域网共享已停止');
   } catch (error) {
     log('WEB PACKAGE ERROR', String(error));
+  }
+}
+
+async function stopDevicePackageShare() {
+  try {
+    await devicePackageQueue.catch(() => {});
+    await invoke('stop_device_package_share');
+    log('PACKAGE SHARE', '设备插件局域网共享已停止');
+  } catch (error) {
+    log('DEVICE PACKAGE ERROR', String(error));
   }
 }
 
@@ -437,8 +557,6 @@ async function runWebPlugin() {
     webActive = true;
     frame.hidden = false;
     webEmptyState.hidden = true;
-    shareButton.disabled = false;
-    document.querySelector('#run-web').disabled = false;
     webState.textContent = '加载中';
     const entryUrl = new URL(entry);
     entryUrl.searchParams.set('studioGeneration', Date.now());
@@ -468,26 +586,13 @@ async function runDevicePlugin() {
     updateDeviceControls();
     emitConnection();
     updatePairStatus();
+    queueDevicePackageShareAfterPaint(devicePlugin.value);
   } catch (error) {
     deviceRunning = false;
     runningDevicePath = '';
     deviceState.textContent = '加载失败';
     updateDeviceControls();
     updatePairStatus();
-    log('DEVICE ERROR', String(error));
-  }
-}
-
-async function stopDevicePlugin() {
-  clearDirectionInputUi();
-  try {
-    const status = await invoke('stop_device_plugin');
-    deviceRunning = status.running;
-    deviceState.textContent = status.loaded ? '已停止' : '未加载';
-    emitConnection();
-    updateDeviceControls();
-    updatePairStatus();
-  } catch (error) {
     log('DEVICE ERROR', String(error));
   }
 }
@@ -926,7 +1031,6 @@ function updateDeviceControls() {
   directionJoystick.classList.toggle('disabled', !deviceRunning);
   directionJoystick.setAttribute('aria-disabled', String(!deviceRunning));
   directionJoystick.tabIndex = deviceRunning ? 0 : -1;
-  document.querySelector('#stop-device').disabled = !deviceRunning;
 }
 
 context.fillStyle = '#00150d';

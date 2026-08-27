@@ -11,9 +11,9 @@ simulation core from the adjacent `previewer/` directory.
 - An in-process localhost server with a random token serves the Web plugin, so
   ES modules, relative assets, and the plugin's own CSP behave consistently on
   both platforms. The server listens only on `127.0.0.1`.
-- Open an `.mmpkg` directly or load a Web plugin development directory. Studio
-  reads the entry from `manifest.json` and falls back to `index.html` when no
-  manifest exists.
+- Open an `.mmpkg` directly or select a discovered Web plugin development
+  directory. Studio reads the entry from `manifest.json` and falls back to
+  `index.html` when no manifest exists.
 - At startup, Studio scans `WebSDK/examples/*`, the single home for runnable
   Web plugin examples and complete workspaces. Output from tools such as Vite
   under `dist` or `build` is also supported. Studio starts in
@@ -32,14 +32,17 @@ simulation core from the adjacent `previewer/` directory.
   plugin ID, minimum version, and protocol versions, and marks choices as
   **Recommended**, **Compatible**, or **Incompatible**. An incompatible manual
   choice remains available for diagnosis but is not reported as ready.
-- The Web side can import an external development directory or `.mmpkg`. The
-  device side scans built `.gmp` files under `GlassSDK/build-host` and can also
-  import an external build workspace or individual `.gmp`.
-- Package the selected Web plugin as an `.mmpkg`, serve it through a LAN TCP
-  service, and display an installation QR code. See
+- The Web side can import an `.mmpkg`. The device side scans built `.gmp` files
+  under `GlassSDK/build-host` and can also import an individual `.gmp`.
+- Selecting a Web plugin, or refreshing the repository, immediately runs the
+  current selection and automatically rebuilds its `.mmpkg`. Studio serves the
+  package through a LAN TCP service and keeps its installation QR code visible
+  beside the selector. See
   [`../../WebSDK/docs/web-plugin/lan-install.md`](../../WebSDK/docs/web-plugin/lan-install.md)
   for the QR and download protocol.
-- Share the selected device `.gmp` through the SDK-compatible `gmp+tcp` service
+- Selecting or refreshing a device plugin immediately loads and runs it, while
+  Studio exposes its `.gmp` through the SDK-compatible `gmp+tcp` service and
+  keeps the installation QR code visible beside the selector
   and display a QR code for Apps that support device plugin installation.
 - Load and continuously run one device `.gmp`.
 - Bridge v1 `plugin.sendMessage` calls
@@ -88,10 +91,13 @@ cargo install tauri-cli --version 2.11.4 --locked
 npm run desktop:build
 ```
 
-**Package and show QR code** uses the same `.mmpkg v1` structure and SHA-256
-file table as `WebSDK/tools/build-mmpkg.mjs`. Generated packages are written to
-the SDK `dist/` directory. The phone and computer must be on the same LAN, and
-the App must implement the `mmpkg+tcp` debugging installation protocol.
+Automatic Web packaging uses the same `.mmpkg v1` structure and SHA-256 file
+table as `WebSDK/tools/build-mmpkg.mjs`. Generated packages are written to the
+SDK `dist/` directory. The QR payload contains the LAN host, TCP port, and
+package name. The server reads the package at download time, so the same QR
+continues to serve rebuilt content while those endpoint fields stay unchanged.
+The phone and computer must be on the same LAN, and the App must implement the
+`mmpkg+tcp` debugging installation protocol.
 
 ## Platform artifacts
 
@@ -99,3 +105,25 @@ Build and sign `.app/.dmg` artifacts on a macOS runner. Build and sign
 `.msi/.exe` artifacts with MSVC on a Windows runner. Both platforms share all
 Rust, frontend, and C++ core source. `Studio/previewer/src/main_win32.cpp`
 remains available as a standalone native Windows debugger.
+
+For local Windows testing, Linux can cross-compile the unsigned x64 executable
+with Tauri's `cargo-xwin` runner. Clang 19 or newer is required because the
+desktop application compiles the bundled C++ previewer core against the MSVC
+standard library:
+
+```bash
+rustup target add x86_64-pc-windows-msvc
+cargo install --locked cargo-xwin
+cargo install --locked tauri-cli --version 2.11.4
+cd Studio/desktop/src-tauri
+PATH=/usr/lib/llvm-19/bin:$PATH cargo tauri build \
+  --runner cargo-xwin \
+  --target x86_64-pc-windows-msvc \
+  --no-bundle
+```
+
+The executable is written to
+`target/x86_64-pc-windows-msvc/release/gm-plugin-studio-desktop.exe`. Run it
+from within a repository checkout so Studio can discover `WebSDK` and
+`GlassSDK`. Production installers and code signing should still use a Windows
+runner.

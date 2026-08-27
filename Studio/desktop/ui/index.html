@@ -13,27 +13,47 @@
     </header>
 
     <section class="pair-toolbar">
-      <div class="plugin-picker">
-        <label><span>Web 插件工作区 / 包 · 可选</span><select id="web-plugin"><option value="">正在识别…</option></select></label>
-        <div class="picker-actions">
-          <button id="refresh-web" class="secondary">刷新仓库</button>
-          <button id="import-web-workspace" class="secondary">导入外部工作区</button>
-          <button id="import-web-file" class="secondary">导入 .mmpkg</button>
-          <button id="run-web" class="secondary">运行 / 重载</button>
-          <button id="share-web">打包 / 扫码安装</button>
+      <div class="plugin-picker web-plugin-picker">
+        <div class="web-picker-main">
+          <label><span>Web 插件工作区 / 包 · 可选</span><select id="web-plugin"><option value="">正在识别…</option></select></label>
+          <p class="compatibility-status picker-hint">选择后自动运行，并在空闲时生成安装二维码</p>
+          <div class="web-share-copy" aria-live="polite">
+            <strong id="web-share-status">等待选择</strong>
+            <span id="web-share-address"></span>
+            <span id="web-share-name"></span>
+          </div>
+          <div class="picker-actions">
+            <button id="refresh-web" class="secondary">刷新仓库</button>
+            <button id="import-web-file" class="secondary">导入 .mmpkg</button>
+          </div>
         </div>
+        <aside class="web-share-card" aria-live="polite">
+          <div class="web-share-visual">
+            <canvas id="web-share-qr" class="clickable-qr" width="160" height="160" hidden role="button" tabindex="0" aria-label="点击放大 Web 插件安装二维码"></canvas>
+            <span id="web-share-placeholder">选择插件后<br>自动生成</span>
+          </div>
+        </aside>
       </div>
-      <div class="plugin-picker">
-        <label><span>设备插件工作区 / 包 · 必需</span><select id="device-plugin"><option value="">正在识别…</option></select></label>
-        <p id="device-compatibility" class="compatibility-status">等待设备插件</p>
-        <div class="picker-actions">
-          <button id="refresh-device" class="secondary">刷新仓库</button>
-          <button id="import-device-workspace" class="secondary">导入外部工作区</button>
-          <button id="import-device-file" class="secondary">导入 .gmp</button>
-          <button id="run-device">加载并运行</button>
-          <button id="share-device">扫码安装</button>
-          <button id="stop-device" class="secondary">停止</button>
+      <div class="plugin-picker device-plugin-picker">
+        <div class="device-picker-main">
+          <label><span>设备插件工作区 / 包 · 必需</span><select id="device-plugin"><option value="">正在识别…</option></select></label>
+          <p id="device-compatibility" class="compatibility-status">等待设备插件</p>
+          <div class="device-share-copy" aria-live="polite">
+            <strong id="device-share-status">等待选择</strong>
+            <span id="device-share-address"></span>
+            <span id="device-share-name"></span>
+          </div>
+          <div class="picker-actions">
+            <button id="refresh-device" class="secondary">刷新仓库</button>
+            <button id="import-device-file" class="secondary">导入 .gmp</button>
+          </div>
         </div>
+        <aside class="device-share-card" aria-live="polite">
+          <div class="device-share-visual">
+            <canvas id="device-share-qr" class="clickable-qr" width="160" height="160" hidden role="button" tabindex="0" aria-label="点击放大设备插件安装二维码"></canvas>
+            <span id="device-share-placeholder">选择插件后<br>自动生成</span>
+          </div>
+        </aside>
       </div>
     </section>
 
@@ -91,22 +111,13 @@
       <ol id="logs"></ol>
     </section>
 
-    <dialog id="share-dialog">
-      <div class="share-header">
-        <div><p>APP INSTALL</p><h2 id="share-title">扫码安装插件</h2></div>
-        <button id="close-share" class="secondary" aria-label="关闭">关闭</button>
+    <div id="qr-zoom" class="qr-zoom" hidden role="dialog" aria-modal="true" aria-label="放大的安装二维码">
+      <div class="qr-zoom-card">
+        <canvas id="qr-zoom-canvas" width="640" height="640" aria-label="放大的安装二维码"></canvas>
+        <p>使用手机扫码安装 · 点击二维码外任意位置返回</p>
       </div>
-      <div class="share-content">
-        <canvas id="share-qr" width="360" height="360" aria-label="插件安装二维码"></canvas>
-        <div class="share-details">
-          <strong id="share-name"></strong>
-          <p id="share-help">手机与电脑需连接同一局域网，请在对应的 App 调试入口扫码。</p>
-          <dl><dt>下载地址</dt><dd id="share-address"></dd><dt>本地包</dt><dd id="share-path"></dd></dl>
-          <details><summary>二维码协议内容</summary><code id="share-payload"></code></details>
-          <button id="stop-share" class="secondary">停止共享</button>
-        </div>
-      </div>
-    </dialog>
+    </div>
+
     <script type="module" src="./studio.js"></script>
   </body>
 </html>
