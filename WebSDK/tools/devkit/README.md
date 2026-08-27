@@ -15,7 +15,7 @@ Requirement: Node.js 18 or later.
 ## Run immediately
 
 ```sh
-node studio/gm-plugin-studio.mjs --plugin examples/counter
+node studio/gm-plugin-studio.mjs --plugin examples/basic-counter
 ```
 
 Open `http://127.0.0.1:4173`.

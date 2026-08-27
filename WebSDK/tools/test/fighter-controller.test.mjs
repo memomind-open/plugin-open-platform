@@ -10,7 +10,7 @@ import {
   bytesToBase64,
   decodeFightEvent,
   encodeInput,
-} from '../../plugins/fighter-controller/protocol.js';
+} from '../../examples/fighter-controller/protocol.js';
 
 test('Fighter controller matches the GMPluginWindows v2 wire format', () => {
   assert.equal(INPUT_CHANNEL, 0x4647);

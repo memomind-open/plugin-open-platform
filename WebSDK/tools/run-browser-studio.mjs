@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { resolveServedFile } from './studio-paths.mjs';
+import { resolveServedFile } from './browser-studio-paths.mjs';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const options = parseArguments(process.argv.slice(2));
@@ -21,7 +21,7 @@ const mounts = [
   ['/contract/', resolve(repositoryRoot, 'packages/bridge-contract/src')],
   ['/renderer/', resolve(repositoryRoot, 'packages/device-renderer/src')],
   ['/runtime/', resolve(repositoryRoot, 'packages/studio-runtime/src')],
-  ['/', resolve(repositoryRoot, 'browser-studio')],
+  ['/', resolve(repositoryRoot, 'tools/browser-studio')],
 ];
 
 const server = createServer((request, response) => {
@@ -57,7 +57,7 @@ server.listen(options.port, options.host, () => {
 });
 
 function parseArguments(arguments_) {
-  const result = { plugin: 'examples/counter', host: '127.0.0.1', port: 4173 };
+  const result = { plugin: 'examples/basic-counter', host: '127.0.0.1', port: 4173 };
   for (let index = 0; index < arguments_.length; index += 1) {
     const name = arguments_[index];
     const value = arguments_[index + 1];

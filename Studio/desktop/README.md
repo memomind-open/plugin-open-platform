@@ -14,9 +14,9 @@ simulation core from the adjacent `previewer/` directory.
 - Open an `.mmpkg` directly or load a Web plugin development directory. Studio
   reads the entry from `manifest.json` and falls back to `index.html` when no
   manifest exists.
-- At startup, Studio scans `WebSDK/plugins/*` and `WebSDK/examples/*`. Complete
-  plugin workspaces under `plugins/` take precedence, while output from tools
-  such as Vite under `dist` or `build` is also supported. Studio starts in
+- At startup, Studio scans `WebSDK/examples/*`, the single home for runnable
+  Web plugin examples and complete workspaces. Output from tools such as Vite
+  under `dist` or `build` is also supported. Studio starts in
   **Device only** mode and does not launch a Web plugin without an explicit
   selection.
 - A device plugin is required; a Web plugin is optional. When developing a

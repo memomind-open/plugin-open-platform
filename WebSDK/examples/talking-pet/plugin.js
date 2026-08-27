@@ -16,7 +16,7 @@ const deviceContext = deviceCanvas.getContext('2d', { willReadFrequently: true }
 const DEVICE_WIDTH = 600;
 const DEVICE_HEIGHT = 350;
 const petVisuals = {
-  idle: './assets/momo-festive.png',
+  idle: './assets/momo-idle-v2.png',
   blink: './assets/momo-blink-v2.webp',
   eating: './assets/momo-eating-v2.png',
   playing: './assets/momo-playing-v2.png',

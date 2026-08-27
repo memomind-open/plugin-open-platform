@@ -10,8 +10,8 @@ const packageJson = JSON.parse(await readFile(resolve(repositoryRoot, 'package.j
 const bundled = await bundleWebSdk(repositoryRoot, packageJson.version);
 
 for (const plugin of [
-  'plugins/fighter-controller',
-  'plugins/gm-life-desk',
+  'examples/fighter-controller',
+  'examples/life-desk',
   'examples/talking-pet',
 ]) {
   const vendorDirectory = resolve(repositoryRoot, plugin, 'vendor');

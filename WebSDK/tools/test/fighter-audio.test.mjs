@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { FighterAudio } from '../../plugins/fighter-controller/audio.js';
+import { FighterAudio } from '../../examples/fighter-controller/audio.js';
 
 class FakeAudio {
   constructor(source) {
@@ -113,7 +113,7 @@ test('Fighter generated audio assets are PCM mono WAV files', async () => {
     'music_victory.wav', 'music_defeat.wav',
   ];
   for (const name of names) {
-    const data = await readFile(new URL(`../../plugins/fighter-controller/assets/sfx/${name}`, import.meta.url));
+    const data = await readFile(new URL(`../../examples/fighter-controller/assets/sfx/${name}`, import.meta.url));
     assert.equal(data.toString('ascii', 0, 4), 'RIFF', name);
     assert.equal(data.toString('ascii', 8, 12), 'WAVE', name);
     assert.equal(data.readUInt16LE(20), 1, name);

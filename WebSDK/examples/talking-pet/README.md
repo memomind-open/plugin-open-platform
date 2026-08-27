@@ -16,7 +16,7 @@ the native glasses animation.
 From `WebSDK`:
 
 ```sh
-node tools/studio-cli.mjs --plugin examples/talking-pet
+node tools/run-browser-studio.mjs --plugin examples/talking-pet
 ```
 
 Open `http://127.0.0.1:4173`. Microphone access requires browser permission and

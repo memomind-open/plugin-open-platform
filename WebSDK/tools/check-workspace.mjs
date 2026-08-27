@@ -13,14 +13,14 @@ for (const file of sourceFiles) {
 }
 
 const requiredDocs = [
-  'docs/GM-Web-Plugin-Developer-Guide-Draft.md',
+  'docs/web-plugin/developer-guide.md',
   'docs/web-plugin/README.md',
   'docs/web-plugin/quick-start.md',
   'docs/web-plugin/devkit-zip.md',
   'docs/web-plugin/api-reference.md',
   'docs/web-plugin/studio.md',
   'docs/web-plugin/package-format.md',
-  'examples/counter/manifest.json',
+  'examples/basic-counter/manifest.json',
 ];
 for (const path of requiredDocs) {
   try {
