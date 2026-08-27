@@ -23,7 +23,7 @@ simulation core from the adjacent `previewer/` directory.
   normal Web plugin without choosing a device plugin, Studio automatically
   selects and runs `web_bridge.gmp`. Selecting **Device only** unloads the Web
   view but retains the device display and all simulated single-click,
-  double-click, long-press, and head-gesture controls.
+  double-click, long-press, continuous direction, and head-gesture controls.
 - After a user chooses a device plugin, Studio preserves that selection when
   the Web plugin changes. This supports arbitrary paired plugins that exchange
   custom `plugin.sendMessage` channels.
@@ -51,8 +51,10 @@ simulation core from the adjacent `previewer/` directory.
 - Tick the device plugin at 30 Hz and display its 600×350 GRAY_4 framebuffer on
   the right.
 - Support runtime, storage, and connection queries plus button, `imuGesture`,
-  `rawImu`, and connection events. The UI directly simulates clicks and common
-  head gestures.
+  `rawImu`, and connection events. Dragging the virtual head-motion stick drives
+  proportional Raw IMU input; vertical movement gradually changes the
+  persistent simulated head pitch. Nod and shake remain discrete firmware
+  gesture events.
 - Scene acknowledgements, standard device events, and custom channels sent by
   the device plugin through Host Bluetooth share one outbox. The first two are
   returned to the Bridge, while custom uplink messages remain visible in the

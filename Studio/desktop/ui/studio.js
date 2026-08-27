@@ -42,6 +42,8 @@ const storageNamespaces = new Map();
 const importedWebPlugins = new Map();
 const importedDevicePlugins = new Map();
 const deviceEventButtons = [...document.querySelectorAll('[data-button-action], [data-gesture]')];
+const directionJoystick = document.querySelector('[data-direction-joystick]');
+const joystickKnob = document.querySelector('[data-joystick-knob]');
 const runtimeGeneration = 1;
 let sessionToken = crypto.randomUUID();
 let frameOrigin = null;
@@ -58,6 +60,12 @@ let currentCompatibility = null;
 let framePending = false;
 let renderedFrames = 0;
 let fpsWindow = performance.now();
+let joystickPointerId = null;
+let joystickNativeActive = false;
+let pendingJoystickVector = null;
+let joystickAnimationFrame = null;
+let directionCommand = Promise.resolve();
+let directionInputGeneration = 0;
 
 document.querySelector('#refresh-web').addEventListener('click', discoverWebPlugins);
 document.querySelector('#refresh-device').addEventListener('click', discoverDevicePlugins);
@@ -85,6 +93,16 @@ for (const button of document.querySelectorAll('[data-gesture]')) {
     gesture: Number(button.dataset.gesture), active: true,
   }));
 }
+directionJoystick.addEventListener('pointerdown', startJoystickInput);
+directionJoystick.addEventListener('pointermove', updateJoystickInput);
+directionJoystick.addEventListener('pointerup', stopJoystickInput);
+directionJoystick.addEventListener('pointercancel', stopJoystickInput);
+directionJoystick.addEventListener('lostpointercapture', stopJoystickInput);
+directionJoystick.addEventListener('contextmenu', (event) => event.preventDefault());
+window.addEventListener('blur', () => stopJoystickInput());
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopJoystickInput();
+});
 frame.addEventListener('load', () => {
   if (!webActive) return;
   webState.textContent = '运行中';
@@ -441,6 +459,7 @@ async function runWebPlugin() {
 
 async function runDevicePlugin() {
   if (!devicePlugin.value) return;
+  clearDirectionInputUi();
   try {
     const status = await invoke('load_device_plugin', { path: devicePlugin.value });
     deviceRunning = status.running;
@@ -460,6 +479,7 @@ async function runDevicePlugin() {
 }
 
 async function stopDevicePlugin() {
+  clearDirectionInputUi();
   try {
     const status = await invoke('stop_device_plugin');
     deviceRunning = status.running;
@@ -479,6 +499,111 @@ async function simulateDeviceEvent(command, params) {
   } catch (error) {
     log('SIMULATION ERROR', normalizeBridgeError(error));
   }
+}
+
+function queueDirectionVector(x, y, active) {
+  const generation = directionInputGeneration;
+  directionCommand = directionCommand.then(async () => {
+    if (generation !== directionInputGeneration) return;
+    if (active && !deviceRunning) return;
+    try {
+      const result = await invoke('set_direction_vector', { x, y, active });
+      if (!result.handled) {
+        throw bridgeError('CAPABILITY_UNAVAILABLE', 'Device plugin did not handle the direction input');
+      }
+    } catch (error) {
+      if (active || deviceRunning) log('SIMULATION ERROR', normalizeBridgeError(error));
+    }
+  });
+}
+
+function scheduleJoystickVector(x, y) {
+  pendingJoystickVector = { x, y };
+  if (joystickAnimationFrame !== null) return;
+  joystickAnimationFrame = requestAnimationFrame(() => {
+    joystickAnimationFrame = null;
+    const vector = pendingJoystickVector;
+    pendingJoystickVector = null;
+    if (!vector || joystickPointerId === null) return;
+    if (!joystickNativeActive && vector.x === 0 && vector.y === 0) return;
+    joystickNativeActive = true;
+    queueDirectionVector(vector.x, vector.y, true);
+  });
+}
+
+function positionJoystick(event) {
+  const rect = directionJoystick.getBoundingClientRect();
+  const radius = Math.max(1, (Math.min(rect.width, rect.height) - joystickKnob.offsetWidth) / 2);
+  let x = event.clientX - (rect.left + rect.width / 2);
+  let y = event.clientY - (rect.top + rect.height / 2);
+  const distance = Math.hypot(x, y);
+  if (distance > radius) {
+    x = x * radius / distance;
+    y = y * radius / distance;
+  }
+  joystickKnob.style.transform = `translate(${x}px, ${y}px)`;
+  let normalizedX = Math.round(x / radius * 1000);
+  let normalizedY = Math.round(y / radius * 1000);
+  if (Math.hypot(normalizedX, normalizedY) < 120) {
+    normalizedX = 0;
+    normalizedY = 0;
+  }
+  scheduleJoystickVector(normalizedX, normalizedY);
+}
+
+function startJoystickInput(event) {
+  if (!deviceRunning || joystickPointerId !== null || event.button !== 0) return;
+  event.preventDefault();
+  joystickPointerId = event.pointerId;
+  directionJoystick.classList.add('active');
+  directionJoystick.setPointerCapture?.(event.pointerId);
+  positionJoystick(event);
+}
+
+function updateJoystickInput(event) {
+  if (joystickPointerId !== event.pointerId) return;
+  event.preventDefault();
+  positionJoystick(event);
+}
+
+function stopJoystickInput(event) {
+  if (joystickPointerId === null) return;
+  if (event?.pointerId !== undefined && event.pointerId !== joystickPointerId) return;
+  event?.preventDefault?.();
+  const pointerId = joystickPointerId;
+  joystickPointerId = null;
+  if (joystickAnimationFrame !== null) {
+    cancelAnimationFrame(joystickAnimationFrame);
+    joystickAnimationFrame = null;
+  }
+  if (pendingJoystickVector && (joystickNativeActive ||
+      pendingJoystickVector.x !== 0 || pendingJoystickVector.y !== 0)) {
+    joystickNativeActive = true;
+    queueDirectionVector(pendingJoystickVector.x, pendingJoystickVector.y, true);
+    pendingJoystickVector = null;
+  }
+  if (directionJoystick.hasPointerCapture?.(pointerId)) {
+    directionJoystick.releasePointerCapture(pointerId);
+  }
+  directionJoystick.classList.remove('active');
+  joystickKnob.style.transform = '';
+  if (joystickNativeActive) queueDirectionVector(0, 0, false);
+  joystickNativeActive = false;
+}
+
+function clearDirectionInputUi() {
+  directionInputGeneration += 1;
+  if (joystickAnimationFrame !== null) cancelAnimationFrame(joystickAnimationFrame);
+  joystickAnimationFrame = null;
+  pendingJoystickVector = null;
+  const pointerId = joystickPointerId;
+  joystickPointerId = null;
+  joystickNativeActive = false;
+  if (pointerId !== null && directionJoystick.hasPointerCapture?.(pointerId)) {
+    directionJoystick.releasePointerCapture(pointerId);
+  }
+  directionJoystick.classList.remove('active');
+  joystickKnob.style.transform = '';
 }
 
 async function handleBridgeRequest(request) {
@@ -798,6 +923,9 @@ function updatePairStatus() {
 
 function updateDeviceControls() {
   for (const button of deviceEventButtons) button.disabled = !deviceRunning;
+  directionJoystick.classList.toggle('disabled', !deviceRunning);
+  directionJoystick.setAttribute('aria-disabled', String(!deviceRunning));
+  directionJoystick.tabIndex = deviceRunning ? 0 : -1;
   document.querySelector('#stop-device').disabled = !deviceRunning;
 }
 

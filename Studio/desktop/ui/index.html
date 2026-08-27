@@ -48,21 +48,37 @@
       </section>
       <section class="pane device-pane">
         <div class="pane-title"><span>DEVICE PLUGIN</span><strong id="device-state">未加载</strong></div>
-        <div class="device-stage">
-          <div class="glasses-shell"><canvas id="device-canvas" width="600" height="350"></canvas></div>
-        </div>
-        <div class="device-controls" aria-label="设备事件模拟">
-          <span>按键</span>
-          <button class="secondary" data-button-action="1">单击</button>
-          <button class="secondary" data-button-action="2">双击</button>
-          <button class="secondary" data-button-action="3">长按</button>
-          <span>手势</span>
-          <button class="secondary" data-gesture="7">左转</button>
-          <button class="secondary" data-gesture="8">右转</button>
-          <button class="secondary" data-gesture="2">抬头</button>
-          <button class="secondary" data-gesture="3">低头</button>
-          <button class="secondary" data-gesture="1">点头</button>
-          <button class="secondary" data-gesture="4">摇头</button>
+        <div class="device-workbench">
+          <div class="device-controls" aria-label="设备事件模拟">
+            <div class="device-control-group">
+              <span>按键</span>
+              <div class="button-control-row">
+                <button class="secondary action-button" data-button-action="1">单击</button>
+                <button class="secondary action-button" data-button-action="2">双击</button>
+                <button class="secondary action-button" data-button-action="3">长按</button>
+              </div>
+            </div>
+            <div class="device-control-group">
+              <span>手势</span>
+              <div class="button-control-row">
+                <button class="secondary gesture-button" data-gesture="1">点头</button>
+                <button class="secondary gesture-button" data-gesture="4">摇头</button>
+              </div>
+            </div>
+            <div class="device-control-group direction-control-group">
+              <span>头动操作</span>
+              <div class="direction-joystick disabled" data-direction-joystick role="application" tabindex="-1" aria-label="头动操作摇杆" aria-disabled="true">
+                <span class="joystick-arrow joystick-arrow-up">↑</span>
+                <span class="joystick-arrow joystick-arrow-left">←</span>
+                <span class="joystick-arrow joystick-arrow-down">↓</span>
+                <span class="joystick-arrow joystick-arrow-right">→</span>
+                <span class="joystick-knob" data-joystick-knob></span>
+              </div>
+            </div>
+          </div>
+          <div class="device-stage">
+            <div class="glasses-shell"><canvas id="device-canvas" width="600" height="350"></canvas></div>
+          </div>
         </div>
         <div class="device-meta">
           <span>600 × 350</span><span>GRAY_4</span><span id="frame-rate">0 FPS</span>

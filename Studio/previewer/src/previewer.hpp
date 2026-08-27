@@ -87,6 +87,8 @@ public:
 
     bool sendButton(uint16_t action, uint16_t button = 1);
     bool sendGesture(uint16_t gesture, bool active = true);
+    bool setDirectionInput(uint16_t gesture, bool active);
+    bool setDirectionVector(int16_t x, int16_t y, bool active);
     bool simulateDirectionGesture(uint16_t gesture);
     bool sendBluetooth(uint16_t channel, const std::vector<uint8_t> &payload);
     bool sendConnection(bool connected);
@@ -176,6 +178,18 @@ private:
     uint16_t locked_y_ = 0;
     uint16_t locked_height_ = 0;
     uint8_t imu_modes_ = 0;
+    enum class DirectionInputPhase { Idle, Held, Return, Quiet };
+    DirectionInputPhase direction_input_phase_ = DirectionInputPhase::Idle;
+    uint16_t direction_input_gesture_ = 0;
+    uint32_t direction_input_elapsed_ms_ = 0;
+    bool direction_release_requested_ = false;
+    bool direction_input_accepted_ = false;
+    bool direction_vector_mode_ = false;
+    int16_t direction_input_x_ = 0;
+    int16_t direction_input_y_ = 0;
+    int32_t direction_pitch_remainder_ = 0;
+    int16_t direction_base_gyro_[3] = {0, 0, 0};
+    int16_t direction_base_pitch_ = 0;
     bool auto_brightness_blocked_ = false;
     uint32_t monotonic_ms_ = 0;
     uint32_t next_object_ = kObjectBase + 0x104;
@@ -202,6 +216,13 @@ private:
     bool dispatchEvent(uint16_t type);
     void honorExitRequest();
     void validateCallback(uint32_t callback) const;
+    void applyDirectionInput(bool returning);
+    uint16_t directionGestureForVector() const;
+    void updateDirectionVectorGesture();
+    void advanceDirectionVectorPitch(uint32_t elapsed_ms);
+    void beginDirectionRelease();
+    void advanceDirectionInput(uint32_t elapsed_ms);
+    void resetDirectionInput();
 
     uint32_t allocate(uint32_t size);
     void release(uint32_t address);

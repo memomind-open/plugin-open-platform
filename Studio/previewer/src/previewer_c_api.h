@@ -44,6 +44,11 @@ int gm_preview_send_button(gm_preview_handle *handle, uint16_t action,
                            uint16_t button, int *handled);
 int gm_preview_send_gesture(gm_preview_handle *handle, uint16_t gesture,
                             int active, int *handled);
+int gm_preview_set_direction_input(gm_preview_handle *handle, uint16_t gesture,
+                                   int active, int *handled);
+int gm_preview_set_direction_vector(gm_preview_handle *handle,
+                                    int16_t x, int16_t y,
+                                    int active, int *handled);
 int gm_preview_simulate_direction_gesture(gm_preview_handle *handle,
                                           uint16_t gesture, int *handled);
 
