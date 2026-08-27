@@ -51,23 +51,23 @@ export function evaluateCompatibility(webPlugin, devicePlugin) {
       compatible: true,
       preferred: false,
       status: 'unknown',
-      reasons: ['设备包没有可读取的 manifest 元数据'],
+      reasons: ['The glass package has no readable manifest metadata'],
     };
   }
   const reasons = [];
   if (requirements.requiredPluginId && requirements.requiredPluginId !== devicePlugin.id) {
-    reasons.push(`需要设备插件 ${requirements.requiredPluginId}`);
+    reasons.push(`Requires glass plugin ${requirements.requiredPluginId}`);
   }
   if (requirements.requiredPluginId === devicePlugin.id && requirements.minPluginVersion &&
       compareVersions(devicePlugin.version, requirements.minPluginVersion) < 0) {
-    reasons.push(`设备插件版本需不低于 ${requirements.minPluginVersion}`);
+    reasons.push(`Glass plugin version must be at least ${requirements.minPluginVersion}`);
   }
   const provided = new Map((devicePlugin.provides ?? []).map((protocol) => [protocol.id, protocol.version]));
   for (const protocol of requirements.protocols ?? []) {
     const version = provided.get(protocol.id);
-    if (!version) reasons.push(`缺少协议 ${protocol.id}`);
+    if (!version) reasons.push(`Missing protocol ${protocol.id}`);
     else if (compareVersions(version, protocol.minVersion) < 0) {
-      reasons.push(`${protocol.id} 需要 ${protocol.minVersion}，当前为 ${version}`);
+      reasons.push(`${protocol.id} requires ${protocol.minVersion}; current version is ${version}`);
     }
   }
   const compatible = reasons.length === 0;
@@ -94,14 +94,14 @@ export function compareVersions(left, right) {
 export function describeWorkspace({ webEnabled, deviceRunning }) {
   if (!deviceRunning) {
     return {
-      text: webEnabled ? 'Web 已选择 · 设备插件未运行' : '仅设备调试 · 设备插件未运行',
+      text: webEnabled ? 'Phone plugin selected · Glass plugin not running' : 'Glass-only debugging · Glass plugin not running',
       ready: false,
-      bridgeLabel: webEnabled ? 'Web ↔ Device' : 'Device events',
+      bridgeLabel: webEnabled ? 'Phone ↔ Glass' : 'Glass events',
     };
   }
   return {
-    text: webEnabled ? '联合调试 · Web 与设备插件运行中' : '仅设备调试 · 设备插件运行中',
+    text: webEnabled ? 'Paired debugging · Phone and glass plugins running' : 'Glass-only debugging · Glass plugin running',
     ready: true,
-    bridgeLabel: webEnabled ? 'Web ↔ Device' : 'Device events',
+    bridgeLabel: webEnabled ? 'Phone ↔ Glass' : 'Glass events',
   };
 }

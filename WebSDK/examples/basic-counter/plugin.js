@@ -33,7 +33,7 @@ try {
     report(`gesture.${event.gesture}`);
   });
   gm.device.onConnection((event) => {
-    status.textContent = event.connected ? 'Studio 已连接 · 可绘制设备画面' : '设备已断开';
+    status.textContent = event.connected ? 'Studio connected · Device display ready' : 'Device disconnected';
     report(`connection.${event.connected}`);
   });
   await gm.device.subscribeEvents(['button', 'imuGesture', 'connection']);
@@ -46,7 +46,7 @@ try {
 
 draw.addEventListener('click', async () => {
   try {
-    await gm.display.updateText({ id: 1, x: 40, y: 80, width: 520, height: 120, border: 2, radius: 12, text: `计数器 ${value}` });
+    await gm.display.updateText({ id: 1, x: 40, y: 80, width: 520, height: 120, border: 2, radius: 12, text: `Counter ${value}` });
     report('display.updateText presented');
   } catch (error) {
     report(`${error.code ?? 'ERROR'}: ${error.message}`);

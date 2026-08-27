@@ -21,6 +21,7 @@ import {
   storageNamespace,
 } from './bridge-security.js';
 import { drawTextOverlays } from './text-overlay.js';
+import { displayPath } from './path-display.js';
 
 const { invoke } = window.__TAURI__.core;
 
@@ -86,7 +87,7 @@ document.querySelector('#refresh-web').addEventListener('click', discoverWebPlug
 document.querySelector('#refresh-device').addEventListener('click', discoverDevicePlugins);
 webPlugin.addEventListener('change', handleWebSelectionChange);
 devicePlugin.addEventListener('change', handleDeviceSelectionChange);
-document.querySelector('#import-web-file').addEventListener('click', () => importWebPlugin('pick_web_package', '外部包'));
+document.querySelector('#import-web-file').addEventListener('click', () => importWebPlugin('pick_web_package', 'External package'));
 document.querySelector('#import-device-file').addEventListener('click', importDeviceFile);
 document.querySelector('#clear-log').addEventListener('click', () => logs.replaceChildren());
 for (const qr of [webShareQr, deviceShareQr]) {
@@ -128,7 +129,7 @@ document.addEventListener('visibilitychange', () => {
 });
 frame.addEventListener('load', () => {
   if (!webActive) return;
-  webState.textContent = '运行中';
+  webState.textContent = 'Running';
   postBootstrap();
   const path = pendingWebPackagePath;
   pendingWebPackagePath = '';
@@ -138,11 +139,11 @@ frame.addEventListener('load', () => {
 async function discoverWebPlugins() {
   const previous = webPlugin.value;
   webPlugin.disabled = true;
-  webPlugin.replaceChildren(new Option('正在识别…', ''));
+  webPlugin.replaceChildren(new Option('Discovering…', ''));
   try {
     const plugins = await invoke('discover_web_plugins');
     availableWebPlugins = plugins;
-    webPlugin.replaceChildren(new Option('不加载 Web 插件（仅设备调试）', ''));
+    webPlugin.replaceChildren(new Option('No phone plugin (glass-only debugging)', ''));
     for (const plugin of plugins) {
       const option = new Option(`${plugin.name}  ${plugin.version}`, plugin.path);
       option.dataset.id = plugin.id;
@@ -155,9 +156,9 @@ async function discoverWebPlugins() {
     webDiscoveryComplete = true;
     await handleWebSelectionChange();
   } catch (error) {
-    webPlugin.replaceChildren(new Option('不加载 Web 插件（识别失败）', ''));
-    clearWebPackageShare('识别失败');
-    webState.textContent = '识别失败';
+    webPlugin.replaceChildren(new Option('No phone plugin (discovery failed)', ''));
+    clearWebPackageShare('Discovery failed');
+    webState.textContent = 'Discovery failed';
     log('WEB DISCOVERY ERROR', String(error));
   } finally {
     webPlugin.disabled = false;
@@ -183,7 +184,7 @@ async function importWebPlugin(command, kind) {
 async function discoverDevicePlugins() {
   const previous = devicePlugin.value;
   devicePlugin.disabled = true;
-  devicePlugin.replaceChildren(new Option('正在识别…', ''));
+  devicePlugin.replaceChildren(new Option('Discovering…', ''));
   try {
     const plugins = await invoke('discover_device_plugins');
     devicePlugin.replaceChildren();
@@ -191,9 +192,9 @@ async function discoverDevicePlugins() {
     for (const plugin of importedDevicePlugins.values()) addDeviceOption(plugin, true);
     availableDevicePlugins = mergeDevicePlugins(plugins, [...importedDevicePlugins.values()]);
     if (availableDevicePlugins.length === 0) {
-      devicePlugin.add(new Option('尚未构建设备插件，请导入 .gmp', ''));
-      deviceState.textContent = '缺少设备插件';
-      clearDevicePackageShare('等待选择');
+      devicePlugin.add(new Option('No glass plugins built; import a .gmp', ''));
+      deviceState.textContent = 'Glass plugin missing';
+      clearDevicePackageShare('Not selected');
       void stopDevicePackageShare();
       updateDeviceControls();
       updatePairStatus();
@@ -208,7 +209,7 @@ async function discoverDevicePlugins() {
     updateDeviceCompatibility();
     await runDevicePlugin();
   } catch (error) {
-    devicePlugin.replaceChildren(new Option('识别失败', ''));
+    devicePlugin.replaceChildren(new Option('Discovery failed', ''));
     log('DEVICE DISCOVERY ERROR', String(error));
   } finally {
     devicePlugin.disabled = false;
@@ -238,9 +239,9 @@ function addDeviceOptions(plugins, imported) {
 function addDeviceOption(plugin, imported) {
   if (imported) importedDevicePlugins.set(plugin.path, plugin);
   const version = plugin.version ? `  v${plugin.version}` : '';
-  const defaultRole = plugin.id === WEB_BRIDGE_PLUGIN_ID ? '  · Web 默认桥接' : '';
+  const defaultRole = plugin.id === WEB_BRIDGE_PLUGIN_ID ? '  · Default phone bridge' : '';
   const option = addOption(devicePlugin, plugin.path,
-    `${plugin.name}${version}${defaultRole}${imported ? '  · 外部' : ''}`);
+    `${plugin.name}${version}${defaultRole}${imported ? '  · External' : ''}`);
   option.dataset.id = plugin.id;
   option.dataset.baseLabel = option.textContent;
 }
@@ -324,22 +325,22 @@ function updateDeviceCompatibility() {
       continue;
     }
     const result = evaluateCompatibility(web, device);
-    const marker = result.status === 'recommended' ? '推荐' :
-      result.status === 'compatible' ? '兼容' :
-      result.status === 'incompatible' ? '不兼容' : '未声明依赖';
+    const marker = result.status === 'recommended' ? 'Recommended' :
+      result.status === 'compatible' ? 'Compatible' :
+      result.status === 'incompatible' ? 'Incompatible' : 'Dependencies not declared';
     option.textContent = `${base}  · ${marker}`;
     if (option.value === devicePlugin.value) currentCompatibility = result;
   }
   status.classList.remove('compatible', 'incompatible');
   if (!webPlugin.value) {
-    status.textContent = '仅设备调试：不需要 Web 配对校验';
+    status.textContent = 'Glass-only debugging: phone pairing validation is not required';
   } else if (!currentCompatibility || currentCompatibility.status === 'unknown') {
-    status.textContent = '该 Web 插件未声明设备依赖，无法预检配对';
+    status.textContent = 'This phone plugin declares no glass dependency, so pairing cannot be prevalidated';
   } else if (currentCompatibility.compatible) {
-    status.textContent = currentCompatibility.preferred ? '推荐配对：设备协议完全匹配' : '设备协议兼容';
+    status.textContent = currentCompatibility.preferred ? 'Recommended pair: glass protocols fully match' : 'Glass protocols are compatible';
     status.classList.add('compatible');
   } else {
-    status.textContent = `配对不兼容：${currentCompatibility.reasons.join('；')}`;
+    status.textContent = `Incompatible pair: ${currentCompatibility.reasons.join('; ')}`;
     status.classList.add('incompatible');
   }
   updatePairStatus();
@@ -353,21 +354,21 @@ function disableWebPlugin() {
   frame.hidden = true;
   webEmptyState.hidden = false;
   frame.src = 'about:blank';
-  webState.textContent = '未启用 · 仅设备调试';
+  webState.textContent = 'Disabled · Glass-only debugging';
   pendingWebPackagePath = '';
-  clearWebPackageShare('等待选择');
+  clearWebPackageShare('Not selected');
   updatePairStatus();
 }
 
 function queueWebPackageShare() {
   const path = webPlugin.value;
   const generation = ++webPackageGeneration;
-  webShareStatus.textContent = '正在打包…';
+  webShareStatus.textContent = 'Packaging…';
   webShareAddress.textContent = '';
   webShareName.textContent = '';
   webShareQr.hidden = true;
   webSharePlaceholder.hidden = false;
-  webSharePlaceholder.textContent = '正在生成';
+  webSharePlaceholder.textContent = 'Generating';
   webPackageQueue = webPackageQueue.catch(() => {}).then(async () => {
     if (generation !== webPackageGeneration || path !== webPlugin.value) return;
     try {
@@ -377,7 +378,7 @@ function queueWebPackageShare() {
       log('WEB PACKAGE READY', { name: result.name, address: `${result.host}:${result.port}` });
     } catch (error) {
       if (generation !== webPackageGeneration) return;
-      clearWebPackageShare('打包失败');
+      clearWebPackageShare('Packaging failed');
       log('WEB PACKAGE ERROR', String(error));
     }
   });
@@ -397,13 +398,14 @@ function queueWebPackageShareWhenIdle(path) {
 }
 
 function showWebPackageShare(result) {
+  const packagePath = displayPath(result.packagePath);
   drawQrCode(webShareQr, result.qrSize, result.qrModules);
   webShareQr.hidden = false;
   webSharePlaceholder.hidden = true;
-  webShareStatus.textContent = '扫码安装';
+  webShareStatus.textContent = 'Scan to install';
   webShareAddress.textContent = `${result.host}:${result.port}`;
-  webShareName.textContent = `路径：${result.packagePath}`;
-  webShareName.title = result.packagePath;
+  webShareName.textContent = `Path: ${packagePath}`;
+  webShareName.title = packagePath;
 }
 
 function clearWebPackageShare(status) {
@@ -411,7 +413,7 @@ function clearWebPackageShare(status) {
   closeQrZoom(webShareQr);
   webShareQr.hidden = true;
   webSharePlaceholder.hidden = false;
-  webSharePlaceholder.textContent = '选择插件后\n自动生成';
+  webSharePlaceholder.textContent = 'Generated after\nselection';
   webShareStatus.textContent = status;
   webShareAddress.textContent = '';
   webShareName.textContent = '';
@@ -421,12 +423,12 @@ function clearWebPackageShare(status) {
 function queueDevicePackageShare() {
   const path = devicePlugin.value;
   const generation = ++devicePackageGeneration;
-  deviceShareStatus.textContent = '正在生成…';
+  deviceShareStatus.textContent = 'Generating…';
   deviceShareAddress.textContent = '';
   deviceShareName.textContent = '';
   deviceShareQr.hidden = true;
   deviceSharePlaceholder.hidden = false;
-  deviceSharePlaceholder.textContent = '正在生成';
+  deviceSharePlaceholder.textContent = 'Generating';
   devicePackageQueue = devicePackageQueue.catch(() => {}).then(async () => {
     if (generation !== devicePackageGeneration || path !== devicePlugin.value) return;
     try {
@@ -436,7 +438,7 @@ function queueDevicePackageShare() {
       log('DEVICE PACKAGE READY', { name: result.name, address: `${result.host}:${result.port}` });
     } catch (error) {
       if (generation !== devicePackageGeneration) return;
-      clearDevicePackageShare('生成失败');
+      clearDevicePackageShare('Generation failed');
       log('DEVICE PACKAGE ERROR', String(error));
     }
   });
@@ -451,13 +453,14 @@ function queueDevicePackageShareAfterPaint(path) {
 }
 
 function showDevicePackageShare(result) {
+  const packagePath = displayPath(result.packagePath);
   drawQrCode(deviceShareQr, result.qrSize, result.qrModules);
   deviceShareQr.hidden = false;
   deviceSharePlaceholder.hidden = true;
-  deviceShareStatus.textContent = '扫码安装';
+  deviceShareStatus.textContent = 'Scan to install';
   deviceShareAddress.textContent = `${result.host}:${result.port}`;
-  deviceShareName.textContent = `路径：${result.packagePath}`;
-  deviceShareName.title = result.packagePath;
+  deviceShareName.textContent = `Path: ${packagePath}`;
+  deviceShareName.title = packagePath;
 }
 
 function clearDevicePackageShare(status) {
@@ -465,7 +468,7 @@ function clearDevicePackageShare(status) {
   closeQrZoom(deviceShareQr);
   deviceShareQr.hidden = true;
   deviceSharePlaceholder.hidden = false;
-  deviceSharePlaceholder.textContent = '选择插件后\n自动生成';
+  deviceSharePlaceholder.textContent = 'Generated after\nselection';
   deviceShareStatus.textContent = status;
   deviceShareAddress.textContent = '';
   deviceShareName.textContent = '';
@@ -521,7 +524,7 @@ async function stopDevicePackageShare() {
   try {
     await devicePackageQueue.catch(() => {});
     await invoke('stop_device_package_share');
-    log('PACKAGE SHARE', '设备插件局域网共享已停止');
+    log('PACKAGE SHARE', 'Glass plugin LAN sharing stopped');
   } catch (error) {
     log('DEVICE PACKAGE ERROR', String(error));
   }
@@ -548,7 +551,7 @@ async function runWebPlugin() {
   }
   try {
     const web = selectedWebPlugin();
-    if (!web) throw new Error('Selected Web plugin is unavailable');
+    if (!web) throw new Error('Selected phone plugin is unavailable');
     const entry = await invoke('resolve_web_entry', { path: webPlugin.value });
     activeWebPlugin = web;
     frameOrigin = new URL(entry).origin;
@@ -557,7 +560,7 @@ async function runWebPlugin() {
     webActive = true;
     frame.hidden = false;
     webEmptyState.hidden = true;
-    webState.textContent = '加载中';
+    webState.textContent = 'Loading';
     const entryUrl = new URL(entry);
     entryUrl.searchParams.set('studioGeneration', Date.now());
     entryUrl.searchParams.set('studioOrigin', window.location.origin);
@@ -569,7 +572,7 @@ async function runWebPlugin() {
     frameOrigin = null;
     frame.hidden = true;
     webEmptyState.hidden = false;
-    webState.textContent = '加载失败';
+    webState.textContent = 'Load failed';
     updatePairStatus();
     log('WEB ERROR', String(error));
   }
@@ -582,7 +585,7 @@ async function runDevicePlugin() {
     const status = await invoke('load_device_plugin', { path: devicePlugin.value });
     deviceRunning = status.running;
     runningDevicePath = status.source ?? devicePlugin.value;
-    deviceState.textContent = status.running ? '运行中' : '已加载';
+    deviceState.textContent = status.running ? 'Running' : 'Loaded';
     updateDeviceControls();
     emitConnection();
     updatePairStatus();
@@ -590,7 +593,7 @@ async function runDevicePlugin() {
   } catch (error) {
     deviceRunning = false;
     runningDevicePath = '';
-    deviceState.textContent = '加载失败';
+    deviceState.textContent = 'Load failed';
     updateDeviceControls();
     updatePairStatus();
     log('DEVICE ERROR', String(error));
@@ -600,7 +603,7 @@ async function runDevicePlugin() {
 async function simulateDeviceEvent(command, params) {
   try {
     const result = await invoke(command, params);
-    if (!result.handled) throw bridgeError('CAPABILITY_UNAVAILABLE', 'Device plugin did not handle the simulated event');
+    if (!result.handled) throw bridgeError('CAPABILITY_UNAVAILABLE', 'Glass plugin did not handle the simulated event');
   } catch (error) {
     log('SIMULATION ERROR', normalizeBridgeError(error));
   }
@@ -614,7 +617,7 @@ function queueDirectionVector(x, y, active) {
     try {
       const result = await invoke('set_direction_vector', { x, y, active });
       if (!result.handled) {
-        throw bridgeError('CAPABILITY_UNAVAILABLE', 'Device plugin did not handle the direction input');
+        throw bridgeError('CAPABILITY_UNAVAILABLE', 'Glass plugin did not handle the direction input');
       }
     } catch (error) {
       if (active || deviceRunning) log('SIMULATION ERROR', normalizeBridgeError(error));
@@ -765,7 +768,7 @@ async function dispatch(method, params) {
 }
 
 async function sendPluginMessage(params) {
-  if (!deviceRunning) throw bridgeError('DEVICE_DISCONNECTED', 'Device plugin is not running');
+  if (!deviceRunning) throw bridgeError('DEVICE_DISCONNECTED', 'Glass plugin is not running');
   const channel = params?.channel;
   if (!Number.isInteger(channel) || channel < 0 || channel > 0xffff) {
     throw bridgeError('INVALID_REQUEST', 'channel must be uint16');
@@ -833,13 +836,13 @@ async function rebuildPage(params) {
 }
 
 async function sendNativeMessage(channel, payload) {
-  if (!deviceRunning) throw bridgeError('DEVICE_DISCONNECTED', 'Device plugin is not running');
+  if (!deviceRunning) throw bridgeError('DEVICE_DISCONNECTED', 'Glass plugin is not running');
   const result = await invoke('send_plugin_message', { channel, payload: [...payload] });
   if (result.service !== PLUGIN_TRANSPORT.service ||
       result.command !== PLUGIN_TRANSPORT.phoneToGlassesCommand) {
     throw bridgeError('INTERNAL_ERROR', 'Studio returned an invalid phone-to-glasses route');
   }
-  if (!result.handled) throw bridgeError('CAPABILITY_UNAVAILABLE', `Device plugin did not handle channel ${channel}`);
+  if (!result.handled) throw bridgeError('CAPABILITY_UNAVAILABLE', `Glass plugin did not handle channel ${channel}`);
   return result;
 }
 
@@ -1021,7 +1024,7 @@ function log(kind, value) {
 function updatePairStatus() {
   const workspace = describeWorkspace({ webEnabled: webActive, deviceRunning });
   const incompatible = webActive && currentCompatibility?.compatible === false;
-  pairStatus.textContent = incompatible ? `${workspace.text} · 配对不兼容` : workspace.text;
+  pairStatus.textContent = incompatible ? `${workspace.text} · Incompatible pair` : workspace.text;
   pairStatus.classList.toggle('ready', workspace.ready && !incompatible);
   document.querySelector('#bridge-mode-label').textContent = workspace.bridgeLabel;
 }

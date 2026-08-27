@@ -34,7 +34,7 @@ test('Web development defaults to web_bridge when device selection is implicit',
   }), plugins[1].path);
 });
 
-test('Device selection chooses the newest Web plugin from a many-to-one pairing', () => {
+test('Glass selection chooses the newest phone plugin from a many-to-one pairing', () => {
   const device = plugins[1];
   const webPlugins = [
     { path: '/web/older', updatedAtMs: 100, deviceRequirements: {
@@ -49,7 +49,7 @@ test('Device selection chooses the newest Web plugin from a many-to-one pairing'
   assert.equal(chooseWebPlugin(webPlugins, device), '/web/newer');
 });
 
-test('An exact device ID match outranks a newer protocol-only Web plugin', () => {
+test('An exact glass plugin ID match outranks a newer protocol-only phone plugin', () => {
   const device = plugins[2];
   const webPlugins = [
     { path: '/web/protocol-newer', updatedAtMs: 300, deviceRequirements: {
@@ -63,7 +63,7 @@ test('An exact device ID match outranks a newer protocol-only Web plugin', () =>
   assert.equal(chooseWebPlugin(webPlugins, device), '/web/exact-older');
 });
 
-test('A device without a related Web plugin resolves to device-only mode', () => {
+test('A glass plugin without a related phone plugin resolves to glass-only mode', () => {
   assert.equal(chooseWebPlugin([sceneWebPlugin], plugins[2]), '');
 });
 
@@ -73,7 +73,7 @@ test('protocol metadata distinguishes recommended and incompatible devices', () 
     compatible: false,
     preferred: false,
     status: 'incompatible',
-    reasons: ['缺少协议 gm.scene'],
+    reasons: ['Missing protocol gm.scene'],
   });
 });
 
@@ -104,10 +104,10 @@ test('an explicit custom device selection is preserved for paired plugins', () =
   }), plugins[2].path);
 });
 
-test('device-only mode remains ready without a Web plugin', () => {
+test('glass-only mode remains ready without a phone plugin', () => {
   assert.deepEqual(describeWorkspace({ webEnabled: false, deviceRunning: true }), {
-    text: '仅设备调试 · 设备插件运行中',
+    text: 'Glass-only debugging · Glass plugin running',
     ready: true,
-    bridgeLabel: 'Device events',
+    bridgeLabel: 'Glass events',
   });
 });

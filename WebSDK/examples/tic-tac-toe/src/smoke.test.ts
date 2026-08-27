@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MemoBridgeClient, type BridgeGlobalTarget } from './bridge';
 import { newGame, parseStoredGame, placeAtCursor } from './game';
 
-describe('插件最短主路径', () => {
-  it('bootstrap 后落子、电脑响应、保存并在新 Runtime 恢复', async () => {
+describe('plugin minimum happy path', () => {
+  it('places a mark, receives a computer response, saves, and restores in a new Runtime after bootstrap', async () => {
     const storage = new Map<string, unknown>();
     const target: BridgeGlobalTarget = {};
     target.MemoPluginBridge = {

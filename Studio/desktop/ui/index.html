@@ -9,49 +9,49 @@
   <body>
     <header class="app-header">
       <div><p>GM PLUGIN SDK</p><h1>Desktop Studio</h1></div>
-      <div id="pair-status" class="pair-status">等待选择插件</div>
+      <div id="pair-status" class="pair-status">Select plugins to begin</div>
     </header>
 
     <section class="pair-toolbar">
       <div class="plugin-picker web-plugin-picker">
         <div class="web-picker-main">
-          <label><span>Web 插件工作区 / 包 · 可选</span><select id="web-plugin"><option value="">正在识别…</option></select></label>
-          <p class="compatibility-status picker-hint">选择后自动运行，并在空闲时生成安装二维码</p>
+          <label><span>Phone plugin workspace / package · optional</span><select id="web-plugin"><option value="">Discovering…</option></select></label>
+          <p class="compatibility-status picker-hint">Runs on selection and generates an install QR code when idle</p>
           <div class="web-share-copy" aria-live="polite">
-            <strong id="web-share-status">等待选择</strong>
+            <strong id="web-share-status">Not selected</strong>
             <span id="web-share-address"></span>
             <span id="web-share-name"></span>
           </div>
           <div class="picker-actions">
-            <button id="refresh-web" class="secondary">刷新仓库</button>
-            <button id="import-web-file" class="secondary">导入 .mmpkg</button>
+            <button id="refresh-web" class="secondary">Refresh repository</button>
+            <button id="import-web-file" class="secondary">Import .mmpkg</button>
           </div>
         </div>
         <aside class="web-share-card" aria-live="polite">
           <div class="web-share-visual">
-            <canvas id="web-share-qr" class="clickable-qr" width="160" height="160" hidden role="button" tabindex="0" aria-label="点击放大 Web 插件安装二维码"></canvas>
-            <span id="web-share-placeholder">选择插件后<br>自动生成</span>
+            <canvas id="web-share-qr" class="clickable-qr" width="160" height="160" hidden role="button" tabindex="0" aria-label="Click to enlarge the phone plugin installation QR code"></canvas>
+            <span id="web-share-placeholder">Generated after<br>selection</span>
           </div>
         </aside>
       </div>
       <div class="plugin-picker device-plugin-picker">
         <div class="device-picker-main">
-          <label><span>设备插件工作区 / 包 · 必需</span><select id="device-plugin"><option value="">正在识别…</option></select></label>
-          <p id="device-compatibility" class="compatibility-status">等待设备插件</p>
+          <label><span>Glass plugin workspace / package · required</span><select id="device-plugin"><option value="">Discovering…</option></select></label>
+          <p id="device-compatibility" class="compatibility-status">Waiting for a glass plugin</p>
           <div class="device-share-copy" aria-live="polite">
-            <strong id="device-share-status">等待选择</strong>
+            <strong id="device-share-status">Not selected</strong>
             <span id="device-share-address"></span>
             <span id="device-share-name"></span>
           </div>
           <div class="picker-actions">
-            <button id="refresh-device" class="secondary">刷新仓库</button>
-            <button id="import-device-file" class="secondary">导入 .gmp</button>
+            <button id="refresh-device" class="secondary">Refresh repository</button>
+            <button id="import-device-file" class="secondary">Import .gmp</button>
           </div>
         </div>
         <aside class="device-share-card" aria-live="polite">
           <div class="device-share-visual">
-            <canvas id="device-share-qr" class="clickable-qr" width="160" height="160" hidden role="button" tabindex="0" aria-label="点击放大设备插件安装二维码"></canvas>
-            <span id="device-share-placeholder">选择插件后<br>自动生成</span>
+            <canvas id="device-share-qr" class="clickable-qr" width="160" height="160" hidden role="button" tabindex="0" aria-label="Click to enlarge the glass plugin installation QR code"></canvas>
+            <span id="device-share-placeholder">Generated after<br>selection</span>
           </div>
         </aside>
       </div>
@@ -59,35 +59,35 @@
 
     <main class="workspace">
       <section class="pane web-pane">
-        <div class="pane-title"><span>WEB PLUGIN</span><strong id="web-state">未加载</strong></div>
+        <div class="pane-title"><span>PHONE PLUGIN</span><strong id="web-state">Not loaded</strong></div>
         <div id="web-empty-state" class="web-empty-state" hidden>
-          <strong>仅设备插件调试</strong>
-          <p>Web 插件未启用。右侧设备画面、按键和头部手势模拟仍可独立使用。</p>
+          <strong>Glass-only debugging</strong>
+          <p>No phone plugin is active. The glass display, buttons, and head-gesture simulation remain available.</p>
         </div>
-        <iframe id="plugin-frame" title="Web plugin" allow="autoplay"></iframe>
+        <iframe id="plugin-frame" title="Phone plugin" allow="autoplay"></iframe>
       </section>
       <section class="pane device-pane">
-        <div class="pane-title"><span>DEVICE PLUGIN</span><strong id="device-state">未加载</strong></div>
+        <div class="pane-title"><span>GLASS PLUGIN</span><strong id="device-state">Not loaded</strong></div>
         <div class="device-workbench">
-          <div class="device-controls" aria-label="设备事件模拟">
+          <div class="device-controls" aria-label="Glass event simulation">
             <div class="device-control-group">
-              <span>按键</span>
+              <span>BUTTONS</span>
               <div class="button-control-row">
-                <button class="secondary action-button" data-button-action="1">单击</button>
-                <button class="secondary action-button" data-button-action="2">双击</button>
-                <button class="secondary action-button" data-button-action="3">长按</button>
+                <button class="secondary action-button" data-button-action="1">Single click</button>
+                <button class="secondary action-button" data-button-action="2">Double click</button>
+                <button class="secondary action-button" data-button-action="3">Long press</button>
               </div>
             </div>
             <div class="device-control-group">
-              <span>手势</span>
+              <span>GESTURES</span>
               <div class="button-control-row">
-                <button class="secondary gesture-button" data-gesture="1">点头</button>
-                <button class="secondary gesture-button" data-gesture="4">摇头</button>
+                <button class="secondary gesture-button" data-gesture="1">Nod</button>
+                <button class="secondary gesture-button" data-gesture="4">Shake</button>
               </div>
             </div>
             <div class="device-control-group direction-control-group">
-              <span>头动操作</span>
-              <div class="direction-joystick disabled" data-direction-joystick role="application" tabindex="-1" aria-label="头动操作摇杆" aria-disabled="true">
+              <span>HEAD MOTION</span>
+              <div class="direction-joystick disabled" data-direction-joystick role="application" tabindex="-1" aria-label="Head-motion joystick" aria-disabled="true">
                 <span class="joystick-arrow joystick-arrow-up">↑</span>
                 <span class="joystick-arrow joystick-arrow-left">←</span>
                 <span class="joystick-arrow joystick-arrow-down">↓</span>
@@ -107,14 +107,14 @@
     </main>
 
     <section class="log-panel">
-      <div class="pane-title"><span>BRIDGE</span><strong id="bridge-mode-label">Web ↔ Device</strong><button id="clear-log" class="secondary">清空</button></div>
+      <div class="pane-title"><span>BRIDGE</span><strong id="bridge-mode-label">Phone ↔ Glass</strong><button id="clear-log" class="secondary">Clear</button></div>
       <ol id="logs"></ol>
     </section>
 
-    <div id="qr-zoom" class="qr-zoom" hidden role="dialog" aria-modal="true" aria-label="放大的安装二维码">
+    <div id="qr-zoom" class="qr-zoom" hidden role="dialog" aria-modal="true" aria-label="Enlarged installation QR code">
       <div class="qr-zoom-card">
-        <canvas id="qr-zoom-canvas" width="640" height="640" aria-label="放大的安装二维码"></canvas>
-        <p>使用手机扫码安装 · 点击二维码外任意位置返回</p>
+        <canvas id="qr-zoom-canvas" width="640" height="640" aria-label="Enlarged installation QR code"></canvas>
+        <p>Scan with your phone to install · Click outside the QR code to return</p>
       </div>
     </div>
 

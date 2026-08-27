@@ -29,17 +29,17 @@ const DOS_DATE_1980_01_01 = 0x0021;
 export async function buildMmpkg(sourceDirectory, outputPath) {
   const sourceRoot = resolve(sourceDirectory);
   const outputFile = resolve(outputPath);
-  if (extname(outputFile).toLowerCase() !== '.mmpkg') throw new Error('输出文件必须使用 .mmpkg 扩展名');
+  if (extname(outputFile).toLowerCase() !== '.mmpkg') throw new Error('The output file must use the .mmpkg extension');
   const outputRelative = relative(sourceRoot, outputFile);
   if (outputRelative === '' || (!outputRelative.startsWith(`..${sep}`) && outputRelative !== '..')) {
-    throw new Error('mmpkg 输出文件不能位于插件输入目录内');
+    throw new Error('The mmpkg output file cannot be inside the plugin input directory');
   }
   const sourceStat = await stat(sourceRoot).catch(() => null);
-  if (!sourceStat?.isDirectory()) throw new Error(`插件输入目录不存在: ${sourceRoot}`);
+  if (!sourceStat?.isDirectory()) throw new Error(`Plugin input directory does not exist: ${sourceRoot}`);
 
   const manifestPath = resolve(sourceRoot, 'manifest.json');
   const sourceManifest = parseJson(await readFile(manifestPath, 'utf8').catch(() => {
-    throw new Error('插件输入目录缺少 manifest.json');
+    throw new Error('Plugin input directory is missing manifest.json');
   }));
   validateManifest(sourceManifest);
 
@@ -48,7 +48,7 @@ export async function buildMmpkg(sourceDirectory, outputPath) {
   let signature;
   for (const file of files) {
     const bytes = await readFile(file.absolutePath);
-    if (bytes.length > MMPKG_LIMITS.maxFileBytes) throw new Error(`${file.path} 超过单文件 10 MB 限制`);
+    if (bytes.length > MMPKG_LIMITS.maxFileBytes) throw new Error(`${file.path} exceeds the 10 MB per-file limit`);
     if (file.path === 'manifest.json') continue;
     if (file.path === 'signature.sig') {
       signature = bytes;
@@ -56,7 +56,7 @@ export async function buildMmpkg(sourceDirectory, outputPath) {
     }
     payloads.set(file.path, bytes);
   }
-  if (!payloads.has(sourceManifest.entry)) throw new Error(`entry 文件不存在: ${sourceManifest.entry}`);
+  if (!payloads.has(sourceManifest.entry)) throw new Error(`Entry file does not exist: ${sourceManifest.entry}`);
 
   const hashes = {};
   for (const path of [...payloads.keys()].sort()) {
@@ -76,7 +76,7 @@ export async function buildMmpkg(sourceDirectory, outputPath) {
   validatePackageLimits(entries);
 
   const archive = createZip(entries);
-  if (archive.length > MMPKG_LIMITS.maxPackageBytes) throw new Error('生成的 mmpkg 超过 10 MB 限制');
+  if (archive.length > MMPKG_LIMITS.maxPackageBytes) throw new Error('The generated mmpkg exceeds the 10 MB limit');
   await mkdir(dirname(outputFile), { recursive: true });
   const temporary = `${outputFile}.tmp-${randomBytes(8).toString('hex')}`;
   try {
@@ -104,34 +104,34 @@ async function collectFiles(root) {
     entries.sort((left, right) => left.name.localeCompare(right.name));
     for (const entry of entries) {
       const path = prefix ? `${prefix}/${entry.name}` : entry.name;
-      requireSafePath(path, '文件路径');
+      requireSafePath(path, 'File path');
       const absolutePath = resolve(directory, entry.name);
-      if (entry.isSymbolicLink()) throw new Error(`插件输入目录不允许符号链接: ${path}`);
+      if (entry.isSymbolicLink()) throw new Error(`Symbolic links are not allowed in the plugin input directory: ${path}`);
       if (entry.isDirectory()) await walk(absolutePath, path);
       else if (entry.isFile()) result.push({ path, absolutePath });
-      else throw new Error(`插件输入目录包含不支持的文件类型: ${path}`);
+      else throw new Error(`Plugin input directory contains an unsupported file type: ${path}`);
     }
   }
 }
 
 function validateManifest(manifest) {
-  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) throw new Error('manifest.json 必须是 JSON 对象');
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) throw new Error('manifest.json must be a JSON object');
   requireString(manifest, 'id', 128);
   requireString(manifest, 'name', 80);
   requireString(manifest, 'version', 64);
   requireString(manifest, 'entry', 256);
   requireString(manifest, 'bridgeVersion', 32);
-  if (!PLUGIN_ID.test(manifest.id)) throw new Error('插件 id 格式无效');
-  if (!SEMVER.test(manifest.version)) throw new Error('插件 version 必须是语义化版本');
+  if (!PLUGIN_ID.test(manifest.id)) throw new Error('Invalid plugin id format');
+  if (!SEMVER.test(manifest.version)) throw new Error('Plugin version must use semantic versioning');
   requireSafePath(manifest.entry, 'entry');
-  if (!manifest.entry.toLowerCase().endsWith('.html')) throw new Error('entry 必须指向 HTML 文件');
-  if (manifest.bridgeVersion !== '1.0') throw new Error(`不支持 bridgeVersion=${manifest.bridgeVersion}`);
-  if (!Array.isArray(manifest.permissions) || manifest.permissions.length > 16) throw new Error('permissions 必须是有界数组');
+  if (!manifest.entry.toLowerCase().endsWith('.html')) throw new Error('entry must point to an HTML file');
+  if (manifest.bridgeVersion !== '1.0') throw new Error(`Unsupported bridgeVersion=${manifest.bridgeVersion}`);
+  if (!Array.isArray(manifest.permissions) || manifest.permissions.length > 16) throw new Error('permissions must be a bounded array');
   const seen = new Set();
   for (const item of manifest.permissions) {
     const permission = typeof item === 'string' ? item : item?.name;
-    if (typeof permission !== 'string' || !SUPPORTED_PERMISSIONS.has(permission)) throw new Error(`不支持插件权限 ${String(permission)}`);
-    if (seen.has(permission)) throw new Error(`插件权限 ${permission} 重复`);
+    if (typeof permission !== 'string' || !SUPPORTED_PERMISSIONS.has(permission)) throw new Error(`Unsupported plugin permission: ${String(permission)}`);
+    if (seen.has(permission)) throw new Error(`Duplicate plugin permission: ${permission}`);
     seen.add(permission);
   }
   validateDeviceRequirements(manifest.deviceRequirements);
@@ -140,47 +140,47 @@ function validateManifest(manifest) {
 function validateDeviceRequirements(requirements) {
   if (requirements === undefined) return;
   if (!requirements || typeof requirements !== 'object' || Array.isArray(requirements)) {
-    throw new Error('deviceRequirements 必须是 JSON 对象');
+    throw new Error('deviceRequirements must be a JSON object');
   }
   for (const field of ['preferredPluginId', 'requiredPluginId']) {
     if (requirements[field] === undefined) continue;
     requireString(requirements, field, 128);
-    if (!PLUGIN_ID.test(requirements[field])) throw new Error(`${field} 插件 id 格式无效`);
+    if (!PLUGIN_ID.test(requirements[field])) throw new Error(`Invalid plugin id format in ${field}`);
   }
   if (requirements.minPluginVersion !== undefined &&
       (typeof requirements.minPluginVersion !== 'string' ||
        !/^\d+(?:\.\d+){0,3}$/u.test(requirements.minPluginVersion))) {
-    throw new Error('minPluginVersion 必须是数字版本字符串');
+    throw new Error('minPluginVersion must be a numeric version string');
   }
   if (!Array.isArray(requirements.protocols) || requirements.protocols.length > 16) {
-    throw new Error('deviceRequirements.protocols 必须是最多 16 项的数组');
+    throw new Error('deviceRequirements.protocols must be an array with at most 16 entries');
   }
   const protocols = new Set();
   for (const protocol of requirements.protocols) {
     if (!protocol || typeof protocol !== 'object' || Array.isArray(protocol)) {
-      throw new Error('设备协议声明必须是 JSON 对象');
+      throw new Error('A device protocol declaration must be a JSON object');
     }
     requireString(protocol, 'id', 80);
     requireString(protocol, 'minVersion', 32);
     if (!/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/u.test(protocol.id)) {
-      throw new Error(`设备协议 id 格式无效: ${protocol.id}`);
+      throw new Error(`Invalid device protocol id: ${protocol.id}`);
     }
     if (!/^\d+(?:\.\d+){0,3}$/u.test(protocol.minVersion)) {
-      throw new Error(`设备协议版本格式无效: ${protocol.minVersion}`);
+      throw new Error(`Invalid device protocol version: ${protocol.minVersion}`);
     }
-    if (protocols.has(protocol.id)) throw new Error(`设备协议 ${protocol.id} 重复`);
+    if (protocols.has(protocol.id)) throw new Error(`Duplicate device protocol: ${protocol.id}`);
     protocols.add(protocol.id);
   }
 }
 
 function validatePackageLimits(entries) {
-  if (entries.length > MMPKG_LIMITS.maxFiles) throw new Error('插件包普通文件超过 500 个');
+  if (entries.length > MMPKG_LIMITS.maxFiles) throw new Error('The plugin package contains more than 500 regular files');
   let total = 0;
   for (const entry of entries) {
-    if (entry.bytes.length > MMPKG_LIMITS.maxFileBytes) throw new Error(`${entry.path} 超过单文件 10 MB 限制`);
+    if (entry.bytes.length > MMPKG_LIMITS.maxFileBytes) throw new Error(`${entry.path} exceeds the 10 MB per-file limit`);
     total += entry.bytes.length;
   }
-  if (total > MMPKG_LIMITS.maxExtractedBytes) throw new Error('插件包解压后超过 30 MB 限制');
+  if (total > MMPKG_LIMITS.maxExtractedBytes) throw new Error('The extracted plugin package exceeds the 30 MB limit');
 }
 
 export function createZip(entries) {
@@ -255,25 +255,25 @@ function parseJson(value) {
   try {
     return JSON.parse(value);
   } catch {
-    throw new Error('manifest.json 不是有效 JSON');
+    throw new Error('manifest.json is not valid JSON');
   }
 }
 
 function requireString(values, key, maxLength) {
   const value = values[key];
-  if (typeof value !== 'string' || value.trim() === '' || value.length > maxLength) throw new Error(`${key} 必须是有效字符串`);
+  if (typeof value !== 'string' || value.trim() === '' || value.length > maxLength) throw new Error(`${key} must be a valid string`);
 }
 
 function requireSafePath(value, field) {
   const segments = value.split('/');
   if (!value || value.startsWith('/') || value.includes('\\') || segments.some((segment) => !segment || segment === '.' || segment === '..')) {
-    throw new Error(`${field} 包含不安全路径`);
+    throw new Error(`${field} contains an unsafe path`);
   }
 }
 
 async function main(arguments_) {
   if (arguments_.length !== 2) {
-    process.stderr.write('用法: build-mmpkg <插件构建目录> <输出.mmpkg>\n');
+    process.stderr.write('Usage: build-mmpkg <plugin-build-directory> <output.mmpkg>\n');
     process.exitCode = 64;
     return;
   }
@@ -281,7 +281,7 @@ async function main(arguments_) {
     const result = await buildMmpkg(arguments_[0], arguments_[1]);
     process.stdout.write(`${result.id} ${result.version} -> ${result.outputFile} (${result.fileCount} files, ${result.outputBytes} bytes)\n`);
   } catch (error) {
-    process.stderr.write(`mmpkg 构建失败: ${error.message}\n`);
+    process.stderr.write(`mmpkg build failed: ${error.message}\n`);
     process.exitCode = 1;
   }
 }

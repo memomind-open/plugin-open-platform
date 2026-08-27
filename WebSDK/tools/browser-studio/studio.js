@@ -55,7 +55,7 @@ document.querySelector('#lifecycle').addEventListener('change', (event) => runti
 document.querySelector('#connected').addEventListener('change', (event) => {
   runtime.setConnected(event.target.checked);
   document.querySelector('#connection-dot').style.background = event.target.checked ? '#5bf0ba' : '#ff657a';
-  document.querySelector('#connection-label').textContent = event.target.checked ? '设备已连接' : '设备已断开';
+  document.querySelector('#connection-label').textContent = event.target.checked ? 'Device connected' : 'Device disconnected';
 });
 
 window.addEventListener('keydown', (event) => {
@@ -98,10 +98,10 @@ function updateTransportStatus(response) {
     : null;
   transportStatus.classList.toggle('error', response.error?.code === 'PAYLOAD_TOO_LARGE');
   if (transfer) {
-    const decoded = transfer.codec === 'gray4-lz4' ? ` · 解压 ${formatBytes(transfer.decodedBytes)}` : '';
+    const decoded = transfer.codec === 'gray4-lz4' ? ` · decoded ${formatBytes(transfer.decodedBytes)}` : '';
     transportStatus.textContent = `CH${transfer.channel} · ${formatBytes(transfer.payloadBytes)} / ${formatBytes(transfer.maxPayloadBytes)}${decoded}`;
   } else if (response.error?.code === 'PAYLOAD_TOO_LARGE') {
-    transportStatus.textContent = `超出单包限制 · 请拆分区块${response.error.message.includes('LZ4') ? '并分别压缩' : '或评估 LZ4'}`;
+    transportStatus.textContent = `Packet limit exceeded · Split into tiles${response.error.message.includes('LZ4') ? ' and compress each tile' : ' or consider LZ4'}`;
   }
 }
 

@@ -21,14 +21,14 @@
         <p class="eyebrow">GM WEB PLUGIN SDK</p>
         <h1>Plugin Studio</h1>
       </div>
-      <div class="status"><span id="connection-dot"></span><span id="connection-label">设备已连接</span></div>
+      <div class="status"><span id="connection-dot"></span><span id="connection-label">Device connected</span></div>
     </header>
 
     <main>
       <section class="panel plugin-panel">
         <div class="panel-title">
-          <div><span>WEB PLUGIN</span><strong>插件页面</strong></div>
-          <button id="reload" class="secondary">重新加载</button>
+          <div><span>WEB PLUGIN</span><strong>Plugin page</strong></div>
+          <button id="reload" class="secondary">Reload</button>
         </div>
         <iframe id="plugin-frame" src="/plugin/index.html" title="Web plugin preview" scrolling="no"></iframe>
       </section>
@@ -36,11 +36,11 @@
       <section class="panel device-panel">
         <div class="panel-title">
           <div><span>DEVICE PREVIEW</span><strong>600 × 350 · GRAY_4 → GREEN · 30 Hz</strong></div>
-          <span class="fidelity">荧光绿单色预览</span>
+          <span class="fidelity">Fluorescent green monochrome preview</span>
         </div>
         <div class="transport-bar">
-          <span>BT Scene 单包 ≤ 81,901 B · Channel 6 原图 / Channel 7 raw LZ4</span>
-          <strong id="transport-status">等待绘制请求</strong>
+          <span>BT Scene packet ≤ 81,901 B · Channel 6 raw image / Channel 7 raw LZ4</span>
+          <strong id="transport-status">Waiting for a draw request</strong>
         </div>
         <div class="glasses-view">
           <div class="device-shell">
@@ -49,40 +49,40 @@
         </div>
         <div class="controls">
           <div class="control-group">
-            <label>头部动作</label>
+            <label>Head gestures</label>
             <div class="gesture-grid">
-              <button data-gesture="headRaise">抬头 <kbd>↑</kbd></button>
-              <button data-gesture="left">向左转头 <kbd>←</kbd></button>
-              <button data-gesture="headLower">低头 <kbd>↓</kbd></button>
-              <button data-gesture="right">向右转头 <kbd>→</kbd></button>
+              <button data-gesture="headRaise">Look up <kbd>↑</kbd></button>
+              <button data-gesture="left">Turn left <kbd>←</kbd></button>
+              <button data-gesture="headLower">Look down <kbd>↓</kbd></button>
+              <button data-gesture="right">Turn right <kbd>→</kbd></button>
             </div>
           </div>
           <div class="control-group">
-            <label>设备按钮</label>
+            <label>Device button</label>
             <div class="button-row">
-              <button data-button="single">单击</button>
-              <button data-button="double">双击</button>
-              <button data-button="long">长按</button>
+              <button data-button="single">Single click</button>
+              <button data-button="double">Double click</button>
+              <button data-button="long">Long press</button>
             </div>
           </div>
           <div class="control-group compact">
-            <label for="lifecycle">生命周期</label>
+            <label for="lifecycle">Lifecycle</label>
             <select id="lifecycle">
               <option value="running">running</option>
               <option value="suspended">suspended</option>
               <option value="stopped">stopped</option>
               <option value="failed">failed</option>
             </select>
-            <label class="switch"><input id="connected" type="checkbox" checked><span>连接设备</span></label>
-            <button id="clear" class="secondary">清空画面</button>
+            <label class="switch"><input id="connected" type="checkbox" checked><span>Connect device</span></label>
+            <button id="clear" class="secondary">Clear display</button>
           </div>
         </div>
       </section>
 
       <section class="panel log-panel">
         <div class="panel-title">
-          <div><span>BRIDGE INSPECTOR</span><strong>请求与事件</strong></div>
-          <button id="clear-log" class="secondary">清空日志</button>
+          <div><span>BRIDGE INSPECTOR</span><strong>Requests and events</strong></div>
+          <button id="clear-log" class="secondary">Clear log</button>
         </div>
         <ol id="logs"></ol>
       </section>

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#ffe8a8">
-    <title>Momo 会说话</title>
+    <title>Talking Momo</title>
     <link rel="stylesheet" href="./style.css">
     <link rel="preload" as="image" href="./assets/momo-blink-v2.webp">
   </head>
@@ -13,14 +13,14 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">MY TALKING PET</p>
-          <h1>Momo <span>的房间</span></h1>
+          <h1>Momo's <span>Room</span></h1>
         </div>
-        <button class="level-badge" id="level-badge" type="button" aria-label="当前等级">
+        <button class="level-badge" id="level-badge" type="button" aria-label="Current level">
           <span>LV.</span><strong id="level">1</strong>
         </button>
       </header>
 
-      <section class="meters" aria-label="Momo 的状态">
+      <section class="meters" aria-label="Momo's status">
         <div class="meter meter-happy">
           <span aria-hidden="true">♥</span>
           <div><i id="happy-bar"></i></div>
@@ -38,13 +38,13 @@
         </div>
       </section>
 
-      <section class="room" id="room" aria-label="游戏场景">
+      <section class="room" id="room" aria-label="Game scene">
         <div class="sun" aria-hidden="true"></div>
         <div class="cloud cloud-one" aria-hidden="true"></div>
         <div class="cloud cloud-two" aria-hidden="true"></div>
         <div class="shelf" aria-hidden="true"><span></span><span></span><span></span></div>
         <div class="plant" aria-hidden="true"><i></i><i></i><b></b></div>
-        <p class="speech" id="speech" role="status">嗨！摸摸我的脑袋吧～</p>
+        <p class="speech" id="speech" role="status">Hi! Give my head a pat!</p>
 
         <div class="scene-effects" aria-hidden="true">
           <span class="prop-cookie">🍪</span>
@@ -59,9 +59,9 @@
           </span>
         </div>
 
-        <button class="pet" id="pet" type="button" aria-label="摸摸 Momo">
+        <button class="pet" id="pet" type="button" aria-label="Pet Momo">
           <span class="pet-glow" aria-hidden="true"></span>
-          <img id="pet-image" src="./assets/momo-idle-v2.png" alt="穿红色节庆外套、长着星星眼的黑猫 Momo">
+          <img id="pet-image" src="./assets/momo-idle-v2.png" alt="Momo, a black cat with starry eyes wearing a festive red coat">
           <svg viewBox="0 0 320 390" aria-hidden="true">
             <defs>
               <linearGradient id="fur" x1="0" y1="0" x2="1" y2="1">
@@ -112,25 +112,25 @@
         <div class="particles" id="particles" aria-hidden="true"></div>
       </section>
 
-      <nav class="actions" aria-label="互动操作">
+      <nav class="actions" aria-label="Interactions">
         <button class="action action-feed" data-action="feed" type="button">
-          <span aria-hidden="true">🍪</span><strong>喂食</strong>
+          <span aria-hidden="true">🍪</span><strong>Feed</strong>
         </button>
         <button class="action action-talk" id="talk" data-action="talk" type="button">
-          <span class="mic-icon" aria-hidden="true">●</span><strong>按住说话</strong>
+          <span class="mic-icon" aria-hidden="true">●</span><strong>Hold to talk</strong>
         </button>
         <button class="action action-play" data-action="play" type="button">
-          <span aria-hidden="true">⚽</span><strong>玩耍</strong>
+          <span aria-hidden="true">⚽</span><strong>Play</strong>
         </button>
         <button class="action action-sleep" data-action="sleep" type="button">
-          <span aria-hidden="true">☾</span><strong>睡觉</strong>
+          <span aria-hidden="true">☾</span><strong>Sleep</strong>
         </button>
       </nav>
 
       <footer>
         <span class="connection-dot" id="connection-dot"></span>
-        <span id="status">正在连接 Studio…</span>
-        <button id="sync" type="button">同步到眼镜</button>
+        <span id="status">Connecting to Studio…</span>
+        <button id="sync" type="button">Sync to glasses</button>
       </footer>
     </main>
     <script type="module" src="./plugin.js"></script>

@@ -83,13 +83,13 @@ export class MemoBridgeClient {
     const configuration = this.configuration;
     const transport = this.target.MemoPluginBridge;
     if (!configuration || !transport) {
-      return Promise.reject(new MemoBridgeError('BRIDGE_UNAVAILABLE', 'App Bridge 尚未就绪'));
+      return Promise.reject(new MemoBridgeError('BRIDGE_UNAVAILABLE', 'App Bridge is not ready'));
     }
     const requestId = `tictactoe-${Date.now()}-${++this.requestSequence}`;
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(requestId);
-        reject(new MemoBridgeError('TIMEOUT', `${method} 调用超时`));
+        reject(new MemoBridgeError('TIMEOUT', `${method} timed out`));
       }, this.timeoutMs);
       this.pending.set(requestId, {
         resolve: (value) => resolve(value as T),
@@ -128,7 +128,7 @@ export class MemoBridgeClient {
     const previous = this.configuration;
     if (previous &&
         (previous.sessionToken !== sessionToken || previous.runtimeGeneration !== runtimeGeneration)) {
-      this.rejectAll(new MemoBridgeError('STALE_RUNTIME', '插件 Runtime 已重建'));
+      this.rejectAll(new MemoBridgeError('STALE_RUNTIME', 'Plugin Runtime was recreated'));
       this.configuredPromise = this.newConfiguredPromise();
     }
     this.configuration = { sessionToken, runtimeGeneration };
@@ -146,7 +146,7 @@ export class MemoBridgeClient {
     } else {
       item.reject(new MemoBridgeError(
         response.error?.code ?? 'BRIDGE_ERROR',
-        response.error?.message ?? 'Bridge 调用失败',
+        response.error?.message ?? 'Bridge call failed',
       ));
     }
   }

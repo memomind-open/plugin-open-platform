@@ -58,9 +58,9 @@ test('rejects symlinks and output paths inside the plugin directory', async (con
     permissions: [],
   }));
   await writeFile(join(root, 'index.html'), '<!doctype html>');
-  await assert.rejects(buildMmpkg(root, join(root, 'plugin.mmpkg')), /不能位于/);
+  await assert.rejects(buildMmpkg(root, join(root, 'plugin.mmpkg')), /cannot be inside/);
   await symlink(join(root, 'index.html'), join(root, 'linked.html'));
-  await assert.rejects(buildMmpkg(root, join(tmpdir(), `invalid-${Date.now()}.mmpkg`)), /符号链接/);
+  await assert.rejects(buildMmpkg(root, join(tmpdir(), `invalid-${Date.now()}.mmpkg`)), /Symbolic links/);
 });
 
 function readZip(archive) {

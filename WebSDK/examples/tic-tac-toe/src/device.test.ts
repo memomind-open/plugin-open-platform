@@ -25,32 +25,32 @@ async function tick(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-describe('设备中文绘制', () => {
-  it('左侧输出完整中文规则和当前状态', () => {
+describe('device rendering', () => {
+  it('renders the complete rules and current status in the left pane', () => {
     const text = renderDeviceText(newGame());
-    expect(text).toContain('井字棋');
-    expect(text).toContain('你是 X，电脑是 O，你先手');
-    expect(text).toContain('目标：横、竖或斜线连成三个');
-    expect(text).toContain('抬头 / 低头：上 / 下');
-    expect(text).toContain('向左转头 / 向右转头：左 / 右');
-    expect(text).toContain('单击：确认落子');
-    expect(text).toContain('双击：重新开始');
-    expect(text).toContain('发亮方框是当前选中格');
-    expect(text).toContain('已选择：中间');
+    expect(text).toContain('TIC-TAC-TOE');
+    expect(text).toContain('You are X; computer is O; you move first');
+    expect(text).toContain('Goal: connect three in any direction');
+    expect(text).toContain('Look up / down: move up / down');
+    expect(text).toContain('Turn head left / right: move left / right');
+    expect(text).toContain('Single click: place mark');
+    expect(text).toContain('Double click: restart');
+    expect(text).toContain('The glowing frame is the selected cell');
+    expect(text).toContain('Selected: center');
   });
 
   it.each([
-    ['playerWon', ['X', 'X', 'X', 'O', 'O', null, null, null, null], '你赢了！'],
-    ['computerWon', ['O', 'X', 'X', 'O', 'X', null, 'O', null, null], '你输了！'],
-    ['draw', ['X', 'O', 'X', 'X', 'O', 'O', 'O', 'X', 'X'], '打平了！'],
-  ] as const)('终局 %s 在设备左侧明确提示结果', (result, board, message) => {
+    ['playerWon', ['X', 'X', 'X', 'O', 'O', null, null, null, null], 'You won!'],
+    ['computerWon', ['O', 'X', 'X', 'O', 'X', null, 'O', null, null], 'You lost!'],
+    ['draw', ['X', 'O', 'X', 'X', 'O', 'O', 'O', 'X', 'X'], 'Draw!'],
+  ] as const)('shows a clear %s result in the device left pane', (result, board, message) => {
     const text = renderDeviceText({ version: 1, board: [...board], cursor: 8, result });
     const lines = text.split('\n');
     expect(lines[0]).toBe(`【${message}】`);
-    expect(lines[1]).toBe('双击主按钮，重新开始');
+    expect(lines[1]).toBe('Double-click the main button to restart');
   });
 
-  it('先更新规则，再发送一张完整 LZ4 棋盘作为最终提交', async () => {
+  it('updates the rules before sending one complete LZ4 board as the final commit', async () => {
     const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
     const bridge = {
       call: vi.fn(async (method: string, params?: Record<string, unknown>) => {
@@ -74,13 +74,13 @@ describe('设备中文绘制', () => {
     });
   });
 
-  it('按完整协议 payload 长度选择压缩通道', () => {
+  it('selects the compressed channel using the full protocol payload length', () => {
     expect(shouldUseLz4(100, 95)).toBe(true);
     expect(shouldUseLz4(100, 96)).toBe(false);
     expect(shouldUseLz4(100, 100)).toBe(false);
   });
 
-  it('A/B/C 只发送在途 A 和最新 C，且共享 drain Promise', async () => {
+  it('sends only in-flight A and latest C for A/B/C and shares the drain Promise', async () => {
     const images: Array<Record<string, unknown>> = [];
     const gates: ReturnType<typeof deferred>[] = [];
     const bridge = {
@@ -106,7 +106,7 @@ describe('设备中文绘制', () => {
     await expect(first).resolves.toBeUndefined();
   });
 
-  it('A/B/A 清除中间 B，A 成功后不重复发送', async () => {
+  it('drops intermediate B for A/B/A and does not resend A after success', async () => {
     const gates: ReturnType<typeof deferred>[] = [];
     const imageCall = vi.fn(() => {
       const gate = deferred();
@@ -127,7 +127,7 @@ describe('设备中文绘制', () => {
     expect(imageCall).toHaveBeenCalledTimes(1);
   });
 
-  it('在途失败但有更新时继续最新帧，最新成功则 drain 成功', async () => {
+  it('continues with the latest frame after an in-flight failure and resolves drain when it succeeds', async () => {
     const gates: ReturnType<typeof deferred>[] = [];
     const bridge = {
       call: vi.fn((method: string) => {
@@ -147,7 +147,7 @@ describe('设备中文绘制', () => {
     await expect(done).resolves.toBeUndefined();
   });
 
-  it('无更新的失败会拒绝，且同状态可显式重试', async () => {
+  it('rejects a failure without an update and allows an explicit retry of the same state', async () => {
     let fail = true;
     const bridge = {
       call: vi.fn(async (method: string) => {
@@ -156,12 +156,12 @@ describe('设备中文绘制', () => {
       }),
     };
     const presenter = new DevicePresenter(bridge);
-    await expect(presenter.present(newGame())).rejects.toThrow('棋盘发送失败：operation timed out');
+    await expect(presenter.present(newGame())).rejects.toThrow('board transfer failed: operation timed out');
     fail = false;
     await expect(presenter.present(newGame())).resolves.toBeUndefined();
   });
 
-  it('B 部分绘制失败后再次请求已成功的 A 仍会完整重发', async () => {
+  it('fully resends successful A when requested again after a partial B failure', async () => {
     let failImage = false;
     const bridge = {
       call: vi.fn(async (method: string) => {
@@ -179,7 +179,7 @@ describe('设备中文绘制', () => {
     expect(bridge.call).toHaveBeenCalledTimes(6);
   });
 
-  it('断连使在途绘制 generation 立即失效', () => {
+  it('invalidates the in-flight draw generation immediately on disconnect', () => {
     const generations = new PresentationGeneration();
     const inFlight = generations.begin();
     expect(generations.isCurrent(inFlight)).toBe(true);

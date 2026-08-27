@@ -25,7 +25,7 @@
       const saved = await call('storage.get', { key: 'seconds' });
       seconds = Number(saved.value || 0);
       log('Runtime ready');
-    } catch (error) { log(`启动失败：${error.message || error}`); }
+    } catch (error) { log(`Startup failed: ${error.message || error}`); }
   };
   window.__memoPluginResolve = (response) => {
     if (response.runtimeGeneration !== generation) return;
@@ -45,10 +45,10 @@
     seconds += 1;
     document.getElementById('counter').textContent = String(seconds);
   }, 1000);
-  document.getElementById('subscribe').onclick = () => call('device.subscribeEvents', { types: ['button', 'imuGesture', 'connection'] }).then(() => log('已订阅事件')).catch(log);
-  document.getElementById('persist').onclick = () => call('storage.set', { key: 'seconds', value: seconds }).then(() => log('已保存')).catch(log);
+  document.getElementById('subscribe').onclick = () => call('device.subscribeEvents', { types: ['button', 'imuGesture', 'connection'] }).then(() => log('Events subscribed')).catch(log);
+  document.getElementById('persist').onclick = () => call('storage.set', { key: 'seconds', value: seconds }).then(() => log('Saved')).catch(log);
   document.getElementById('draw').onclick = () => call('display.updateText', {
     id: 1, x: 20, y: 20, width: 520, height: 80, border: 1, radius: 8,
-    text: `插件运行 ${seconds} 秒`
-  }).then(() => log('设备已确认绘制')).catch((error) => log(`绘制失败：${error.message || JSON.stringify(error)}`));
+    text: `Plugin running for ${seconds} seconds`
+  }).then(() => log('Device confirmed the draw')).catch((error) => log(`Draw failed: ${error.message || JSON.stringify(error)}`));
 })();

@@ -35,7 +35,7 @@ const logElement = requiredElement('log');
 
 function requiredElement(id: string): HTMLElement {
   const element = document.getElementById(id);
-  if (!element) throw new Error(`缺少页面元素：${id}`);
+  if (!element) throw new Error(`Missing page element: ${id}`);
   return element;
 }
 
@@ -49,8 +49,8 @@ function render(): void {
   resultOverlay.hidden = state.result === 'playing';
   resultTitle.textContent = resultText(state.result);
   selection.textContent = state.result === 'playing'
-    ? `当前选择：${positionName(state.cursor)}`
-    : `${resultText(state.result)} 双击主按钮或点击“重新开始”再来一局。`;
+    ? `Selected: ${positionName(state.cursor)}`
+    : `${resultText(state.result)} Double-click the main button or select Restart to play again.`;
   board.replaceChildren(...state.board.map((cell, index) => {
     const button = document.createElement('button');
     button.type = 'button';
@@ -58,7 +58,7 @@ function render(): void {
     button.textContent = cell ?? '';
     button.disabled = !initialized || state.result !== 'playing' || cell !== null;
     button.setAttribute('role', 'gridcell');
-    button.setAttribute('aria-label', `${positionName(index)}：${cell ?? '空格'}`);
+    button.setAttribute('aria-label', `${positionName(index)}: ${cell ?? 'empty'}`);
     button.addEventListener('click', () => {
       if (state.result !== 'playing' || state.board[index] !== null) return;
       state = { ...state, cursor: index };
@@ -82,7 +82,7 @@ async function persist(): Promise<void> {
   try {
     await persistence.save(state);
   } catch (error) {
-    log(`保存失败：${errorMessage(error)}`);
+    log(`Save failed: ${errorMessage(error)}`);
   }
 }
 
@@ -91,11 +91,11 @@ async function present(): Promise<void> {
   try {
     await presenter.present(state);
     if (!presentationGenerations.isCurrent(generation)) return;
-    bridgeStatus.textContent = '设备已确认接收当前棋盘';
+    bridgeStatus.textContent = 'Device confirmed the current board';
   } catch (error) {
     if (!presentationGenerations.isCurrent(generation)) return;
-    bridgeStatus.textContent = '设备暂不可用，网页棋局仍可继续';
-    log(`设备绘制失败：${errorMessage(error)}`);
+    bridgeStatus.textContent = 'Device unavailable; the Web game can continue';
+    log(`Device draw failed: ${errorMessage(error)}`);
   }
 }
 
@@ -106,7 +106,7 @@ function onDeviceEvent(event: BridgeEvent): void {
   if (!decision.action) {
     const ignored = describeIgnoredReason(decision.reason);
     lastOperation.textContent = ignored;
-    log(`收到：${received} → ${ignored}`);
+    log(`Received: ${received} → ${ignored}`);
     return;
   }
 
@@ -117,7 +117,7 @@ function onDeviceEvent(event: BridgeEvent): void {
     ? describeNoStateChange(decision.action)
     : describeStateChange(decision.action, before, state);
   lastOperation.textContent = operation;
-  log(`收到：${received} → ${actionName} → ${operation}`);
+  log(`Received: ${received} → ${actionName} → ${operation}`);
 }
 
 function describeDeviceEvent(event: BridgeEvent): string {
@@ -127,44 +127,44 @@ function describeDeviceEvent(event: BridgeEvent): string {
   if (event.name === 'device.button') {
     const action = event.data.action;
     const name = action === 'single'
-      ? '主按钮单击'
+      ? 'Main button single click'
       : action === 'double'
-        ? '主按钮双击'
-        : `主按钮 ${String(action)}`;
+        ? 'Main button double click'
+        : `Main button ${String(action)}`;
     return `${name}${sequence}`;
   }
-  const gesture = String(event.data.gesture ?? '未知');
+  const gesture = String(event.data.gesture ?? 'unknown');
   const names: Record<string, string> = {
-    headRaise: '抬头',
-    headLower: '低头',
-    headRaiseTimeout: '持续抬头超时',
-    headLowerTimeout: '持续低头超时',
-    left: '向左转头',
-    right: '向右转头',
-    nod: '点头',
-    shake: '摇头',
+    headRaise: 'Look up',
+    headLower: 'Look down',
+    headRaiseTimeout: 'Sustained look-up timeout',
+    headLowerTimeout: 'Sustained look-down timeout',
+    left: 'Turn head left',
+    right: 'Turn head right',
+    nod: 'Nod',
+    shake: 'Shake head',
   };
   return `${names[gesture] ?? gesture}${sequence}，active=${String(event.data.active)}`;
 }
 
 function describeIgnoredReason(reason: string): string {
   switch (reason) {
-    case 'debounced': return '已忽略：300ms 内同方向重复上报';
-    case 'verticalRebound': return '已忽略：600ms 内上下反向事件判定为回正';
-    case 'timeoutAlreadySeen': return '已忽略：对应普通姿态事件已经收到';
-    case 'inactive': return '已忽略：手势未激活';
-    default: return '已忽略：当前游戏未绑定该指令';
+    case 'debounced': return 'Ignored: repeated direction within 300 ms';
+    case 'verticalRebound': return 'Ignored: opposite vertical event within 600 ms treated as recentering';
+    case 'timeoutAlreadySeen': return 'Ignored: matching regular posture event already received';
+    case 'inactive': return 'Ignored: gesture is inactive';
+    default: return 'Ignored: command is not bound in the current game';
   }
 }
 
 function describeAction(action: GameAction): string {
   const names: Record<GameAction['type'], string> = {
-    up: '执行向上移动',
-    down: '执行向下移动',
-    left: '执行向左移动',
-    right: '执行向右移动',
-    place: '执行落子',
-    restart: '执行重新开始',
+    up: 'Move up',
+    down: 'Move down',
+    left: 'Move left',
+    right: 'Move right',
+    place: 'Place mark',
+    restart: 'Restart game',
   };
   return names[action.type];
 }
@@ -174,17 +174,17 @@ function describeStateChange(
   before: typeof state,
   after: typeof state,
 ): string {
-  if (action.type === 'restart') return '已重新开始，当前选择：中间';
+  if (action.type === 'restart') return 'Game restarted; selected: center';
   if (action.type === 'place') {
-    return `已在${positionName(before.cursor)}落子，当前状态：${resultText(after.result)}`;
+    return `Placed a mark at ${positionName(before.cursor)}; status: ${resultText(after.result)}`;
   }
-  return `已移动：${positionName(before.cursor)} → ${positionName(after.cursor)}`;
+  return `Moved: ${positionName(before.cursor)} → ${positionName(after.cursor)}`;
 }
 
 function describeNoStateChange(action: GameAction): string {
-  if (state.result !== 'playing') return `未执行${describeAction(action).replace('执行', '')}：棋局已结束，请双击重开`;
-  if (action.type === 'place') return '未落子：当前格已被占用';
-  return `未执行${describeAction(action).replace('执行', '')}：该方向没有可选空格`;
+  if (state.result !== 'playing') return `${describeAction(action)} not performed: game over; double-click to restart`;
+  if (action.type === 'place') return 'Mark not placed: selected cell is occupied';
+  return `${describeAction(action)} not performed: no empty cell in that direction`;
 }
 
 function errorMessage(error: unknown): string {
@@ -210,12 +210,12 @@ async function start(): Promise<void> {
   render();
   await bridge.whenConfigured();
   await bridge.call('runtime.ready');
-  bridgeStatus.textContent = 'App Bridge 已连接，正在恢复棋局…';
+  bridgeStatus.textContent = 'App Bridge connected; restoring game…';
   try {
     state = await persistence.load();
   } catch (error) {
     state = newGame();
-    log(`读取存档失败，已开始新局：${errorMessage(error)}`);
+    log(`Could not load saved game; started a new game: ${errorMessage(error)}`);
   }
   render();
 
@@ -225,7 +225,7 @@ async function start(): Promise<void> {
     if (event.data.connected === true) void present();
     if (event.data.connected === false) {
       presentationGenerations.invalidate();
-      bridgeStatus.textContent = '设备已断开，网页棋局仍可继续';
+      bridgeStatus.textContent = 'Device disconnected; the Web game can continue';
     }
   });
   bridge.on('runtime.lifecycleChanged', (event) => {
@@ -238,9 +238,9 @@ async function start(): Promise<void> {
       types: ['button', 'imuGesture', 'connection'],
     });
     subscriptionId = subscription.subscriptionId;
-    log(`设备事件已订阅：${subscriptionId}`);
+    log(`Device events subscribed: ${subscriptionId}`);
   } catch (error) {
-    log(`设备事件订阅失败，网页仍可操作：${errorMessage(error)}`);
+    log(`Device event subscription failed; Web controls remain available: ${errorMessage(error)}`);
   }
   initialized = true;
   for (const id of ['up', 'down', 'left', 'right', 'place', 'restart']) {
@@ -252,6 +252,6 @@ async function start(): Promise<void> {
 }
 
 void start().catch((error) => {
-  bridgeStatus.textContent = '插件启动失败';
+  bridgeStatus.textContent = 'Plugin startup failed';
   log(errorMessage(error));
 });

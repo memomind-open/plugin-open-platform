@@ -12,7 +12,7 @@ test('Package information keeps the install status aligned beside the QR', async
   assert.match(css, /#web-share-name, #device-share-name \{[^}]*height: 2\.7em;[^}]*-webkit-line-clamp: 2;/u);
 });
 
-test('Web plugin selection owns the inline package QR and automatic run flow', async () => {
+test('Phone plugin selection owns the inline package QR and automatic run flow', async () => {
   const [html, script] = await Promise.all([
     readFile(new URL('index.html', directory), 'utf8'),
     readFile(new URL('studio.js', directory), 'utf8'),
@@ -32,11 +32,11 @@ test('Web plugin selection owns the inline package QR and automatic run flow', a
   assert.match(script, /frame\.addEventListener\('load', \(\) => \{/u);
   assert.match(script, /queueWebPackageShareWhenIdle\(path\);/u);
   assert.match(script, /requestIdleCallback\(startPackaging, \{ timeout: 1500 \}\)/u);
-  assert.match(script, /webShareName\.textContent = `路径：\$\{result\.packagePath\}`;/u);
+  assert.match(script, /webShareName\.textContent = `Path: \$\{packagePath\}`;/u);
   assert.match(html, /id="web-share-qr"[^>]*width="160" height="160"/u);
 });
 
-test('Device plugin selection owns the inline package QR and automatic run flow', async () => {
+test('Glass plugin selection owns the inline package QR and automatic run flow', async () => {
   const [html, script] = await Promise.all([
     readFile(new URL('index.html', directory), 'utf8'),
     readFile(new URL('studio.js', directory), 'utf8'),
@@ -53,7 +53,7 @@ test('Device plugin selection owns the inline package QR and automatic run flow'
   assert.match(script, /webPlugin\.value = '';\s+disableWebPlugin\(\);\s+void stopWebPackageShare\(\);/u);
   assert.match(script, /invoke\('share_device_plugin', \{ path \}\)/u);
   assert.match(script, /queueDevicePackageShareAfterPaint\(devicePlugin\.value\);/u);
-  assert.match(script, /deviceShareName\.textContent = `路径：\$\{result\.packagePath\}`;/u);
+  assert.match(script, /deviceShareName\.textContent = `Path: \$\{packagePath\}`;/u);
 });
 
 test('Package QR codes open a centered zoom view without multi-click dismissal', async () => {
