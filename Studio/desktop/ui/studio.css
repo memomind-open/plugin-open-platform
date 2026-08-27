@@ -1,6 +1,6 @@
 :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; background: #090d13; color: #eef6f2; }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 1050px; background: radial-gradient(circle at top, #18242a 0, #090d13 42%); }
+body { margin: 0; min-width: 1450px; background: radial-gradient(circle at top, #18242a 0, #090d13 42%); }
 button, input, select { font: inherit; }
 button { border: 1px solid #2d6c59; border-radius: 9px; padding: 9px 13px; color: #06140e; background: #5bf0ba; cursor: pointer; font-weight: 750; }
 button.secondary { color: #cfe5dc; background: #121c22; border-color: #33464e; }
@@ -17,20 +17,38 @@ button:disabled { cursor: wait; opacity: .55; }
 .pair-toolbar label { display: flex; flex-direction: column; gap: 4px; }.pair-toolbar label span { color: #81968e; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; }
 .pair-toolbar input, .pair-toolbar select { width: 100%; border: 1px solid #304149; border-radius: 8px; padding: 9px 10px; color: #e9f6f0; background: #111a20; }
 .pair-toolbar button { align-self: end; white-space: nowrap; }
-.workspace { height: calc(100vh - 356px); min-height: 430px; padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.workspace { height: calc(100vh - 356px); min-height: 430px; padding: 16px 20px; display: grid; grid-template-columns: minmax(420px, .8fr) minmax(900px, 1.2fr); gap: 16px; }
 .pane, .log-panel { overflow: hidden; border: 1px solid #2a3940; border-radius: 14px; background: #0c1318; box-shadow: 0 20px 50px #0008; }
 .pane { display: flex; flex-direction: column; }.pane-title { height: 48px; padding: 11px 14px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #25343b; }.pane-title span { color: #5bf0ba; font-size: 10px; letter-spacing: .14em; }.pane-title strong { color: #a8bbb4; font-size: 12px; }.pane-title button { margin-left: auto; padding: 5px 9px; }
 #plugin-frame { flex: 1; width: 100%; border: 0; background: #fff; }
 .web-empty-state { flex: 1; place-content: center; padding: 48px; text-align: center; background: radial-gradient(circle, #162329 0, #080d11 70%); }
 .web-empty-state:not([hidden]) { display: grid; }
 .web-empty-state strong { color: #d9ebe4; font-size: 20px; }.web-empty-state p { max-width: 430px; margin: 10px auto 0; color: #849991; line-height: 1.7; }
-.device-stage { flex: 1; display: grid; place-items: center; padding: 28px; background: radial-gradient(circle, #17282a 0, #080d11 65%); }
+.device-workbench { flex: 1; min-height: 0; display: grid; grid-template-columns: 180px minmax(0, 1fr); }
+.device-stage { min-width: 0; display: grid; place-items: center; padding: 28px; background: radial-gradient(circle, #17282a 0, #080d11 65%); }
 /* Keep the framebuffer at its native CSS size when space permits. Fractional
    enlargement makes one-pixel glyph strokes and borders look uneven. */
 .glasses-shell { width: 650px; max-width: 100%; padding: 24px; border: 1px solid #314b47; border-radius: 44px; background: linear-gradient(150deg, #22312f, #070b0d 55%); box-shadow: inset 0 0 0 8px #080c0e, 0 25px 70px #000b; }
 #device-canvas { display: block; width: 600px; max-width: 100%; height: auto; image-rendering: crisp-edges; image-rendering: pixelated; border-radius: 14px; background: #00150d; box-shadow: 0 0 34px #1dff9b25; }
-.device-controls { display: flex; align-items: center; gap: 6px; padding: 7px 12px; overflow-x: auto; border-top: 1px solid #25343b; background: #0a1116; }
-.device-controls span { margin-left: 5px; color: #70867e; font-size: 10px; letter-spacing: .1em; }.device-controls button { min-width: 38px; padding: 5px 8px; font-size: 11px; }
+.device-controls { min-height: 0; display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 16px 14px; overflow: hidden; border-right: 1px solid #25343b; background: #0a1116; }
+.device-control-group { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.device-control-group + .device-control-group { padding-top: 12px; border-top: 1px solid #25343b; }
+.device-control-group > span { color: #70867e; font-size: 10px; letter-spacing: .1em; }
+.button-control-row { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.device-controls .action-button, .device-controls .gesture-button { width: 100%; min-width: 0; min-height: 34px; padding: 6px 10px; font-size: 12px; }
+.direction-control-group { min-width: 0; align-self: stretch; }
+.direction-joystick { position: relative; width: 104px; height: 104px; align-self: center; border: 1px solid #38564e; border-radius: 50%; background: radial-gradient(circle at center, #172b28 0 24%, #0c1719 25% 56%, #152225 57% 100%); box-shadow: inset 0 0 18px #0009, 0 0 18px #1dff9b18; touch-action: none; user-select: none; cursor: grab; outline: none; }
+.direction-joystick:focus-visible { border-color: #5bf0ba; box-shadow: inset 0 0 18px #0009, 0 0 0 2px #5bf0ba55; }
+.direction-joystick.active { cursor: grabbing; border-color: #4dbf96; }
+.direction-joystick.disabled { opacity: .45; cursor: not-allowed; }
+.direction-joystick::before, .direction-joystick::after { content: ""; position: absolute; inset: 50% 10px auto; height: 1px; background: #335149; pointer-events: none; }
+.direction-joystick::after { transform: rotate(90deg); }
+.joystick-arrow { position: absolute; color: #58746b; font-size: 12px; line-height: 1; pointer-events: none; }
+.joystick-arrow-up { top: 6px; left: 50%; transform: translateX(-50%); }
+.joystick-arrow-left { top: 50%; left: 7px; transform: translateY(-50%); }
+.joystick-arrow-down { bottom: 6px; left: 50%; transform: translateX(-50%); }
+.joystick-arrow-right { top: 50%; right: 7px; transform: translateY(-50%); }
+.joystick-knob { position: absolute; top: 50%; left: 50%; width: 42px; height: 42px; margin: -21px 0 0 -21px; border: 1px solid #65d9b0; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #8af4cc, #35a77f 72%); box-shadow: 0 5px 14px #000b, inset 0 0 0 3px #b9ffe033; pointer-events: none; will-change: transform; }
 .device-meta { display: flex; gap: 18px; padding: 10px 16px; color: #82968f; font-size: 11px; border-top: 1px solid #25343b; }
 .log-panel { height: 170px; margin: 0 20px 20px; }.log-panel .pane-title { height: 40px; }.log-panel ol { height: 128px; margin: 0; padding: 8px 16px 12px 38px; overflow: auto; color: #9eb2aa; font: 11px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; }
 dialog { width: min(820px, calc(100vw - 48px)); padding: 0; color: #eef6f2; border: 1px solid #345048; border-radius: 18px; background: #0c1318; box-shadow: 0 30px 100px #000d; }

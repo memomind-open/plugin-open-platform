@@ -1,4 +1,5 @@
 #include "previewer_c_api.h"
+#include "previewer.hpp"
 
 #include <algorithm>
 #include <array>
@@ -46,6 +47,26 @@ std::vector<uint8_t> plugin_message_payload(size_t size)
         payload[index] = static_cast<uint8_t>((index * 37u + 11u) & 0xffu);
     }
     return payload;
+}
+
+int longest_bright_run_start(const std::vector<uint8_t> &frame, size_t row)
+{
+    int best_start = -1;
+    int best_length = 0;
+    int start = -1;
+    for (int x = 0; x <= 600; ++x) {
+        const bool bright = x < 600 && frame[row * 600u + static_cast<size_t>(x)] != 0;
+        if (bright && start < 0) start = x;
+        if (!bright && start >= 0) {
+            const int length = x - start;
+            if (length > best_length) {
+                best_start = start;
+                best_length = length;
+            }
+            start = -1;
+        }
+    }
+    return best_length >= 70 ? best_start : -1;
 }
 
 } // namespace
@@ -212,11 +233,36 @@ int main(int argc, char **argv)
         assert(channel == 0x0100);
         assert(gm_preview_clear_outbox(handle) == 1);
 
-        assert(gm_preview_simulate_direction_gesture(handle, 7, &handled) == 1);
+        for (int index = 0; index < 4; ++index)
+            assert(gm_preview_tick(handle, 33) == 1);
+        assert(gm_preview_set_direction_vector(handle, -1000, 0, 1, &handled) == 1);
         assert(handled == 1);
-        assert(gm_preview_outbox_count(handle) >= 1);
-        assert(gm_preview_outbox_channel(handle, 0, &channel) == 1);
-        assert(channel == 0x0101);
+        for (int index = 0; index < 4; ++index)
+            assert(gm_preview_tick(handle, 33) == 1);
+        assert(gm_preview_set_direction_vector(handle, 0, 0, 0, &handled) == 1);
+        assert(handled == 1);
+        for (int index = 0; index < 6; ++index)
+            assert(gm_preview_tick(handle, 33) == 1);
+        bool saw_direction_start = false;
+        bool saw_direction_end = false;
+        const size_t direction_message_count = gm_preview_outbox_count(handle);
+        for (size_t index = 0; index < direction_message_count; ++index) {
+            assert(gm_preview_outbox_channel(handle, index, &channel) == 1);
+            if (channel != 0x0101) continue;
+            assert(gm_preview_outbox_payload_size(handle, index) == 13);
+            std::array<uint8_t, 13> gesture_payload{};
+            assert(gm_preview_copy_outbox_payload(handle, index,
+                                                   gesture_payload.data(),
+                                                   gesture_payload.size()) == 1);
+            const uint16_t gesture = static_cast<uint16_t>(
+                (static_cast<uint16_t>(gesture_payload[10]) << 8) |
+                gesture_payload[11]);
+            if (gesture != 7) continue;
+            if (gesture_payload[12] != 0) saw_direction_start = true;
+            else if (saw_direction_start) saw_direction_end = true;
+        }
+        assert(saw_direction_start);
+        assert(saw_direction_end);
         assert(gm_preview_clear_outbox(handle) == 1);
         assert(gm_preview_stop(handle) == 1);
     }
@@ -237,6 +283,72 @@ int main(int argc, char **argv)
             return pixel != 0;
         }));
         assert(gm_preview_stop(handle) == 1);
+    }
+
+    if (argc > 5) {
+        int handled = 0;
+        assert(gm_preview_load(handle, argv[5]) == 1);
+        assert(gm_preview_start(handle) == 1);
+        assert(gm_preview_tick(handle, 66) == 1);
+        assert(gm_preview_copy_frame(handle, frame.data(), frame.size()) == 1);
+        const int center_x = longest_bright_run_start(frame, 312);
+        assert(center_x >= 0);
+
+        assert(gm_preview_set_direction_vector(handle, -1000, 0, 1, &handled) == 1);
+        assert(handled == 1);
+        for (int index = 0; index < 6; ++index)
+            assert(gm_preview_tick(handle, 33) == 1);
+        assert(gm_preview_copy_frame(handle, frame.data(), frame.size()) == 1);
+        const int held_left_x = longest_bright_run_start(frame, 312);
+        assert(held_left_x >= 0 && held_left_x < center_x);
+
+        assert(gm_preview_set_direction_vector(handle, 0, 0, 0, &handled) == 1);
+        assert(handled == 1);
+        for (int index = 0; index < 8; ++index)
+            assert(gm_preview_tick(handle, 33) == 1);
+        assert(gm_preview_copy_frame(handle, frame.data(), frame.size()) == 1);
+        const int released_left_x = longest_bright_run_start(frame, 312);
+        assert(released_left_x >= 0 && released_left_x <= held_left_x);
+        assert(gm_preview_stop(handle) == 1);
+
+        assert(gm_preview_load(handle, argv[5]) == 1);
+        assert(gm_preview_start(handle) == 1);
+        assert(gm_preview_tick(handle, 66) == 1);
+        assert(gm_preview_set_direction_vector(handle, 1000, 0, 1, &handled) == 1);
+        assert(handled == 1);
+        for (int index = 0; index < 6; ++index)
+            assert(gm_preview_tick(handle, 33) == 1);
+        assert(gm_preview_copy_frame(handle, frame.data(), frame.size()) == 1);
+        const int held_right_x = longest_bright_run_start(frame, 312);
+        assert(held_right_x > center_x);
+        assert(gm_preview_set_direction_vector(handle, 0, 0, 0, &handled) == 1);
+        assert(handled == 1);
+        for (int index = 0; index < 8; ++index)
+            assert(gm_preview_tick(handle, 33) == 1);
+        assert(gm_preview_stop(handle) == 1);
+    }
+
+    if (argc > 6) {
+        gmpreview::Previewer jet_runner;
+        jet_runner.loadFile(argv[6]);
+        jet_runner.start();
+        jet_runner.tick(50);
+        assert(jet_runner.device().pitch == 0);
+
+        assert(jet_runner.setDirectionVector(0, -1000, true));
+        for (int index = 0; index < 10; ++index) jet_runner.tick(50);
+        assert(jet_runner.device().pitch == 18);
+        assert(jet_runner.setDirectionVector(0, 0, false));
+        for (int index = 0; index < 6; ++index) jet_runner.tick(33);
+        assert(jet_runner.device().pitch == 18);
+
+        assert(jet_runner.setDirectionVector(0, 1000, true));
+        for (int index = 0; index < 10; ++index) jet_runner.tick(50);
+        assert(jet_runner.device().pitch == 0);
+        assert(jet_runner.setDirectionVector(0, 0, false));
+        for (int index = 0; index < 6; ++index) jet_runner.tick(33);
+        assert(jet_runner.device().pitch == 0);
+        jet_runner.stop();
     }
 
     gm_preview_destroy(handle);

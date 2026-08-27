@@ -15,6 +15,14 @@
 namespace gmpreview {
 namespace {
 
+constexpr uint32_t kDirectionMinimumHoldMs = 99;
+constexpr uint32_t kDirectionReturnSampleMs = 33;
+constexpr uint32_t kDirectionQuietMs = 132;
+constexpr int kDirectionPitchDegrees = 12;
+constexpr int kDirectionVectorScale = 1000;
+constexpr int kDirectionVectorDeadZone = 120;
+constexpr int kDirectionVectorPitchDegreesPerSecond = 36;
+
 enum TrapId : unsigned {
     HLog = 1, HMonotonic, HAlloc, HFree, HDisplayInfo,
     HFramebufferLock, HFramebufferUnlock,
@@ -98,7 +106,8 @@ bool roundedRectContains(int pixel_x, int pixel_y,
 
 Previewer::Previewer()
     : frame_(kDisplayWidth * kDisplayHeight, 0),
-      presented_framebuffer_(320u * kDisplayHeight, 0)
+      presented_framebuffer_(320u * kDisplayHeight, 0),
+      staged_framebuffer_(320u * kDisplayHeight, 0)
 {
     lvgl_ = std::make_unique<LvglHost>(presented_framebuffer_, kRootObject,
                                       kObjectBase + 0x104, kFontDefault,
@@ -264,10 +273,12 @@ void Previewer::initializeMemory(uint32_t plugin_memory_size)
     nodes_.clear();
     next_object_ = kObjectBase + 0x104;
     framebuffer_locked_ = false;
+    pending_framebuffer_dirty_.clear();
     imu_modes_ = 0;
     auto_brightness_blocked_ = false;
     std::fill(frame_.begin(), frame_.end(), 0);
     std::fill(presented_framebuffer_.begin(), presented_framebuffer_.end(), 0);
+    std::fill(staged_framebuffer_.begin(), staged_framebuffer_.end(), 0);
 }
 
 void Previewer::validateCallback(uint32_t callback) const
@@ -293,6 +304,7 @@ void Previewer::start()
 {
     if (!loaded_) throw std::runtime_error("load a GMP package before starting it");
     if (running_) return;
+    resetDirectionInput();
     lvgl_->start();
     device_.display_power = true;
     exit_requested_ = false;
@@ -317,11 +329,13 @@ void Previewer::stop()
 {
     if (!running_) return;
     if (callbacks_[6]) invokeVoid(callbacks_[6], {context_});
+    resetDirectionInput();
     running_ = false;
     suspended_ = false;
     imu_modes_ = 0;
     auto_brightness_blocked_ = false;
     framebuffer_locked_ = false;
+    pending_framebuffer_dirty_.clear();
     lvgl_->stop();
     appendLog("[Previewer] Plugin stopped");
 }
@@ -330,6 +344,7 @@ void Previewer::suspend()
 {
     if (!running_ || suspended_) return;
     if (callbacks_[5]) invokeVoid(callbacks_[5], {context_});
+    resetDirectionInput();
     suspended_ = true;
     appendLog("[Previewer] Plugin suspended");
     honorExitRequest();
@@ -357,9 +372,11 @@ void Previewer::unload()
     loaded_ = false;
     running_ = false;
     suspended_ = false;
+    resetDirectionInput();
     std::fill(std::begin(callbacks_), std::end(callbacks_), 0);
     context_ = 0;
     nodes_.clear();
+    pending_framebuffer_dirty_.clear();
     lvgl_->stop();
     allocations_.clear();
 }
@@ -372,7 +389,10 @@ void Previewer::tick(uint32_t elapsed_ms)
             invokeVoid(callbacks_[3], {context_, elapsed_ms});
             honorExitRequest();
         }
-        if (running_) lvgl_->tick(elapsed_ms);
+        if (running_) {
+            lvgl_->tick(elapsed_ms);
+            advanceDirectionInput(elapsed_ms);
+        }
     }
 }
 
@@ -535,55 +555,275 @@ bool Previewer::sendGesture(uint16_t gesture, bool active)
     return dispatchEvent(2);
 }
 
+void Previewer::applyDirectionInput(bool returning)
+{
+    auto add = [](int16_t value, int delta) {
+        return static_cast<int16_t>(std::clamp(static_cast<int>(value) + delta,
+                                               -32768, 32767));
+    };
+    auto add_pitch = [](int16_t value, int delta) {
+        return static_cast<int16_t>(std::clamp(static_cast<int>(value) + delta,
+                                               -90, 90));
+    };
+    for (int index = 0; index < 3; ++index)
+        device_.gyro[index] = direction_base_gyro_[index];
+    device_.pitch = direction_base_pitch_;
+
+    if (direction_vector_mode_) {
+        int x = direction_input_x_;
+        int y = direction_input_y_;
+        if (returning) {
+            x = -x / 4;
+            y = -y / 4;
+        }
+        device_.gyro[0] = add(device_.gyro[0], x * 60 / kDirectionVectorScale);
+        device_.gyro[1] = add(device_.gyro[1], -x * 60 / kDirectionVectorScale);
+        device_.gyro[2] = add(device_.gyro[2], -y * 80 / kDirectionVectorScale);
+        return;
+    }
+
+    switch (direction_input_gesture_) {
+    case 2:
+        device_.gyro[2] = add(device_.gyro[2], returning ? -30 : 80);
+        if (!returning)
+            device_.pitch = add_pitch(direction_base_pitch_, kDirectionPitchDegrees);
+        break;
+    case 3:
+        device_.gyro[2] = add(device_.gyro[2], returning ? 30 : -80);
+        if (!returning)
+            device_.pitch = add_pitch(direction_base_pitch_, -kDirectionPitchDegrees);
+        break;
+    case 7:
+        device_.gyro[0] = add(device_.gyro[0], returning ? 11 : -60);
+        device_.gyro[1] = add(device_.gyro[1], returning ? -11 : 60);
+        break;
+    case 8:
+        device_.gyro[0] = add(device_.gyro[0], returning ? -11 : 60);
+        device_.gyro[1] = add(device_.gyro[1], returning ? 11 : -60);
+        break;
+    default:
+        break;
+    }
+}
+
+uint16_t Previewer::directionGestureForVector() const
+{
+    const int x = direction_input_x_;
+    const int y = direction_input_y_;
+    if (x * x + y * y < kDirectionVectorDeadZone * kDirectionVectorDeadZone)
+        return 0;
+    if (std::abs(x) >= std::abs(y)) return x < 0 ? 7 : 8;
+    return y < 0 ? 2 : 3;
+}
+
+void Previewer::updateDirectionVectorGesture()
+{
+    const uint16_t gesture = directionGestureForVector();
+    if (gesture == direction_input_gesture_) return;
+    if (direction_input_gesture_ != 0)
+        direction_input_accepted_ = sendGesture(direction_input_gesture_, false) ||
+            direction_input_accepted_;
+    direction_input_gesture_ = gesture;
+    if (direction_input_gesture_ != 0)
+        direction_input_accepted_ = sendGesture(direction_input_gesture_, true) ||
+            direction_input_accepted_;
+}
+
+void Previewer::advanceDirectionVectorPitch(uint32_t elapsed_ms)
+{
+    const int vertical = -direction_input_y_;
+    if (std::abs(vertical) < kDirectionVectorDeadZone) return;
+    constexpr int64_t denominator =
+        static_cast<int64_t>(kDirectionVectorScale) * 1000;
+    const int64_t accumulated = direction_pitch_remainder_ +
+        static_cast<int64_t>(vertical) *
+        kDirectionVectorPitchDegreesPerSecond * elapsed_ms;
+    const int delta = static_cast<int>(accumulated / denominator);
+    direction_pitch_remainder_ = static_cast<int32_t>(accumulated % denominator);
+    if (delta == 0) return;
+    direction_base_pitch_ = static_cast<int16_t>(std::clamp(
+        static_cast<int>(direction_base_pitch_) + delta, -90, 90));
+    if (direction_base_pitch_ == -90 || direction_base_pitch_ == 90)
+        direction_pitch_remainder_ = 0;
+}
+
+void Previewer::beginDirectionRelease()
+{
+    if (direction_input_phase_ != DirectionInputPhase::Held) return;
+    const uint16_t released_gesture = direction_input_gesture_;
+    if (released_gesture != 0)
+        direction_input_accepted_ = sendGesture(released_gesture, false) ||
+            direction_input_accepted_;
+    // Releasing a direction ends angular velocity, but a physical head stays
+    // at its new pitch. Preserve that absolute pose for Raw IMU consumers.
+    if (!direction_vector_mode_ &&
+        (released_gesture == 2 || released_gesture == 3))
+        direction_base_pitch_ = device_.pitch;
+    applyDirectionInput(true);
+    direction_input_gesture_ = 0;
+    direction_input_phase_ = DirectionInputPhase::Return;
+    direction_input_elapsed_ms_ = 0;
+    direction_release_requested_ = false;
+}
+
+void Previewer::advanceDirectionInput(uint32_t elapsed_ms)
+{
+    switch (direction_input_phase_) {
+    case DirectionInputPhase::Idle:
+        return;
+    case DirectionInputPhase::Held:
+        direction_input_elapsed_ms_ += elapsed_ms;
+        if (direction_vector_mode_) {
+            advanceDirectionVectorPitch(elapsed_ms);
+            applyDirectionInput(false);
+        }
+        if (direction_release_requested_ &&
+            (direction_vector_mode_ ||
+             direction_input_elapsed_ms_ >= kDirectionMinimumHoldMs))
+            beginDirectionRelease();
+        return;
+    case DirectionInputPhase::Return:
+        direction_input_elapsed_ms_ += elapsed_ms;
+        if (direction_input_elapsed_ms_ < kDirectionReturnSampleMs) return;
+        for (int index = 0; index < 3; ++index)
+            device_.gyro[index] = direction_base_gyro_[index];
+        device_.pitch = direction_base_pitch_;
+        direction_input_phase_ = DirectionInputPhase::Quiet;
+        direction_input_elapsed_ms_ = 0;
+        return;
+    case DirectionInputPhase::Quiet:
+        direction_input_elapsed_ms_ += elapsed_ms;
+        if (direction_input_elapsed_ms_ >= kDirectionQuietMs)
+            resetDirectionInput();
+        return;
+    }
+}
+
+void Previewer::resetDirectionInput()
+{
+    if (direction_input_phase_ != DirectionInputPhase::Idle) {
+        for (int index = 0; index < 3; ++index)
+            device_.gyro[index] = direction_base_gyro_[index];
+        device_.pitch = direction_base_pitch_;
+    }
+    direction_input_phase_ = DirectionInputPhase::Idle;
+    direction_input_gesture_ = 0;
+    direction_input_elapsed_ms_ = 0;
+    direction_release_requested_ = false;
+    direction_input_accepted_ = false;
+    direction_vector_mode_ = false;
+    direction_input_x_ = 0;
+    direction_input_y_ = 0;
+    direction_pitch_remainder_ = 0;
+}
+
+bool Previewer::setDirectionInput(uint16_t gesture, bool active)
+{
+    if (gesture != 2 && gesture != 3 && gesture != 7 && gesture != 8)
+        return false;
+
+    if (!active) {
+        if (direction_input_phase_ == DirectionInputPhase::Idle ||
+            direction_vector_mode_ ||
+            direction_input_gesture_ != gesture)
+            return false;
+        direction_release_requested_ = true;
+        if (direction_input_phase_ == DirectionInputPhase::Held &&
+            direction_input_elapsed_ms_ >= kDirectionMinimumHoldMs)
+            beginDirectionRelease();
+        return direction_input_accepted_;
+    }
+
+    if (direction_input_phase_ != DirectionInputPhase::Idle) {
+        if (direction_input_phase_ == DirectionInputPhase::Held &&
+            !direction_vector_mode_ &&
+            direction_input_gesture_ == gesture)
+            return direction_input_accepted_;
+        if (direction_input_gesture_ != 0)
+            (void)sendGesture(direction_input_gesture_, false);
+        resetDirectionInput();
+    }
+
+    for (int index = 0; index < 3; ++index)
+        direction_base_gyro_[index] = device_.gyro[index];
+    direction_base_pitch_ = device_.pitch;
+    direction_input_gesture_ = gesture;
+    direction_input_phase_ = DirectionInputPhase::Held;
+    direction_input_elapsed_ms_ = 0;
+    direction_release_requested_ = false;
+    direction_vector_mode_ = false;
+    applyDirectionInput(false);
+    direction_input_accepted_ = sendGesture(gesture, true) ||
+        (imu_modes_ & 2u) != 0;
+    return direction_input_accepted_;
+}
+
+bool Previewer::setDirectionVector(int16_t x, int16_t y, bool active)
+{
+    if (!active) {
+        if (direction_input_phase_ != DirectionInputPhase::Held ||
+            !direction_vector_mode_)
+            return false;
+        direction_release_requested_ = true;
+        beginDirectionRelease();
+        return direction_input_accepted_;
+    }
+
+    x = static_cast<int16_t>(std::clamp(static_cast<int>(x),
+                                        -kDirectionVectorScale,
+                                        kDirectionVectorScale));
+    y = static_cast<int16_t>(std::clamp(static_cast<int>(y),
+                                        -kDirectionVectorScale,
+                                        kDirectionVectorScale));
+    if (direction_input_phase_ != DirectionInputPhase::Held ||
+        !direction_vector_mode_) {
+        if (direction_input_phase_ != DirectionInputPhase::Idle) {
+            if (direction_input_gesture_ != 0)
+                (void)sendGesture(direction_input_gesture_, false);
+            resetDirectionInput();
+        }
+        for (int index = 0; index < 3; ++index)
+            direction_base_gyro_[index] = device_.gyro[index];
+        direction_base_pitch_ = device_.pitch;
+        direction_input_gesture_ = 0;
+        direction_input_phase_ = DirectionInputPhase::Held;
+        direction_input_elapsed_ms_ = 0;
+        direction_release_requested_ = false;
+        direction_input_accepted_ = (imu_modes_ & 2u) != 0;
+        direction_vector_mode_ = true;
+        direction_pitch_remainder_ = 0;
+    }
+
+    direction_input_x_ = x;
+    direction_input_y_ = y;
+    applyDirectionInput(false);
+    updateDirectionVectorGesture();
+    direction_input_accepted_ = direction_input_accepted_ ||
+        (imu_modes_ & 2u) != 0;
+    return direction_input_accepted_;
+}
+
 bool Previewer::simulateDirectionGesture(uint16_t gesture)
 {
     if (gesture != 2 && gesture != 3 && gesture != 7 && gesture != 8)
         return false;
 
-    const bool handled = sendGesture(gesture, true);
-    const int16_t saved_gyro[3] = {
-        device_.gyro[0], device_.gyro[1], device_.gyro[2]
-    };
-    auto set_gyro = [this](int16_t x, int16_t y, int16_t z) {
-        device_.gyro[0] = x;
-        device_.gyro[1] = y;
-        device_.gyro[2] = z;
-    };
-    auto restore_gyro = [this, &saved_gyro]() {
-        device_.gyro[0] = saved_gyro[0];
-        device_.gyro[1] = saved_gyro[1];
-        device_.gyro[2] = saved_gyro[2];
-    };
-
     try {
         // Give raw-direction consumers a centered interval so their detector
         // is armed even when this is the first simulated input after start.
-        set_gyro(0, 0, 0);
         for (int index = 0; index < 4; ++index) tick(33);
-        switch (gesture) {
-        case 2: set_gyro(0, 0, 80); break;
-        case 3: set_gyro(0, 0, -80); break;
-        case 7: set_gyro(-60, 60, 0); break;
-        case 8: set_gyro(60, -60, 0); break;
-        default: break;
-        }
-        tick(33);
-        switch (gesture) {
-        case 2: set_gyro(0, 0, -30); break;
-        case 3: set_gyro(0, 0, 30); break;
-        case 7: set_gyro(20, -20, 0); break;
-        case 8: set_gyro(-20, 20, 0); break;
-        default: break;
-        }
-        tick(33);
-        set_gyro(0, 0, 0);
-        for (int index = 0; index < 4; ++index) tick(33);
+        const bool accepted = setDirectionInput(gesture, true);
+        for (int index = 0; index < 3; ++index) tick(33);
+        (void)setDirectionInput(gesture, false);
+        for (int index = 0;
+             index < 8 && direction_input_phase_ != DirectionInputPhase::Idle;
+             ++index)
+            tick(33);
+        return accepted;
     } catch (...) {
-        restore_gyro();
+        resetDirectionInput();
         throw;
     }
-    restore_gyro();
-    return handled;
 }
 
 bool Previewer::sendBluetooth(uint16_t channel, const std::vector<uint8_t> &payload)
@@ -671,37 +911,57 @@ bool Previewer::handleTrap(Rv32 &cpu, uint32_t address)
         if (!framebuffer_locked_) { finish(static_cast<uint32_t>(GM_ESTATE)); return true; }
         int32_t result = OK;
         const uint32_t dirty = cpu.argument(0);
+        FramebufferDirtyRect current_dirty;
         if (dirty) {
-            const int16_t x = static_cast<int16_t>(cpu.memory.read16(dirty));
-            const int16_t y = static_cast<int16_t>(cpu.memory.read16(dirty + 2));
-            const uint16_t width = cpu.memory.read16(dirty + 4);
-            const uint16_t height = cpu.memory.read16(dirty + 6);
-            if (x < 0 || y < locked_y_ || width == 0 || height == 0 ||
-                static_cast<uint32_t>(x) + width > kDisplayWidth ||
-                static_cast<uint32_t>(y) + height > static_cast<uint32_t>(locked_y_) + locked_height_)
+            current_dirty.x = static_cast<int16_t>(cpu.memory.read16(dirty));
+            current_dirty.y = static_cast<int16_t>(cpu.memory.read16(dirty + 2));
+            current_dirty.width = cpu.memory.read16(dirty + 4);
+            current_dirty.height = cpu.memory.read16(dirty + 6);
+            if (current_dirty.x < 0 || current_dirty.y < locked_y_ ||
+                current_dirty.width == 0 || current_dirty.height == 0 ||
+                static_cast<uint32_t>(current_dirty.x) + current_dirty.width > kDisplayWidth ||
+                static_cast<uint32_t>(current_dirty.y) + current_dirty.height >
+                    static_cast<uint32_t>(locked_y_) + locked_height_)
                 result = GM_EINVAL;
         }
         if (result == OK && dirty) {
             const GuestMemory::Region *framebuffer = cpu_.memory.find(kFramebufferBase);
-            if (framebuffer && framebuffer->bytes.size() >= presented_framebuffer_.size()) {
-                const int16_t x = static_cast<int16_t>(cpu.memory.read16(dirty));
-                const int16_t y = static_cast<int16_t>(cpu.memory.read16(dirty + 2));
-                const uint16_t width = cpu.memory.read16(dirty + 4);
-                const uint16_t height = cpu.memory.read16(dirty + 6);
-                for (int32_t row = y; row < static_cast<int32_t>(y) + height; ++row) {
-                    for (int32_t column = x;
-                         column < static_cast<int32_t>(x) + width; ++column) {
+            if (framebuffer && framebuffer->bytes.size() >= staged_framebuffer_.size()) {
+                for (int32_t row = current_dirty.y;
+                     row < static_cast<int32_t>(current_dirty.y) + current_dirty.height; ++row) {
+                    for (int32_t column = current_dirty.x;
+                         column < static_cast<int32_t>(current_dirty.x) + current_dirty.width; ++column) {
                         const size_t offset = static_cast<size_t>(row) * 320u +
                                               static_cast<size_t>(column / 2);
                         const uint8_t source = framebuffer->bytes[offset];
-                        uint8_t &target = presented_framebuffer_[offset];
+                        uint8_t &target = staged_framebuffer_[offset];
                         if ((column & 1) == 0)
-                            target = static_cast<uint8_t>((target & 0x0f) |
-                                                         (source & 0xf0));
+                            target = static_cast<uint8_t>((target & 0x0f) | (source & 0xf0));
                         else
-                            target = static_cast<uint8_t>((target & 0xf0) |
-                                                         (source & 0x0f));
+                            target = static_cast<uint8_t>((target & 0xf0) | (source & 0x0f));
                     }
+                }
+                pending_framebuffer_dirty_.push_back(current_dirty);
+                if (cpu.argument(1)) {
+                    for (const FramebufferDirtyRect &region : pending_framebuffer_dirty_) {
+                        for (int32_t row = region.y;
+                             row < static_cast<int32_t>(region.y) + region.height; ++row) {
+                            for (int32_t column = region.x;
+                                 column < static_cast<int32_t>(region.x) + region.width; ++column) {
+                                const size_t offset = static_cast<size_t>(row) * 320u +
+                                                      static_cast<size_t>(column / 2);
+                                const uint8_t source = staged_framebuffer_[offset];
+                                uint8_t &target = presented_framebuffer_[offset];
+                                if ((column & 1) == 0)
+                                    target = static_cast<uint8_t>((target & 0x0f) |
+                                                                 (source & 0xf0));
+                                else
+                                    target = static_cast<uint8_t>((target & 0xf0) |
+                                                                 (source & 0x0f));
+                            }
+                        }
+                    }
+                    pending_framebuffer_dirty_.clear();
                 }
             }
         }

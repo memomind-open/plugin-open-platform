@@ -89,6 +89,19 @@ extern "C" {
         active: c_int,
         handled: *mut c_int,
     ) -> c_int;
+    fn gm_preview_set_direction_input(
+        handle: *mut c_void,
+        gesture: u16,
+        active: c_int,
+        handled: *mut c_int,
+    ) -> c_int;
+    fn gm_preview_set_direction_vector(
+        handle: *mut c_void,
+        x: i16,
+        y: i16,
+        active: c_int,
+        handled: *mut c_int,
+    ) -> c_int;
     fn gm_preview_simulate_direction_gesture(
         handle: *mut c_void,
         gesture: u16,
@@ -1823,6 +1836,64 @@ fn simulate_gesture(
     })
 }
 
+#[tauri::command]
+fn set_direction_input(
+    gesture: u16,
+    active: bool,
+    state: tauri::State<'_, PreviewerState>,
+) -> Result<SimulatedEventResult, String> {
+    if !matches!(gesture, 2 | 3 | 7 | 8) {
+        return Err("direction gesture must be up, down, left, or right".to_string());
+    }
+    let previewer = state
+        .lock()
+        .map_err(|_| "previewer lock is poisoned".to_string())?;
+    require_running(&previewer)?;
+    let mut handled = 0;
+    let sent = unsafe {
+        gm_preview_set_direction_input(
+            previewer.handle.as_ptr(),
+            gesture,
+            if active { 1 } else { 0 },
+            &mut handled,
+        )
+    };
+    previewer.require(sent)?;
+    Ok(SimulatedEventResult {
+        handled: handled != 0,
+    })
+}
+
+#[tauri::command]
+fn set_direction_vector(
+    x: i16,
+    y: i16,
+    active: bool,
+    state: tauri::State<'_, PreviewerState>,
+) -> Result<SimulatedEventResult, String> {
+    if !(-1000..=1000).contains(&x) || !(-1000..=1000).contains(&y) {
+        return Err("direction vector components must be between -1000 and 1000".to_string());
+    }
+    let previewer = state
+        .lock()
+        .map_err(|_| "previewer lock is poisoned".to_string())?;
+    require_running(&previewer)?;
+    let mut handled = 0;
+    let sent = unsafe {
+        gm_preview_set_direction_vector(
+            previewer.handle.as_ptr(),
+            x,
+            y,
+            if active { 1 } else { 0 },
+            &mut handled,
+        )
+    };
+    previewer.require(sent)?;
+    Ok(SimulatedEventResult {
+        handled: handled != 0,
+    })
+}
+
 fn require_running(previewer: &NativePreviewer) -> Result<(), String> {
     if unsafe { gm_preview_is_running(previewer.handle.as_ptr()) } == 0 {
         Err("device plugin is not running".to_string())
@@ -2002,6 +2073,8 @@ fn main() {
             send_plugin_message,
             simulate_button,
             simulate_gesture,
+            set_direction_input,
+            set_direction_vector,
             tick_frame,
         ])
         .run(tauri::generate_context!())
