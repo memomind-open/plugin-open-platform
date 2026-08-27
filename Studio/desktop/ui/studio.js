@@ -34,7 +34,6 @@ const webPlugin = document.querySelector('#web-plugin');
 const devicePlugin = document.querySelector('#device-plugin');
 const webState = document.querySelector('#web-state');
 const deviceState = document.querySelector('#device-state');
-const pairStatus = document.querySelector('#pair-status');
 const webShareQr = document.querySelector('#web-share-qr');
 const webSharePlaceholder = document.querySelector('#web-share-placeholder');
 const webShareStatus = document.querySelector('#web-share-status');
@@ -1023,9 +1022,6 @@ function log(kind, value) {
 
 function updatePairStatus() {
   const workspace = describeWorkspace({ webEnabled: webActive, deviceRunning });
-  const incompatible = webActive && currentCompatibility?.compatible === false;
-  pairStatus.textContent = incompatible ? `${workspace.text} · Incompatible pair` : workspace.text;
-  pairStatus.classList.toggle('ready', workspace.ready && !incompatible);
   document.querySelector('#bridge-mode-label').textContent = workspace.bridgeLabel;
 }
 
