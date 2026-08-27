@@ -869,12 +869,24 @@ static int run_combat_test(HINSTANCE instance)
                  "tall_narrow_display_scale", "expected=3 actual=%u",
                  sim_plugin_test_display_scale(280U, 1340U));
     combat_check(
-        sim_plugin_test_hurt_uses_source_direction(0U, false) &&
-        !sim_plugin_test_hurt_uses_source_direction(0U, true) &&
-        !sim_plugin_test_hurt_uses_source_direction(1U, false) &&
-        sim_plugin_test_hurt_uses_source_direction(1U, true),
+        !sim_plugin_test_hurt_uses_source_direction(0U, 0U, false) &&
+        sim_plugin_test_hurt_uses_source_direction(0U, 0U, true) &&
+        sim_plugin_test_hurt_uses_source_direction(0U, 1U, false) &&
+        !sim_plugin_test_hurt_uses_source_direction(0U, 1U, true) &&
+        sim_plugin_test_hurt_uses_source_direction(0U, 2U, false) &&
+        !sim_plugin_test_hurt_uses_source_direction(0U, 2U, true) &&
+        !sim_plugin_test_hurt_uses_source_direction(0U, 3U, false) &&
+        sim_plugin_test_hurt_uses_source_direction(0U, 3U, true) &&
+        !sim_plugin_test_hurt_uses_source_direction(1U, 0U, false) &&
+        sim_plugin_test_hurt_uses_source_direction(1U, 0U, true) &&
+        sim_plugin_test_hurt_uses_source_direction(1U, 1U, false) &&
+        !sim_plugin_test_hurt_uses_source_direction(1U, 1U, true) &&
+        !sim_plugin_test_hurt_uses_source_direction(1U, 2U, false) &&
+        sim_plugin_test_hurt_uses_source_direction(1U, 2U, true) &&
+        !sim_plugin_test_hurt_uses_source_direction(1U, 3U, false) &&
+        sim_plugin_test_hurt_uses_source_direction(1U, 3U, true),
         "hurt_sprite_source_orientation",
-        "Zen source falls left and Rival source falls right");
+        "hurt-sheet source orientation must be defined per frame");
     sim_plugin_test_constrain_display(280U, 1340U, 30, 30,
                                       &constrained_player_x,
                                       &constrained_cpu_x);

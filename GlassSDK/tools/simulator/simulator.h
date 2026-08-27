@@ -65,6 +65,7 @@ void sim_plugin_debug_snapshot(sim_debug_snapshot_t *snapshot);
 gm_plugin_result_t sim_plugin_render(void);
 uint8_t sim_plugin_test_display_scale(uint16_t width, uint16_t height);
 bool sim_plugin_test_hurt_uses_source_direction(uint8_t character,
+                                                uint8_t frame,
                                                 bool hurt_right);
 void sim_plugin_test_constrain_display(uint16_t width, uint16_t height,
                                        int16_t player_x, int16_t cpu_x,

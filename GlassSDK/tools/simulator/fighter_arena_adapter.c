@@ -109,9 +109,10 @@ uint8_t sim_plugin_test_display_scale(uint16_t width, uint16_t height)
 }
 
 bool sim_plugin_test_hurt_uses_source_direction(uint8_t character,
+                                                uint8_t frame,
                                                 bool hurt_right)
 {
-    return hurt_uses_source_direction(character, hurt_right);
+    return hurt_uses_source_direction(character, frame, hurt_right);
 }
 
 void sim_plugin_test_constrain_display(uint16_t width, uint16_t height,
