@@ -53,7 +53,7 @@ const outboundWaiters = new Set();
 const storageNamespaces = new Map();
 const importedWebPlugins = new Map();
 const importedDevicePlugins = new Map();
-const deviceEventButtons = [...document.querySelectorAll('[data-button-action], [data-gesture]')];
+const deviceEventButtons = [...document.querySelectorAll('[data-button-action]')];
 const directionJoystick = document.querySelector('[data-direction-joystick]');
 const joystickKnob = document.querySelector('[data-joystick-knob]');
 const runtimeGeneration = 1;
@@ -111,11 +111,6 @@ document.addEventListener('keydown', (event) => {
 for (const button of document.querySelectorAll('[data-button-action]')) {
   button.addEventListener('click', () => simulateDeviceEvent('simulate_button', {
     action: Number(button.dataset.buttonAction),
-  }));
-}
-for (const button of document.querySelectorAll('[data-gesture]')) {
-  button.addEventListener('click', () => simulateDeviceEvent('simulate_gesture', {
-    gesture: Number(button.dataset.gesture), active: true,
   }));
 }
 directionJoystick.addEventListener('pointerdown', startJoystickInput);
