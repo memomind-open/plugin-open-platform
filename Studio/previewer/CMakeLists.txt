@@ -1,16 +1,31 @@
 cmake_minimum_required(VERSION 3.16)
-project(GMPluginPreviewer VERSION 0.1.0 LANGUAGES CXX)
+project(GMPluginPreviewer VERSION 0.1.0 LANGUAGES C CXX)
 
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+file(GLOB_RECURSE GM_DEVICE_LVGL_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lvgl/src/*.c")
+add_library(gm_device_lvgl STATIC ${GM_DEVICE_LVGL_SOURCES})
+target_include_directories(gm_device_lvgl PUBLIC third_party/lvgl)
+target_compile_definitions(gm_device_lvgl PUBLIC
+    LV_CONF_INCLUDE_SIMPLE=1
+    CONFIG_XGIMI_PATCH=1)
+
 add_library(gmplugin_previewer_core
+    src/lvgl_host.cpp
     src/previewer.cpp
     src/previewer_c_api.cpp
     src/rv32.cpp
 )
-target_include_directories(gmplugin_previewer_core PUBLIC src)
+target_include_directories(gmplugin_previewer_core PUBLIC src third_party/lvgl)
+target_link_libraries(gmplugin_previewer_core PUBLIC gm_device_lvgl)
+target_compile_definitions(gmplugin_previewer_core PRIVATE
+    GM_PREVIEW_FONT17_PATH="${CMAKE_CURRENT_SOURCE_DIR}/third_party/lvgl/fonts/lv_font_xgimi_17.bin"
+    GM_PREVIEW_FONT20_PATH="${CMAKE_CURRENT_SOURCE_DIR}/third_party/lvgl/fonts/lv_font_xgimi_20.bin")
 if(MSVC)
     target_compile_options(gmplugin_previewer_core PRIVATE /W4 /permissive-)
 else()
@@ -50,7 +65,7 @@ if(BUILD_TESTING)
 endif()
 
 if(WIN32)
-    set(GM_PREVIEW_FONT_DIR "" CACHE PATH
+    set(GM_PREVIEW_FONT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lvgl/fonts" CACHE PATH
         "Optional directory containing lv_font_xgimi_17.bin and lv_font_xgimi_20.bin")
     get_filename_component(GM_PREVIEW_FONT17
         "${GM_PREVIEW_FONT_DIR}/lv_font_xgimi_17.bin" ABSOLUTE)
