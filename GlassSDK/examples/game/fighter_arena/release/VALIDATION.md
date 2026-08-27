@@ -39,8 +39,8 @@ Date: 2026-08-21
   front-facing stance and alternate a subtle vertical idle motion from fully initialized
   preview state.
 - Left/right knockdown captures were visually inspected at initial recoil and
-  later hurt-sheet frames; both fighters' heads and torsos consistently fall
-  away from the hit.
+  later hurt-sheet frames; per-frame mirroring keeps both fighters' heads and
+  torsos consistently falling away from the hit.
 - Deterministic combat tests passed 49/49 scenarios, including hurt-sheet
   source orientation, shoe-ground visibility, light/heavy kick near-hit and
   far-whiff behavior, distinct kick

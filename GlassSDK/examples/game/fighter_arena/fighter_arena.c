@@ -618,11 +618,13 @@ static uint8_t fighter_render_frame(const fighter_t *fighter)
     return (uint8_t)(0x80U | hurt_sprite_frame(fighter));
 }
 
-static bool hurt_uses_source_direction(uint8_t character, bool hurt_right)
+static bool hurt_uses_source_direction(uint8_t character, uint8_t frame,
+                                       bool hurt_right)
 {
-    /* Source direction follows the head and torso, not the feet: Zen falls
-     * left in its hurt sheet, while Rival falls right. */
-    bool source_falls_right = character != 0U;
+    /* The generated poses do not share one horizontal orientation. Frame 1
+     * falls left for both fighters, frame 2 falls left for Zen and right for
+     * Rival, and the standing/recovery poses lean right. */
+    bool source_falls_right = frame == 2U ? character != 0U : frame != 1U;
     return hurt_right == source_falls_right;
 }
 
@@ -661,7 +663,7 @@ static void draw_fighter(gm_plugin_framebuffer_surface_t *surface,
     int16_t left = (int16_t)(center - target_width / 2);
     if (hurt)
         draw_source_direction = hurt_uses_source_direction(
-            fighter->character, fighter->hurt_right);
+            fighter->character, frame, fighter->hurt_right);
     for (source_y = 0; source_y < PF_SPRITE_HEIGHT; ++source_y) {
         uint8_t start = sprite_data[offset++];
         uint8_t length = sprite_data[offset++];
