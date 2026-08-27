@@ -8,11 +8,11 @@ import { bundleWebSdk } from '../bundle-web-sdk.mjs';
 const repositoryRoot = resolve(import.meta.dirname, '../..');
 const packageJson = JSON.parse(await readFile(resolve(repositoryRoot, 'package.json'), 'utf8'));
 
-test('plugin SDK vendor copies match the formal standalone SDK', async () => {
+test('example SDK copies match the formal standalone SDK', async () => {
   const expected = await bundleWebSdk(repositoryRoot, packageJson.version);
   for (const plugin of [
-    'plugins/fighter-controller',
-    'plugins/gm-life-desk',
+    'examples/fighter-controller',
+    'examples/life-desk',
     'examples/talking-pet',
   ]) {
     const actual = await readFile(

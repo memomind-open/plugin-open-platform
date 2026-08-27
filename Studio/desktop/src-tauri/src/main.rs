@@ -577,20 +577,17 @@ fn read_discovered_manifest(directory: &Path) -> Result<DiscoveredManifest, Stri
 }
 
 fn discover_web_plugins_in(root: &Path) -> Result<Vec<DiscoveredWebPlugin>, String> {
-    let mut directories = Vec::new();
-    for plugins_root in [root.join("plugins"), root.join("examples")] {
-        if !plugins_root.is_dir() {
-            continue;
-        }
-        let mut entries = fs::read_dir(&plugins_root)
-            .map_err(|error| format!("Could not scan {}: {error}", plugins_root.display()))?
-            .filter_map(Result::ok)
-            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
-            .map(|entry| entry.path())
-            .collect::<Vec<_>>();
-        entries.sort();
-        directories.extend(entries);
+    let examples_root = root.join("examples");
+    if !examples_root.is_dir() {
+        return Ok(Vec::new());
     }
+    let mut directories = fs::read_dir(&examples_root)
+        .map_err(|error| format!("Could not scan {}: {error}", examples_root.display()))?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+        .map(|entry| entry.path())
+        .collect::<Vec<_>>();
+    directories.sort();
 
     let mut plugins = Vec::new();
     let mut discovered_ids = HashSet::new();
@@ -2071,7 +2068,7 @@ mod tests {
     }
 
     #[test]
-    fn discovers_source_and_built_web_plugins() {
+    fn discovers_source_and_built_web_plugin_examples() {
         let suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock must be after epoch")
@@ -2081,14 +2078,14 @@ mod tests {
             std::process::id()
         ));
         for (directory, id, name) in [
-            ("plugins/counter", "com.memomind.counter", "Counter"),
+            ("examples/basic-counter", "com.memomind.counter", "Counter"),
             (
-                "examples/counter",
+                "examples/basic-counter-copy",
                 "com.memomind.counter",
                 "Counter Example",
             ),
             (
-                "plugins/tictactoe/dist",
+                "examples/tic-tac-toe/dist",
                 "com.memomind.tictactoe",
                 "Tic Tac Toe",
             ),
@@ -2109,10 +2106,10 @@ mod tests {
         let plugins = discover_web_plugins_in(&root).expect("plugins must be discovered");
         assert_eq!(plugins.len(), 2);
         assert!(plugins.iter().any(|plugin| {
-            plugin.id == "com.memomind.counter" && plugin.path.ends_with("plugins/counter")
+            plugin.id == "com.memomind.counter" && plugin.path.ends_with("examples/basic-counter")
         }));
         assert!(plugins.iter().any(|plugin| {
-            plugin.id == "com.memomind.tictactoe" && plugin.path.ends_with("tictactoe/dist")
+            plugin.id == "com.memomind.tictactoe" && plugin.path.ends_with("tic-tac-toe/dist")
         }));
         fs::remove_dir_all(root).expect("test directory must be removable");
     }

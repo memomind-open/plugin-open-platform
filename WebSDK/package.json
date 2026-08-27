@@ -7,12 +7,12 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "node tools/studio-cli.mjs --plugin examples/counter",
+    "dev": "node tools/run-browser-studio.mjs --plugin examples/basic-counter",
     "build:devkit": "node tools/build-devkit.mjs",
-    "sync:vendor-sdk": "node tools/sync-vendored-sdk.mjs",
+    "sync:example-sdk": "node tools/sync-example-sdk.mjs",
     "pack:plugin": "node tools/build-mmpkg.mjs",
     "test": "node --test packages/*/test/*.test.mjs tools/test/*.test.mjs",
-    "check": "node tools/check.mjs",
+    "check": "node tools/check-workspace.mjs",
     "verify": "npm test && npm run check"
   },
   "engines": {

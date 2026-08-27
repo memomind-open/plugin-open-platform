@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const SAMPLE_RATE = 22050;
 const repositoryRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const outputDirectory = resolve(repositoryRoot, 'plugins/fighter-controller/assets/sfx');
+const outputDirectory = resolve(repositoryRoot, 'examples/fighter-controller/assets/sfx');
 let noiseState = 0x4648a11d;
 
 await mkdir(outputDirectory, { recursive: true });

@@ -213,4 +213,4 @@ then verify both directions:
 - [Glasses Host API](../GlassSDK/include/gm_plugin.h)
 - [Low-level plugin protocol](../GlassSDK/PROTOCOL.md)
 - [Bluetooth round-trip example](../GlassSDK/examples/bluetooth/README.md)
-- [Fighter Controller Web example](../WebSDK/plugins/fighter-controller/README.md)
+- [Fighter Controller Web example](../WebSDK/examples/fighter-controller/README.md)

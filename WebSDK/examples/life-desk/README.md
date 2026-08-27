@@ -31,14 +31,14 @@ glasses.
 
 ```sh
 # Run from the WebSDK workspace root.
-node tools/studio-cli.mjs --plugin plugins/gm-life-desk
+node tools/run-browser-studio.mjs --plugin examples/life-desk
 ```
 
 ## Package
 
 ```sh
 # Run from the WebSDK workspace root.
-npm run pack:plugin -- plugins/gm-life-desk dist/gm-life-desk.mmpkg
+npm run pack:plugin -- examples/life-desk dist/life-desk.mmpkg
 ```
 
 ## Implementation

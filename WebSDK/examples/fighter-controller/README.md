@@ -33,13 +33,13 @@ under `assets/sfx/README.md`.
 Run it in Studio:
 
 ```sh
-node tools/studio-cli.mjs --plugin plugins/fighter-controller
+node tools/run-browser-studio.mjs --plugin examples/fighter-controller
 ```
 
 Build the package:
 
 ```sh
-npm run pack:plugin -- plugins/fighter-controller dist/fighter-controller.mmpkg
+npm run pack:plugin -- examples/fighter-controller dist/fighter-controller.mmpkg
 ```
 
 Studio validates and records the outgoing messages. Real glasses control also

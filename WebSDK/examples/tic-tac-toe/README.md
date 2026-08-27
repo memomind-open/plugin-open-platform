@@ -34,7 +34,7 @@ device drawing and button/IMU events.
 ## Development
 
 ```bash
-# Run from plugins/tictactoe.
+# Run from examples/tic-tac-toe.
 npm ci
 npm test
 npm run typecheck
@@ -48,13 +48,13 @@ Validate the build in WebSDK Browser Studio:
 
 ```bash
 # Run from the WebSDK workspace root.
-node tools/studio-cli.mjs --plugin plugins/tictactoe/dist
+node tools/run-browser-studio.mjs --plugin examples/tic-tac-toe/dist
 ```
 
 Package the plugin:
 
 ```bash
-npm run pack:plugin -- plugins/tictactoe/dist dist/tictactoe.mmpkg
+npm run pack:plugin -- examples/tic-tac-toe/dist dist/tic-tac-toe.mmpkg
 ```
 
 ## App integration

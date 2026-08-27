@@ -20,16 +20,15 @@ await rm(outputZip, { force: true });
 await mkdir(staging, { recursive: true });
 
 await copy('docs/web-plugin', 'docs/web-plugin');
-await copy('docs/GM-Web-Plugin-Developer-Guide-Draft.md', 'GM-Web-Plugin-Developer-Guide-Draft.md');
-await copy('browser-studio', 'internal/browser-studio');
+await copy('tools/browser-studio', 'internal/browser-studio');
 await copy('packages/bridge-contract/src', 'internal/packages/bridge-contract/src');
 await copy('packages/device-renderer/src', 'internal/packages/device-renderer/src');
 await copy('packages/studio-runtime/src', 'internal/packages/studio-runtime/src');
 await copy('packages/web-sdk/src', 'internal/packages/web-sdk/src');
-await copy('examples/counter', 'examples/counter');
+await copy('examples/basic-counter', 'examples/basic-counter');
 await copy('tools/build-mmpkg.mjs', 'tools/build-mmpkg.mjs');
-await copy('tools/studio-cli.mjs', 'studio/gm-plugin-studio.mjs');
-await copy('tools/studio-paths.mjs', 'studio/studio-paths.mjs');
+await copy('tools/run-browser-studio.mjs', 'studio/gm-plugin-studio.mjs');
+await copy('tools/browser-studio-paths.mjs', 'studio/browser-studio-paths.mjs');
 await copy('tools/devkit/README.md', 'README.md');
 await prepareStudioCli();
 
@@ -74,7 +73,7 @@ async function copy(source, target) {
 }
 
 async function prepareStandaloneExample(sdk) {
-  const exampleRoot = resolve(staging, 'examples/counter');
+  const exampleRoot = resolve(staging, 'examples/basic-counter');
   const indexPath = resolve(exampleRoot, 'index.html');
   const pluginPath = resolve(exampleRoot, 'plugin.js');
   const index = await readFile(indexPath, 'utf8');
@@ -93,7 +92,7 @@ async function prepareStudioCli() {
     .replace("resolve(repositoryRoot, 'packages/bridge-contract/src')", "resolve(repositoryRoot, 'internal/packages/bridge-contract/src')")
     .replace("resolve(repositoryRoot, 'packages/device-renderer/src')", "resolve(repositoryRoot, 'internal/packages/device-renderer/src')")
     .replace("resolve(repositoryRoot, 'packages/studio-runtime/src')", "resolve(repositoryRoot, 'internal/packages/studio-runtime/src')")
-    .replace("resolve(repositoryRoot, 'browser-studio')", "resolve(repositoryRoot, 'internal/browser-studio')"));
+    .replace("resolve(repositoryRoot, 'tools/browser-studio')", "resolve(repositoryRoot, 'internal/browser-studio')"));
 }
 
 async function collectEntries(root) {

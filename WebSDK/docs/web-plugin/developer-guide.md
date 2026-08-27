@@ -37,7 +37,7 @@ gm-web-plugin-devkit-0.1.0/
 ├── tools/
 │   └── build-mmpkg.mjs
 ├── examples/
-│   └── counter/
+│   └── basic-counter/
 ├── docs/web-plugin/
 └── internal/
 ```
@@ -57,7 +57,7 @@ Extract the DevKit and start Counter:
 ```sh
 unzip gm-web-plugin-devkit-0.1.0.zip
 cd gm-web-plugin-devkit-0.1.0
-node studio/gm-plugin-studio.mjs --plugin examples/counter
+node studio/gm-plugin-studio.mjs --plugin examples/basic-counter
 ```
 
 Open:
@@ -78,7 +78,7 @@ In Studio:
 Use another port if `4173` is unavailable:
 
 ```sh
-node studio/gm-plugin-studio.mjs --plugin examples/counter --port 4174
+node studio/gm-plugin-studio.mjs --plugin examples/basic-counter --port 4174
 ```
 
 ## 4. Create a plugin

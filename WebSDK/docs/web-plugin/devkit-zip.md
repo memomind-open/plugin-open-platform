@@ -49,7 +49,7 @@ cd gm-web-plugin-devkit-0.1.0
 Run the included example:
 
 ```sh
-node studio/gm-plugin-studio.mjs --plugin examples/counter
+node studio/gm-plugin-studio.mjs --plugin examples/basic-counter
 ```
 
 Open `http://127.0.0.1:4173`, then:
@@ -66,7 +66,7 @@ Package the included example:
 
 ```sh
 node tools/build-mmpkg.mjs \
-  examples/counter \
+  examples/basic-counter \
   release/counter-0.1.0.mmpkg
 ```
 

@@ -5,11 +5,11 @@ Source workspace for the App built-in plugin `com.memomind.demo.weather`.
 Run it from the `WebSDK` workspace root:
 
 ```sh
-node tools/studio-cli.mjs --plugin plugins/weather
+node tools/run-browser-studio.mjs --plugin examples/weather
 ```
 
 Package it with:
 
 ```sh
-npm run pack:plugin -- plugins/weather dist/weather.mmpkg
+npm run pack:plugin -- examples/weather dist/weather.mmpkg
 ```

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { resolveServedFile } from '../studio-paths.mjs';
+import { resolveServedFile } from '../browser-studio-paths.mjs';
 
 test('studio file resolver rejects lexical and symbolic-link traversal', async () => {
   const temporary = await mkdtemp(join(tmpdir(), 'gm-studio-paths-'));
