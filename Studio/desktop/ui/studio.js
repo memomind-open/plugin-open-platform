@@ -512,6 +512,12 @@ async function dispatch(method, params) {
     case 'device.subscribeEvents': return subscribe(params.types);
     case 'device.unsubscribeEvents': return { removed: subscriptions.delete(requireString(params, 'subscriptionId')) };
     case 'plugin.sendMessage': return sendPluginMessage(params);
+    case 'audio.configure':
+    case 'audio.startRecording':
+    case 'audio.stopRecording':
+    case 'audio.playRecording':
+    case 'audio.stopPlayback':
+      throw bridgeError('CAPABILITY_UNAVAILABLE', 'Native glasses audio is unavailable in Studio');
     case 'display.createPage': return createPage();
     case 'display.closePage':
     case 'display.updateText':

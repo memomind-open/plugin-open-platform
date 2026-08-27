@@ -104,3 +104,41 @@ window.__memoPluginEmit({
 - A successful send means that the device acknowledged the message and
   delivered it to the running GMP. It does not mean that the GMP completed its
   business logic or display update.
+
+## Native glasses audio
+
+Plugins declaring `audio.capture` can use the glasses microphone when
+`(await gm.runtime.getCapabilities()).audio` is present:
+
+```js
+const offFrames = gm.audio.onFrames(({ frames, droppedFrameCount }) => {
+  // frames contains Opus packets as Uint8Array values. This event is a lossy
+  // observation stream; native recording and playback retain every packet.
+});
+const offState = gm.audio.onState(async (state) => {
+  if (state.state === 'stopped') {
+    await gm.audio.playRecording({
+      recordingId: state.latestRecordingId,
+      voice: 'cute',
+    });
+  }
+});
+const offPlayback = gm.audio.onPlaybackState(console.log);
+
+await gm.audio.configure({ noiseReduction: true, pickupMode: 'frontFocus' });
+await gm.audio.startRecording();
+// Later, after an explicit user action:
+await gm.audio.stopRecording();
+```
+
+Available methods are `audio.configure`, `audio.startRecording`,
+`audio.stopRecording`, `audio.playRecording`, and `audio.stopPlayback`. Start,
+stop, and playback requests return an operation ID immediately; completion is
+reported through `audio.state` and `audio.playbackState`. The Host limits one
+recording to 15 seconds, 750 Opus frames, and 64 KiB. Supported pickup modes
+and voice effects are advertised in the audio capability object.
+
+The App shows native consent and a recording indicator outside the WebView.
+Hiding, suspending, reloading, or closing the plugin stops audio. Desktop Studio
+does not advertise this capability; a plugin may use browser audio only when
+the capability is absent, not as a fallback after a native operation fails.

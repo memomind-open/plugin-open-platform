@@ -123,6 +123,19 @@ int main(int argc, char **argv)
             assert(gm_preview_clear_outbox(handle) == 1);
         }
 
+        const uint8_t text[] = {
+            1,                   // element id
+            0, 30, 0, 30,       // x, y
+            2, 28, 0, 68,       // width, height
+            2, 12,              // border, radius
+            'M', 'O', 'M', 'O', ' ', 'R', 'E', 'A', 'D', 'Y',
+        };
+        assert(gm_preview_send_bluetooth(handle, 2, text, sizeof(text), &handled) == 1);
+        assert(handled == 1);
+        assert(gm_preview_tick(handle, 33) == 1);
+        assert(gm_preview_copy_frame(handle, frame.data(), frame.size()) == 1);
+        assert(std::any_of(frame.begin(), frame.end(), [](uint8_t value) { return value != 0; }));
+
         const uint32_t frame_id = 1;
         std::vector<uint8_t> begin;
         append_be32(begin, frame_id);

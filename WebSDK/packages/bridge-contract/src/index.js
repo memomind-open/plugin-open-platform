@@ -29,6 +29,22 @@ export const PLUGIN_MESSAGE_PROFILE = Object.freeze({
   uplinkEvent: 'plugin.message',
 });
 
+export const AUDIO_PROFILE = Object.freeze({
+  codec: 'opus',
+  sampleRate: 16000,
+  channels: 1,
+  maxDurationMs: 15000,
+  maxFrames: 750,
+  maxOpusBytes: 64 * 1024,
+  streamEvent: 'audio.frames',
+  streamIsLossyObservation: true,
+  pickupModes: Object.freeze([
+    'unchanged', 'frontFixed', 'meetingAuto', 'nonWearerFocus',
+    'frontBalanced', 'frontFocus',
+  ]),
+  voices: Object.freeze(['original', 'cute', 'deep', 'overlord']),
+});
+
 export const METHOD_NAMES = Object.freeze([
   'runtime.ready',
   'runtime.ping',
@@ -51,6 +67,11 @@ export const METHOD_NAMES = Object.freeze([
   'device.subscribeEvents',
   'device.unsubscribeEvents',
   'plugin.sendMessage',
+  'audio.configure',
+  'audio.startRecording',
+  'audio.stopRecording',
+  'audio.playRecording',
+  'audio.stopPlayback',
 ]);
 
 export const EVENT_NAMES = Object.freeze([
@@ -59,6 +80,9 @@ export const EVENT_NAMES = Object.freeze([
   'device.rawImu',
   'device.connection',
   'plugin.message',
+  'audio.frames',
+  'audio.state',
+  'audio.playbackState',
   'runtime.lifecycleChanged',
 ]);
 
@@ -70,6 +94,8 @@ export const ERROR_CODES = Object.freeze([
   'METHOD_NOT_FOUND',
   'RATE_LIMITED',
   'BUSY',
+  'AUDIO_BUSY',
+  'NO_AUDIO',
   'QUOTA_EXCEEDED',
   'TIMEOUT',
   'DEVICE_DISCONNECTED',

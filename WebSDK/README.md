@@ -48,6 +48,7 @@ packages/device-renderer  GRAY_4 framebuffer and Canvas presentation
 packages/studio-runtime   Simulated App host
 browser-studio            Browser-only compatibility Studio UI
 examples/counter          Minimal Web plugin
+examples/talking-pet      Interactive talking-pet game
 plugins                   Complete maintained Web plugin workspaces
 tools                     Studio server, packagers and repository checks
 docs/web-plugin           Web plugin developer documentation

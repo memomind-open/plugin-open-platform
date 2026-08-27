@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#ffe8a8">
+    <title>Momo 会说话</title>
+    <link rel="stylesheet" href="./style.css">
+    <link rel="preload" as="image" href="./assets/momo-blink-v2.webp">
+    <link rel="preload" as="image" href="./assets/momo-listening-v2.png">
+    <link rel="preload" as="image" href="./assets/momo-talking-v2.png">
+    <link rel="preload" as="image" href="./assets/momo-eating-v2.png">
+    <link rel="preload" as="image" href="./assets/momo-playing-v2.png">
+    <link rel="preload" as="image" href="./assets/momo-sleeping-v2.png">
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">MY TALKING PET</p>
+          <h1>Momo <span>的房间</span></h1>
+        </div>
+        <button class="level-badge" id="level-badge" type="button" aria-label="当前等级">
+          <span>LV.</span><strong id="level">1</strong>
+        </button>
+      </header>
+
+      <section class="meters" aria-label="Momo 的状态">
+        <div class="meter meter-happy">
+          <span aria-hidden="true">♥</span>
+          <div><i id="happy-bar"></i></div>
+          <output id="happy-value">78</output>
+        </div>
+        <div class="meter meter-food">
+          <span aria-hidden="true">●</span>
+          <div><i id="food-bar"></i></div>
+          <output id="food-value">62</output>
+        </div>
+        <div class="meter meter-energy">
+          <span aria-hidden="true">ϟ</span>
+          <div><i id="energy-bar"></i></div>
+          <output id="energy-value">84</output>
+        </div>
+      </section>
+
+      <section class="room" id="room" aria-label="游戏场景">
+        <div class="sun" aria-hidden="true"></div>
+        <div class="cloud cloud-one" aria-hidden="true"></div>
+        <div class="cloud cloud-two" aria-hidden="true"></div>
+        <div class="shelf" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div class="plant" aria-hidden="true"><i></i><i></i><b></b></div>
+        <p class="speech" id="speech" role="status">嗨！摸摸我的脑袋吧～</p>
+
+        <div class="scene-effects" aria-hidden="true">
+          <span class="prop-cookie">🍪</span>
+          <span class="prop-ball">⚽</span>
+          <span class="prop-moon">☾</span>
+          <span class="sleep-cloud"></span>
+          <span class="listen-ring ring-one"></span>
+          <span class="listen-ring ring-two"></span>
+          <span class="listen-ring ring-three"></span>
+          <span class="voice-waves">
+            <i></i><i></i><i></i><i></i><i></i>
+          </span>
+        </div>
+
+        <button class="pet" id="pet" type="button" aria-label="摸摸 Momo">
+          <span class="pet-glow" aria-hidden="true"></span>
+          <img id="pet-image" src="./assets/momo-festive.png" alt="穿红色节庆外套、长着星星眼的黑猫 Momo">
+          <svg viewBox="0 0 320 390" aria-hidden="true">
+            <defs>
+              <linearGradient id="fur" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#9b7bff"/>
+                <stop offset="1" stop-color="#6550d9"/>
+              </linearGradient>
+              <linearGradient id="belly" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#c9bcff"/>
+                <stop offset="1" stop-color="#a795f4"/>
+              </linearGradient>
+            </defs>
+            <g class="tail">
+              <path d="M260 278c58 0 47-64 14-50-14 6-12 28 3 29" fill="none" stroke="#6550d9" stroke-width="25" stroke-linecap="round"/>
+              <path d="M287 230c13-6 23 11 14 21" fill="none" stroke="#bcaeff" stroke-width="7" stroke-linecap="round"/>
+            </g>
+            <g class="body">
+              <ellipse cx="160" cy="265" rx="101" ry="111" fill="url(#fur)"/>
+              <ellipse cx="160" cy="278" rx="64" ry="76" fill="url(#belly)"/>
+              <path d="M89 250c-35 12-46 43-33 55 13 11 35-5 48-29" fill="#8066ed"/>
+              <path d="M231 250c35 12 46 43 33 55-13 11-35-5-48-29" fill="#8066ed"/>
+              <ellipse cx="106" cy="362" rx="52" ry="24" fill="#5846c5"/>
+              <ellipse cx="214" cy="362" rx="52" ry="24" fill="#5846c5"/>
+              <ellipse cx="91" cy="358" rx="15" ry="7" fill="#a997fa"/>
+              <ellipse cx="229" cy="358" rx="15" ry="7" fill="#a997fa"/>
+            </g>
+            <g class="head">
+              <path d="M82 94 59 30c-3-8 5-15 13-10l59 36M238 94l23-64c3-8-5-15-13-10l-59 36" fill="url(#fur)" stroke="#5846c5" stroke-width="7" stroke-linejoin="round"/>
+              <path d="m78 45 27 24-34-14zM242 45l-27 24 34-14z" fill="#ff9fc9"/>
+              <ellipse cx="160" cy="130" rx="111" ry="91" fill="url(#fur)"/>
+              <ellipse cx="117" cy="126" rx="33" ry="39" fill="#fff"/>
+              <ellipse cx="203" cy="126" rx="33" ry="39" fill="#fff"/>
+              <g class="eyes">
+                <ellipse cx="124" cy="132" rx="12" ry="18" fill="#1e2040"/>
+                <ellipse cx="196" cy="132" rx="12" ry="18" fill="#1e2040"/>
+                <circle cx="128" cy="126" r="4" fill="#fff"/>
+                <circle cx="200" cy="126" r="4" fill="#fff"/>
+              </g>
+              <ellipse cx="160" cy="159" rx="23" ry="17" fill="#493a9c"/>
+              <path class="mouth" d="M130 181q30 28 60 0" fill="#ef6f98" stroke="#352c73" stroke-width="7" stroke-linecap="round"/>
+              <circle cx="77" cy="161" r="13" fill="#e38ac3" opacity=".65"/>
+              <circle cx="243" cy="161" r="13" fill="#e38ac3" opacity=".65"/>
+              <path d="M59 151 17 141M60 169l-43 10M261 151l42-10M260 169l43 10" stroke="#493a9c" stroke-width="6" stroke-linecap="round"/>
+            </g>
+          </svg>
+        </button>
+
+        <div class="floor" aria-hidden="true"><div class="rug"></div></div>
+        <div class="particles" id="particles" aria-hidden="true"></div>
+      </section>
+
+      <nav class="actions" aria-label="互动操作">
+        <button class="action action-feed" data-action="feed" type="button">
+          <span aria-hidden="true">🍪</span><strong>喂食</strong>
+        </button>
+        <button class="action action-talk" id="talk" data-action="talk" type="button">
+          <span class="mic-icon" aria-hidden="true">●</span><strong>按住说话</strong>
+        </button>
+        <button class="action action-play" data-action="play" type="button">
+          <span aria-hidden="true">⚽</span><strong>玩耍</strong>
+        </button>
+        <button class="action action-sleep" data-action="sleep" type="button">
+          <span aria-hidden="true">☾</span><strong>睡觉</strong>
+        </button>
+      </nav>
+
+      <footer>
+        <span class="connection-dot" id="connection-dot"></span>
+        <span id="status">正在连接 Studio…</span>
+        <button id="sync" type="button">同步到眼镜</button>
+      </footer>
+    </main>
+    <script type="module" src="./plugin.js"></script>
+  </body>
+</html>

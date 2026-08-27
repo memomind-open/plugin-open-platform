@@ -13,7 +13,13 @@ export const MMPKG_LIMITS = Object.freeze({
   maxFiles: 500,
 });
 
-const SUPPORTED_PERMISSIONS = new Set(['display', 'device.events', 'storage', 'network']);
+const SUPPORTED_PERMISSIONS = new Set([
+  'display',
+  'device.events',
+  'storage',
+  'network',
+  'audio.capture',
+]);
 const PLUGIN_ID = /^[a-zA-Z][a-zA-Z0-9_-]*(\.[a-zA-Z0-9_-]+)+$/;
 const SEMVER = /^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/;
 const UTF8_FLAG = 0x0800;

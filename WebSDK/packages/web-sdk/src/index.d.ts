@@ -1,6 +1,7 @@
 export type BridgeErrorCode =
   | 'INVALID_REQUEST' | 'PAYLOAD_TOO_LARGE' | 'UNAUTHORIZED'
   | 'STALE_RUNTIME' | 'METHOD_NOT_FOUND' | 'RATE_LIMITED' | 'BUSY' | 'QUOTA_EXCEEDED'
+  | 'AUDIO_BUSY' | 'NO_AUDIO'
   | 'TIMEOUT' | 'DEVICE_DISCONNECTED' | 'CAPABILITY_UNAVAILABLE'
   | 'RUNTIME_CLOSED' | 'RUNTIME_REPLACED' | 'INTERNAL_ERROR';
 
@@ -39,6 +40,37 @@ export interface PluginMessageResult {
 export interface PluginMessage {
   channel: number;
   data: Uint8Array;
+}
+
+export type AudioPickupMode =
+  | 'unchanged' | 'frontFixed' | 'meetingAuto' | 'nonWearerFocus'
+  | 'frontBalanced' | 'frontFocus';
+export type AudioVoice = 'original' | 'cute' | 'deep' | 'overlord';
+
+export interface AudioFrameBatch {
+  recordingId?: string;
+  firstSequence: number;
+  frameCount: number;
+  droppedFrameCount: number;
+  frames: Uint8Array[];
+}
+
+export interface AudioState {
+  state: 'starting' | 'recording' | 'stopping' | 'stopped' | 'error';
+  recordingId?: string;
+  latestRecordingId?: string;
+  errorCode?: BridgeErrorCode;
+  message?: string;
+  frameCount?: number;
+  opusBytes?: number;
+  durationMs?: number;
+}
+
+export interface AudioPlaybackState {
+  state: 'preparing' | 'playing' | 'stopped' | 'completed' | 'error';
+  playbackId: string;
+  errorCode?: BridgeErrorCode;
+  message?: string;
 }
 
 export interface FrameBeginOptions {
@@ -86,6 +118,16 @@ export function createGMPlugin(options?: { transport?: BridgeTransport; timeoutM
   plugin: {
     sendMessage(channel: number, data: Uint8Array): Promise<PluginMessageResult>;
     onMessage(listener: (message: PluginMessage, event: PluginEvent) => void): () => void;
+  };
+  audio: {
+    configure(options?: { noiseReduction?: boolean; pickupMode?: AudioPickupMode }): Promise<unknown>;
+    startRecording(): Promise<unknown>;
+    stopRecording(): Promise<unknown>;
+    playRecording(options: { recordingId: string; voice?: AudioVoice }): Promise<unknown>;
+    stopPlayback(): Promise<unknown>;
+    onFrames(listener: (batch: AudioFrameBatch, event: PluginEvent) => void): () => void;
+    onState(listener: (state: AudioState, event: PluginEvent) => void): () => void;
+    onPlaybackState(listener: (state: AudioPlaybackState, event: PluginEvent) => void): () => void;
   };
   close(): void;
 };

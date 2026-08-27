@@ -1,4 +1,9 @@
-import { BRIDGE_VERSION, EVENT_NAMES, PLUGIN_MESSAGE_PROFILE } from '@memomind/gm-plugin-bridge-contract';
+import {
+  AUDIO_PROFILE,
+  BRIDGE_VERSION,
+  EVENT_NAMES,
+  PLUGIN_MESSAGE_PROFILE,
+} from '@memomind/gm-plugin-bridge-contract';
 
 const MAX_PLUGIN_MESSAGE_BASE64_CHARACTERS =
   Math.ceil(PLUGIN_MESSAGE_PROFILE.maxPayloadBytes / 3) * 4;
@@ -308,8 +313,58 @@ export function createGMPlugin({ transport = detectTransport(), timeoutMs = 5000
         });
       },
     },
+    audio: {
+      configure: ({ noiseReduction = true, pickupMode = 'unchanged' } = {}) =>
+        call('audio.configure', { noiseReduction, pickupMode }),
+      startRecording: () => call('audio.startRecording'),
+      stopRecording: () => call('audio.stopRecording'),
+      playRecording: ({ recordingId, voice = 'original' }) =>
+        call('audio.playRecording', { recordingId, voice }),
+      stopPlayback: () => call('audio.stopPlayback'),
+      onFrames: (listener) => typedListener(listener, 'audio.frames', (data) => ({
+        ...data,
+        frames: decodeAudioFrames(data),
+      })),
+      onState: (listener) => typedListener(listener, 'audio.state'),
+      onPlaybackState: (listener) => typedListener(listener, 'audio.playbackState'),
+    },
     close: () => transport.close?.(),
   };
+
+  function typedListener(listener, eventName, transform = (data) => data) {
+    if (typeof listener !== 'function') {
+      throw new GMPluginError('INVALID_REQUEST', `${eventName} listener must be a function`);
+    }
+    return on(eventName, (data, event) => {
+      try {
+        listener(transform(data), event);
+      } catch (error) {
+        if (!(error instanceof GMPluginError)) throw error;
+      }
+    });
+  }
+}
+
+function decodeAudioFrames(value) {
+  const encodedFrames = value?.framesBase64;
+  if (!Array.isArray(encodedFrames) || encodedFrames.length > AUDIO_PROFILE.maxFrames) {
+    throw new GMPluginError('INVALID_REQUEST', 'audio frame event is invalid');
+  }
+  let totalBytes = 0;
+  return encodedFrames.map((encoded) => {
+    if (typeof encoded !== 'string' || encoded.length === 0 ||
+        encoded.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) {
+      throw new GMPluginError('INVALID_REQUEST', 'audio frame payload is invalid');
+    }
+    const frame = typeof Buffer !== 'undefined'
+      ? Uint8Array.from(Buffer.from(encoded, 'base64'))
+      : Uint8Array.from(globalThis.atob(encoded), (character) => character.charCodeAt(0));
+    totalBytes += frame.length;
+    if (frame.length === 0 || totalBytes > AUDIO_PROFILE.maxOpusBytes) {
+      throw new GMPluginError('PAYLOAD_TOO_LARGE', 'audio frame event exceeds the limit');
+    }
+    return frame;
+  });
 }
 
 function encodeBytes(value) {
