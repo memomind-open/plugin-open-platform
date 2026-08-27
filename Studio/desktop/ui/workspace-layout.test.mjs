@@ -23,3 +23,17 @@ test('Plugin selectors start at the top without a dedicated header', async () =>
   assert.doesNotMatch(script, /querySelector\('#pair-status'\)/u);
   assert.match(css, /\.workspace \{[^}]*height: calc\(100vh - 298px\);/u);
 });
+
+test('Glass controls place head motion directly below the button controls', async () => {
+  const [html, script] = await Promise.all([
+    readFile(new URL('index.html', directory), 'utf8'),
+    readFile(new URL('studio.js', directory), 'utf8'),
+  ]);
+  const buttonsPosition = html.indexOf('<span>BUTTONS</span>');
+  const headMotionPosition = html.indexOf('<span>HEAD MOTION</span>');
+
+  assert.ok(buttonsPosition >= 0);
+  assert.ok(headMotionPosition > buttonsPosition);
+  assert.doesNotMatch(html.slice(buttonsPosition, headMotionPosition), /GESTURES|data-gesture/u);
+  assert.doesNotMatch(script, /querySelectorAll\('\[data-gesture\]'\)/u);
+});
