@@ -51,10 +51,10 @@ const state = {
 };
 
 const lines = {
-  pet: ['嘿嘿，好痒！', '再摸一下嘛～', 'Momo 最喜欢你啦！', '呼噜呼噜…'],
-  feed: ['曲奇真香！', '嗷呜！还想吃一块。', '谢谢你的投喂！'],
-  play: ['接住啦！', '再来一局！', '看我超级弹跳！'],
-  sleep: ['晚安，做个甜甜的梦…', 'Zzz…云朵是棉花糖。'],
+  pet: ['Hehe, that tickles!', 'One more pat, please!', 'Momo likes you best!', 'Purr, purr…'],
+  feed: ['That cookie smells amazing!', 'Nom! Can I have another?', 'Thanks for the treat!'],
+  play: ['Caught it!', 'One more round!', 'Watch my super jump!'],
+  sleep: ['Good night and sweet dreams…', 'Zzz… the clouds are cotton candy.'],
 };
 const ACTION_TIMING = Object.freeze({
   happy: 1600,
@@ -113,8 +113,8 @@ gm.audio.onState((audioState) => {
     resetTalkButton();
     stopMouthAnimation();
     const detail = audioState.errorCode === 'NO_AUDIO'
-      ? '没有收到声音，再试一次吧。'
-      : `眼镜录音失败：${audioState.message ?? audioState.errorCode ?? '未知错误'}`;
+      ? 'No audio was captured. Please try again.'
+      : `Glasses recording failed: ${audioState.message ?? audioState.errorCode ?? 'Unknown error'}`;
     say(detail);
   }
 });
@@ -124,7 +124,7 @@ gm.audio.onPlaybackState((playback) => {
     showProcessingState();
   } else if (playback.state === 'playing') {
     resetTalkButton();
-    say('Momo 用眼镜听到后学你说：');
+    say('Momo heard you through the glasses and says:');
     startMouthAnimation();
     // Playback completion is authoritative. Keep a generous timeout only as
     // a fallback in case the native host cannot deliver the terminal event.
@@ -143,34 +143,34 @@ gm.audio.onPlaybackState((playback) => {
 
 function resetTalkButton() {
   talkButton.classList.remove('recording', 'processing');
-  talkButton.querySelector('strong').textContent = '按住说话';
+  talkButton.querySelector('strong').textContent = 'Hold to talk';
   pet.classList.remove('listening');
   room.classList.remove('is-listening');
 }
 
 function showListeningState() {
   talkButton.classList.add('recording');
-  talkButton.querySelector('strong').textContent = '松开让我学';
+  talkButton.querySelector('strong').textContent = 'Release to repeat';
   stopMouthAnimation('listening');
   animate('listening');
   setDeviceMood('listening', 15000);
-  say('眼镜耳朵竖起来啦，我在认真听…');
+  say('My glasses ears are up. I am listening…');
 }
 
 function showProcessingState() {
   resetTalkButton();
   talkButton.classList.add('processing');
-  talkButton.querySelector('strong').textContent = '正在变声…';
+  talkButton.querySelector('strong').textContent = 'Changing voice…';
   stopMouthAnimation('idle');
   animate('processing');
   resetDeviceMood();
-  say('Momo 正在把你的声音变可爱…');
+  say('Momo is making your voice extra cute…');
 }
 
 function showNativeAudioError(error) {
   resetTalkButton();
   stopMouthAnimation();
-  say(`眼镜音频暂时用不了：${error?.message ?? error?.errorCode ?? '未知错误'}`);
+  say(`Glasses audio is temporarily unavailable: ${error?.message ?? error?.errorCode ?? 'Unknown error'}`);
 }
 
 function ensureNativeAudioConfigured() {
@@ -375,7 +375,7 @@ function perform(action) {
       room.classList.add('is-play-caught');
       burst('★', tired ? 7 : 12, 'play');
     }, ACTION_TIMING.playCatch);
-    say(tired ? '虽然有点累，也要接住这一球！呼～' : randomLine(action));
+    say(tired ? 'I am a little tired, but I will still catch it! Whew!' : randomLine(action));
     return;
   } else if (action === 'sleep') {
     setPetVisual('sleeping');
@@ -542,17 +542,17 @@ function renderDeviceFrame() {
   deviceContext.lineWidth = 1;
   deviceContext.beginPath(); deviceContext.moveTo(18, 40); deviceContext.lineTo(582, 40); deviceContext.stroke();
   drawDeviceMomo();
-  deviceText(deviceMood === 'idle' ? 'Momo 正在等你' : {
-    happy: '好舒服！', eating: '正在吃曲奇', playing: '一起玩吧！', sleeping: '正在做美梦', talking: 'Momo 学你说话', listening: 'Momo 在听…'
-  }[deviceMood] ?? 'Momo 很开心', 448, 78, 21, 15, 700, 'center');
-  drawDeviceBar('快乐', state.happy, 130, 15);
-  drawDeviceBar('饱腹', state.food, 180, 11);
-  drawDeviceBar('能量', state.energy, 230, 8);
+  deviceText(deviceMood === 'idle' ? 'Momo is waiting' : {
+    happy: 'That feels great!', eating: 'Eating a cookie', playing: 'Let us play!', sleeping: 'Sweet dreams', talking: 'Momo repeats you', listening: 'Momo is listening…'
+  }[deviceMood] ?? 'Momo is happy', 448, 78, 21, 15, 700, 'center');
+  drawDeviceBar('HAPPY', state.happy, 130, 15);
+  drawDeviceBar('FULL', state.food, 180, 11);
+  drawDeviceBar('ENERGY', state.energy, 230, 8);
   deviceRoundRect(310, 267, 272, 45, 12, 6, 2);
-  deviceText('手机控制：喂食 · 玩耍 · 睡觉', 446, 290, 14, 11, 600, 'center');
+  deviceText('PHONE: FEED · PLAY · SLEEP', 446, 290, 14, 11, 600, 'center');
   deviceContext.strokeStyle = gray(4);
   deviceContext.beginPath(); deviceContext.moveTo(18, 324); deviceContext.lineTo(582, 324); deviceContext.stroke();
-  deviceText('单击 摸摸   双击 喂食', 300, 338, 11, 7, 500, 'center');
+  deviceText('SINGLE: PET   DOUBLE: FEED', 300, 338, 11, 7, 500, 'center');
 }
 
 function deviceGray4Bytes() {
@@ -587,7 +587,7 @@ function deviceBytesToBase64(bytes) {
 
 async function syncToGlasses(announce = false) {
   if (!glassesConnected) {
-    if (announce) say('请先连接眼镜并运行 Momo 原生插件。');
+    if (announce) say('Connect the glasses and run the native Momo plugin first.');
     return;
   }
   if (glassesSyncInFlight) {
@@ -598,10 +598,10 @@ async function syncToGlasses(announce = false) {
   syncButton.disabled = true;
   try {
     await gm.plugin.sendMessage(PET_STATE_CHANNEL, encodePetState(deviceMood, state));
-    if (announce) say('Momo 的状态已经同步到眼镜啦！');
+    if (announce) say("Momo's status is now synced to the glasses!");
   } catch (error) {
-    status.textContent = `眼镜同步失败 · ${error.message}`;
-    if (announce) say(`同步失败：${error.message}`);
+    status.textContent = `Glasses sync failed · ${error.message}`;
+    if (announce) say(`Sync failed: ${error.message}`);
   } finally {
     glassesSyncInFlight = false;
     syncButton.disabled = false;
@@ -643,7 +643,7 @@ async function startRecording(event) {
   }
   if (recorder?.state === 'recording') return;
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-    say('当前浏览器不支持录音，可以摸摸我！');
+    say('This browser cannot record audio, but you can still pet me!');
     return;
   }
   try {
@@ -661,11 +661,11 @@ async function startRecording(event) {
     recorder.start();
     showListeningState();
     setDeviceMood('listening', 6000);
-    say('耳朵竖起来啦，我在认真听…');
+    say('My ears are up. I am listening…');
     recordingTimer = window.setTimeout(stopRecording, 5000);
   } catch (error) {
     stopMouthAnimation();
-    say(error.name === 'NotAllowedError' ? '需要麦克风权限才能学你说话。' : '麦克风暂时用不了。');
+    say(error.name === 'NotAllowedError' ? 'Microphone permission is required so I can repeat you.' : 'The microphone is temporarily unavailable.');
   }
 }
 
@@ -715,7 +715,7 @@ function repeatRecording() {
   audio.preservesPitch = false;
   audio.addEventListener('play', () => {
     resetTalkButton();
-    say('Momo 学你说：');
+    say('Momo repeats:');
     startMouthAnimation();
     animate('talking', Math.max(800, (audio.duration || 2) * 770));
     setDeviceMood('talking', Math.max(800, (audio.duration || 2) * 770));
@@ -729,7 +729,7 @@ function repeatRecording() {
   audio.play().catch(() => {
     stopMouthAnimation();
     resetDeviceMood();
-    say('点一下屏幕后再让我学说话吧。');
+    say('Tap the screen once, then let me repeat you.');
   });
   change({ happy: 10, energy: -2 }, 15);
 }
@@ -774,20 +774,20 @@ async function initialize() {
     gm.device.onConnection((event) => {
       glassesConnected = event.connected;
       connectionDot.classList.toggle('connected', event.connected);
-      status.textContent = event.connected ? '眼镜已连接 · 原生 Momo 动画已就绪' : '眼镜已断开 · 手机端仍可玩';
+      status.textContent = event.connected ? 'Glasses connected · Native Momo animation ready' : 'Glasses disconnected · Phone play remains available';
       if (event.connected) scheduleGlassesSync();
     });
     await gm.device.subscribeEvents(['button', 'connection']);
     const deviceInfo = await gm.device.getInfo();
     glassesConnected = deviceInfo.connected;
     connectionDot.classList.toggle('connected', glassesConnected);
-    const audioMode = nativeAudioAvailable ? '眼镜麦克风已就绪' : '使用手机麦克风';
+    const audioMode = nativeAudioAvailable ? 'Glasses microphone ready' : 'Using phone microphone';
     status.textContent = glassesConnected
-      ? `Momo 原生插件已就绪 · ${audioMode}`
-      : `Momo 原生插件已就绪 · ${audioMode} · 等待眼镜连接`;
+      ? `Native Momo plugin ready · ${audioMode}`
+      : `Native Momo plugin ready · ${audioMode} · Waiting for glasses`;
     if (glassesConnected) await syncToGlasses();
   } catch (error) {
-    status.textContent = `独立试玩模式 · ${error.code ?? 'Bridge 未连接'}`;
+    status.textContent = `Standalone demo mode · ${error.code ?? 'Bridge disconnected'}`;
   }
 
   decayTimer = window.setInterval(() => {

@@ -282,13 +282,13 @@ export function parseStoredGame(value: unknown): GameState {
 
 export function resultText(result: GameResult): string {
   switch (result) {
-    case 'playing': return '轮到你落子';
-    case 'playerWon': return '你赢了！';
-    case 'computerWon': return '你输了！';
-    case 'draw': return '打平了！';
+    case 'playing': return 'Your turn';
+    case 'playerWon': return 'You won!';
+    case 'computerWon': return 'You lost!';
+    case 'draw': return 'Draw!';
   }
 }
 
 export function positionName(index: number): string {
-  return ['左上', '上中', '右上', '左中', '中间', '右中', '左下', '下中', '右下'][index] ?? '未知';
+  return ['top left', 'top center', 'top right', 'middle left', 'center', 'middle right', 'bottom left', 'bottom center', 'bottom right'][index] ?? 'unknown';
 }

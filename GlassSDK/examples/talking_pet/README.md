@@ -1,4 +1,4 @@
-# Momo Talking Pet bridge
+# Momo Talking Pet
 
 This device example is the native companion for the WebSDK `talking-pet`
 example. It draws only the center playroom and character through the native
@@ -49,13 +49,13 @@ The checked-in `momo_sprites.h` is reproducible from the transparent sprite
 sheet when Pillow is installed:
 
 ```sh
-python3 examples/talking_pet_bridge/build_sprites.py
+python3 examples/talking_pet/build_sprites.py
 ```
 
 Build it from `GlassSDK`:
 
 ```sh
-./gm-build build --example talking_pet_bridge
+./gm-build build --example talking_pet
 ```
 
-The output is `build-host/talking_pet_bridge/talking_pet_bridge.gmp`.
+The output is `build-host/talking_pet/talking_pet.gmp`.

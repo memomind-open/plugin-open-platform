@@ -6,15 +6,15 @@ const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const W = 600;
 const H = 350;
 const APPS = ['weather', 'typhoon', 'calculator', 'focus', 'clock', 'memo'];
-const APP_LABELS = { home: '桌面', weather: '天气', typhoon: '台风', calculator: '计算器', focus: '专注', clock: '世界时钟', memo: '便签' };
+const APP_LABELS = { home: 'Home', weather: 'Weather', typhoon: 'Cyclones', calculator: 'Calculator', focus: 'Focus', clock: 'World Clock', memo: 'Memo' };
 const WEATHER = {
-  0: ['晴朗', 'sun'], 1: ['大部晴朗', 'sun'], 2: ['局部多云', 'cloud'], 3: ['阴天', 'cloud'],
-  45: ['有雾', 'fog'], 48: ['雾凇', 'fog'], 51: ['小雨', 'rain'], 53: ['毛毛雨', 'rain'], 55: ['较强毛雨', 'rain'],
-  61: ['小雨', 'rain'], 63: ['中雨', 'rain'], 65: ['大雨', 'rain'], 71: ['小雪', 'snow'], 73: ['中雪', 'snow'], 75: ['大雪', 'snow'],
-  80: ['阵雨', 'rain'], 81: ['较强阵雨', 'rain'], 82: ['强阵雨', 'rain'], 95: ['雷雨', 'storm'], 96: ['雷雨冰雹', 'storm'], 99: ['强雷雨', 'storm']
+  0: ['Clear', 'sun'], 1: ['Mostly clear', 'sun'], 2: ['Partly cloudy', 'cloud'], 3: ['Overcast', 'cloud'],
+  45: ['Fog', 'fog'], 48: ['Rime fog', 'fog'], 51: ['Light drizzle', 'rain'], 53: ['Drizzle', 'rain'], 55: ['Heavy drizzle', 'rain'],
+  61: ['Light rain', 'rain'], 63: ['Rain', 'rain'], 65: ['Heavy rain', 'rain'], 71: ['Light snow', 'snow'], 73: ['Snow', 'snow'], 75: ['Heavy snow', 'snow'],
+  80: ['Showers', 'rain'], 81: ['Heavy showers', 'rain'], 82: ['Severe showers', 'rain'], 95: ['Thunderstorm', 'storm'], 96: ['Thunderstorm with hail', 'storm'], 99: ['Severe thunderstorm', 'storm']
 };
 const CALC_KEYS = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', 'C', '0', '.', '+', '⌫', '±', '%', '='];
-const CLOCKS = [['上海', 'Asia/Shanghai'], ['东京', 'Asia/Tokyo'], ['伦敦', 'Europe/London'], ['纽约', 'America/New_York']];
+const CLOCKS = [['Shanghai', 'Asia/Shanghai'], ['Tokyo', 'Asia/Tokyo'], ['London', 'Europe/London'], ['New York', 'America/New_York']];
 
 let gm;
 let bridgeReady = false;
@@ -36,8 +36,8 @@ let calcIndex = 0;
 let clockIndex = 0;
 let weather = null;
 let storms = [];
-let place = { name: '上海', latitude: 31.2304, longitude: 121.4737 };
-let memo = '今天也要保持好奇。\n\n双击设备按键可随时返回桌面。';
+let place = { name: 'Shanghai', latitude: 31.2304, longitude: 121.4737 };
+let memo = 'Stay curious today.\n\nDouble-click the device button to return home at any time.';
 let calc = { display: '0', left: null, op: null, waiting: false, expression: '' };
 let focusMinutes = 25;
 let focusRemaining = 25 * 60;
@@ -151,7 +151,7 @@ function clearScreen() {
 }
 
 function drawHeader(title) {
-  text('◌  浮光 OS', 18, 18, 13, 12, 650);
+  text('◌  GLOW OS', 18, 18, 13, 12, 650);
   text(title, 300, 18, 13, 8, 550, 'center');
   const now = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
   text(now, 554, 18, 13, 13, 650, 'right');
@@ -160,15 +160,15 @@ function drawHeader(title) {
   line(16, 36, 584, 36, 3, 1);
 }
 
-function drawFooter(hint = '← → 选择     单击 确认     双击 桌面') {
+function drawFooter(hint = '← → SELECT     CLICK CONFIRM     DOUBLE HOME') {
   line(16, 328, 584, 328, 3, 1);
   text(hint, 300, 340, 10, 7, 500, 'center');
 }
 
-function getWeatherInfo(code) { return WEATHER[code] || ['天气变化', 'cloud']; }
+function getWeatherInfo(code) { return WEATHER[code] || ['Changing weather', 'cloud']; }
 
 function renderHome() {
-  drawHeader('桌面');
+  drawHeader('HOME');
   fillRoundRect(18, 48, 156, 112, 16, 2);
   strokeRoundRect(18, 48, 156, 112, 16, 5);
   const now = new Date();
@@ -183,11 +183,11 @@ function renderHome() {
     text(`${Math.round(weather.current.temperature_2m)}°`, 266, 86, 37, 15, 650);
     text(label, 269, 119, 13, 10, 550);
     text(place.name, 552, 70, 14, 12, 650, 'right');
-    text(`体感 ${Math.round(weather.current.apparent_temperature)}°`, 552, 97, 12, 8, 500, 'right');
-    text(`湿度 ${weather.current.relative_humidity_2m}%  风 ${Math.round(weather.current.wind_speed_10m)}km/h`, 552, 124, 11, 7, 500, 'right');
+    text(`FEELS ${Math.round(weather.current.apparent_temperature)}°`, 552, 97, 12, 8, 500, 'right');
+    text(`HUMIDITY ${weather.current.relative_humidity_2m}%  WIND ${Math.round(weather.current.wind_speed_10m)}km/h`, 552, 124, 11, 7, 500, 'right');
   } else {
     drawIcon('cloud', 225, 98, 42, 7);
-    text('天气载入中', 268, 91, 22, 12, 600);
+    text('LOADING WEATHER', 268, 91, 22, 12, 600);
     text(place.name, 268, 121, 12, 7);
   }
 
@@ -203,15 +203,15 @@ function renderHome() {
       : APPS[i];
     drawIcon(appIcon, x + cardW / 2, 218, 35, selected ? 15 : 10);
     text(APP_LABELS[APPS[i]], x + cardW / 2, 263, 13, selected ? 15 : 10, 600, 'center');
-    const sub = APPS[i] === 'weather' ? '预报' : APPS[i] === 'typhoon' ? `${storms.length} 活跃` : APPS[i] === 'calculator' ? '计算' : APPS[i] === 'focus' ? `${focusMinutes} 分` : APPS[i] === 'clock' ? '四地' : '速记';
+    const sub = APPS[i] === 'weather' ? 'FORECAST' : APPS[i] === 'typhoon' ? `${storms.length} ACTIVE` : APPS[i] === 'calculator' ? 'CALCULATE' : APPS[i] === 'focus' ? `${focusMinutes} MIN` : APPS[i] === 'clock' ? '4 CITIES' : 'QUICK NOTE';
     text(sub, x + cardW / 2, 286, 10, selected ? 11 : 6, 500, 'center');
     if (selected) { fillRoundRect(x + 31, 302, 26, 3, 2, 14); }
   }
-  drawFooter('← → 选择     ↑ ↓ 跳转     单击 打开');
+  drawFooter('← → SELECT     ↑ ↓ JUMP     CLICK OPEN');
 }
 
 function renderWeather() {
-  drawHeader('天气');
+  drawHeader('WEATHER');
   const current = weather?.current;
   const [label, icon] = getWeatherInfo(current?.weather_code);
   fillRoundRect(18, 49, 188, 155, 16, 2);
@@ -220,11 +220,11 @@ function renderWeather() {
   text(current ? `${Math.round(current.temperature_2m)}°` : '--°', 102, 86, 43, 15, 650);
   text(label, 35, 139, 17, 12, 600);
   text(place.name, 35, 169, 12, 8);
-  if (current) text(`体感 ${Math.round(current.apparent_temperature)}°  湿度 ${current.relative_humidity_2m}%`, 35, 190, 11, 7);
+  if (current) text(`FEELS ${Math.round(current.apparent_temperature)}°  HUMIDITY ${current.relative_humidity_2m}%`, 35, 190, 11, 7);
 
   fillRoundRect(218, 49, 364, 155, 16, 1);
   strokeRoundRect(218, 49, 364, 155, 16, 4);
-  text('未来 6 小时', 238, 67, 11, 8, 600);
+  text('NEXT 6 HOURS', 238, 67, 11, 8, 600);
   if (weather?.hourly) {
     const start = Math.max(0, weather.hourly.time.findIndex((item) => new Date(item) >= new Date())) + weatherOffset;
     const temps = weather.hourly.temperature_2m.slice(start, start + 6);
@@ -240,12 +240,12 @@ function renderWeather() {
       if (i) line(points[i - 1][0], points[i - 1][1], x, y, 10, 2);
       ctx.fillStyle = shade(i === 0 ? 15 : 10); ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
     });
-  } else text('正在获取预报…', 400, 126, 17, 8, 500, 'center');
+  } else text('FETCHING FORECAST…', 400, 126, 17, 8, 500, 'center');
 
   const metrics = [
-    ['降水', weather?.hourly ? `${weather.hourly.precipitation_probability[Math.max(0, weather.hourly.time.findIndex((item) => new Date(item) >= new Date()))]}%` : '--'],
-    ['风速', current ? `${Math.round(current.wind_speed_10m)} km/h` : '--'],
-    ['湿度', current ? `${current.relative_humidity_2m}%` : '--']
+    ['RAIN', weather?.hourly ? `${weather.hourly.precipitation_probability[Math.max(0, weather.hourly.time.findIndex((item) => new Date(item) >= new Date()))]}%` : '--'],
+    ['WIND', current ? `${Math.round(current.wind_speed_10m)} km/h` : '--'],
+    ['HUMIDITY', current ? `${current.relative_humidity_2m}%` : '--']
   ];
   metrics.forEach(([name, value], i) => {
     const x = 18 + i * 194;
@@ -255,31 +255,31 @@ function renderWeather() {
     text(value, x + 16, 276, 22, 14, 650);
     fillRoundRect(x + 16, 296, Math.min(145, i === 0 ? Number.parseInt(value, 10) * 1.45 || 10 : i === 1 ? 90 : 112), 4, 2, 9);
   });
-  drawFooter('← → 时间轴     长按 刷新     双击 桌面');
+  drawFooter('← → TIMELINE     HOLD REFRESH     DOUBLE HOME');
 }
 
 function renderTyphoon() {
-  drawHeader('全球台风');
+  drawHeader('GLOBAL CYCLONES');
   if (!storms.length) {
     drawIcon('typhoon', 300, 126, 84, 11);
-    text('当前没有活跃热带气旋', 300, 209, 24, 14, 650, 'center');
-    text('数据来源 GDACS · 长按刷新', 300, 246, 12, 7, 500, 'center');
-    drawFooter('长按 刷新     双击 桌面');
+    text('NO ACTIVE TROPICAL CYCLONES', 300, 209, 24, 14, 650, 'center');
+    text('SOURCE: GDACS · HOLD TO REFRESH', 300, 246, 12, 7, 500, 'center');
+    drawFooter('HOLD REFRESH     DOUBLE HOME');
     return;
   }
   const storm = storms[stormIndex % storms.length];
   fillRoundRect(18, 49, 340, 264, 16, 1);
   strokeRoundRect(18, 49, 340, 264, 16, 5);
-  text(`活跃系统 ${stormIndex + 1} / ${storms.length}`, 38, 73, 11, 7, 600);
+  text(`ACTIVE SYSTEM ${stormIndex + 1} / ${storms.length}`, 38, 73, 11, 7, 600);
   fitText(storm.eventname || storm.name, 38, 109, 280, 28, 15, 650);
   fillRoundRect(38, 132, 88, 24, 12, storm.alertlevel === 'Red' ? 12 : storm.alertlevel === 'Orange' ? 8 : 5);
-  text(`${storm.alertlevel || 'Green'} 警报`, 82, 144, 10, 15, 650, 'center');
-  text(storm.country || '开放海域', 38, 181, 14, 11, 550);
-  const point = Array.isArray(storm.coordinates) ? `${Number(storm.coordinates[1]).toFixed(1)}°, ${Number(storm.coordinates[0]).toFixed(1)}°` : '位置更新中';
-  text(`坐标  ${point}`, 38, 214, 12, 8);
-  text(`来源  ${storm.source || 'GDACS'}`, 38, 241, 12, 8);
-  text(`更新  ${new Date(storm.datemodified).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 38, 268, 12, 8);
-  text('信息仅供参考，请以当地官方预警为准', 38, 296, 10, 6);
+  text(`${storm.alertlevel || 'Green'} ALERT`, 82, 144, 10, 15, 650, 'center');
+  text(storm.country || 'OPEN OCEAN', 38, 181, 14, 11, 550);
+  const point = Array.isArray(storm.coordinates) ? `${Number(storm.coordinates[1]).toFixed(1)}°, ${Number(storm.coordinates[0]).toFixed(1)}°` : 'LOCATION UPDATING';
+  text(`COORDS  ${point}`, 38, 214, 12, 8);
+  text(`SOURCE  ${storm.source || 'GDACS'}`, 38, 241, 12, 8);
+  text(`UPDATED  ${new Date(storm.datemodified).toLocaleString('en-US', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 38, 268, 12, 8);
+  text('FOR REFERENCE ONLY · FOLLOW LOCAL OFFICIAL ALERTS', 38, 296, 10, 6);
 
   fillRoundRect(370, 49, 212, 264, 16, 1);
   strokeRoundRect(370, 49, 212, 264, 16, 4);
@@ -287,12 +287,12 @@ function renderTyphoon() {
   line(390, 170, 562, 170, 3); line(476, 84, 476, 256, 3);
   drawIcon('typhoon', 476, 170, 70, 14);
   ctx.fillStyle = shade(14); ctx.beginPath(); ctx.arc(476, 170, 4, 0, Math.PI * 2); ctx.fill();
-  text('热带气旋定位', 476, 281, 11, 8, 550, 'center');
-  drawFooter('↑ ↓ 切换系统     长按 刷新     双击 桌面');
+  text('CYCLONE LOCATION', 476, 281, 11, 8, 550, 'center');
+  drawFooter('↑ ↓ SWITCH     HOLD REFRESH     DOUBLE HOME');
 }
 
 function renderCalculator() {
-  drawHeader('计算器');
+  drawHeader('CALCULATOR');
   fillRoundRect(18, 48, 564, 62, 14, 2);
   strokeRoundRect(18, 48, 564, 62, 14, 5);
   fitText(calc.expression, 36, 65, 300, 11, 7, 500);
@@ -310,11 +310,11 @@ function renderCalculator() {
     strokeRoundRect(x, y, keyW, keyH, 9, selected ? 15 : 4, selected ? 2 : 1);
     text(key, x + keyW / 2, y + keyH / 2 + 1, 16, selected ? 0 : 13, 650, 'center');
   });
-  drawFooter('← → ↑ ↓ 选键     单击 输入     长按 清除');
+  drawFooter('ARROWS SELECT     CLICK INPUT     HOLD CLEAR');
 }
 
 function renderFocus() {
-  drawHeader('专注');
+  drawHeader('FOCUS');
   const total = focusMinutes * 60;
   const visualElapsed = Math.floor((total - focusRemaining) / 5) * 5;
   const progress = total ? visualElapsed / total : 0;
@@ -324,18 +324,18 @@ function renderFocus() {
   const mm = String(Math.floor(focusRemaining / 60)).padStart(2, '0');
   const ss = String(focusRemaining % 60).padStart(2, '0');
   text(`${mm}:${ss}`, focusCenterX, 145, 36, 15, 650, 'center');
-  text(focusRunning ? '正在专注' : '等待开始', focusCenterX, 205, 12, focusRunning ? 12 : 7, 550, 'center');
+  text(focusRunning ? 'FOCUSING' : 'READY', focusCenterX, 205, 12, focusRunning ? 12 : 7, 550, 'center');
   fillRoundRect(314, 61, 268, 79, 14, 1); strokeRoundRect(314, 61, 268, 79, 14, 4);
-  text('当前模式', 332, 82, 10, 7); text(`${focusMinutes} 分钟`, 332, 113, 22, 14, 650);
+  text('CURRENT MODE', 332, 82, 10, 7); text(`${focusMinutes} MINUTES`, 332, 113, 22, 14, 650);
   fillRoundRect(314, 153, 268, 79, 14, focusRunning ? 4 : 1); strokeRoundRect(314, 153, 268, 79, 14, focusRunning ? 13 : 4);
-  text(focusRunning ? '单击暂停' : '单击开始', 332, 177, 11, 8); text(focusRunning ? '保持节奏' : '进入心流', 332, 207, 21, 14, 650);
+  text(focusRunning ? 'CLICK TO PAUSE' : 'CLICK TO START', 332, 177, 11, 8); text(focusRunning ? 'KEEP THE RHYTHM' : 'ENTER THE FLOW', 332, 207, 21, 14, 650);
   fillRoundRect(314, 245, 268, 68, 14, 1); strokeRoundRect(314, 245, 268, 68, 14, 4);
-  text('← → 切换  25 / 5 / 50 分钟', 332, 279, 12, 9, 550);
-  drawFooter('← → 时长     单击 开始/暂停     长按 重置');
+  text('← → SWITCH  25 / 5 / 50 MIN', 332, 279, 12, 9, 550);
+  drawFooter('← → DURATION     CLICK START/PAUSE     HOLD RESET');
 }
 
 function renderClock() {
-  drawHeader('世界时钟');
+  drawHeader('WORLD CLOCK');
   CLOCKS.forEach(([name, zone], index) => {
     const col = index % 2;
     const row = Math.floor(index / 2);
@@ -350,13 +350,13 @@ function renderClock() {
     text(time, x + 18, y + 84, 30, selected ? 15 : 12, 650);
     text(new Date().toLocaleDateString('zh-CN', { timeZone: zone, month: 'numeric', day: 'numeric', weekday: 'short' }), x + 255, y + 87, 11, 7, 500, 'right');
   });
-  drawFooter('← → ↑ ↓ 选择城市     双击 桌面');
+  drawFooter('ARROWS SELECT CITY     DOUBLE HOME');
 }
 
 function wrapText(value, maxWidth, maxLines = 7) {
   font(17, 500);
   const lines = [];
-  for (const paragraph of String(value || '暂无便签').split('\n')) {
+  for (const paragraph of String(value || 'NO MEMO YET').split('\n')) {
     let current = '';
     for (const char of paragraph || ' ') {
       if (ctx.measureText(current + char).width > maxWidth && current) { lines.push(current); current = char; } else current += char;
@@ -370,7 +370,7 @@ function wrapText(value, maxWidth, maxLines = 7) {
 }
 
 function renderMemo() {
-  drawHeader('便签');
+  drawHeader('MEMO');
   fillRoundRect(18, 49, 564, 264, 16, 1);
   strokeRoundRect(18, 49, 564, 264, 16, 5);
   drawIcon('memo', 52, 81, 28, 12);
@@ -378,7 +378,7 @@ function renderMemo() {
   line(38, 104, 562, 104, 3);
   const lines = wrapText(memo, 505, 7);
   lines.forEach((item, index) => text(item, 43, 132 + index * 28, 17, index === 0 ? 15 : 11, index === 0 ? 600 : 500));
-  drawFooter('在手机控制台编辑内容     双击 桌面');
+  drawFooter('EDIT ON PHONE CONSOLE     DOUBLE HOME');
 }
 
 function renderDevice() {
@@ -678,8 +678,8 @@ function activateSelection() {
 
 function longAction() {
   if (screen === 'home') setScreen('weather');
-  else if (screen === 'weather') { toast('正在刷新天气'); void fetchWeather(); }
-  else if (screen === 'typhoon') { toast('正在刷新台风数据'); void fetchStorms(); }
+  else if (screen === 'weather') { toast('Refreshing weather'); void fetchWeather(); }
+  else if (screen === 'typhoon') { toast('Refreshing cyclone data'); void fetchStorms(); }
   else if (screen === 'calculator') { calc = { display: '0', left: null, op: null, waiting: false, expression: '' }; requestRender(); }
   else if (screen === 'focus') resetFocus();
   else requestRender();
@@ -706,7 +706,7 @@ function calculate() {
   const result = calc.op === '+' ? calc.left + right : calc.op === '-' ? calc.left - right : calc.op === '*' ? calc.left * right : right === 0 ? NaN : calc.left / right;
   const symbol = calc.op === '*' ? '×' : calc.op === '/' ? '÷' : calc.op;
   calc.expression = `${calc.left} ${symbol} ${right} =`;
-  calc.display = Number.isFinite(result) ? String(Number(result.toPrecision(12))) : '无法计算';
+  calc.display = Number.isFinite(result) ? String(Number(result.toPrecision(12))) : 'ERROR';
   calc.left = null; calc.op = null; calc.waiting = true;
 }
 
@@ -718,7 +718,7 @@ function toggleFocus() {
     focusTimer = setInterval(() => {
       focusRemaining = Math.max(0, Math.ceil((focusEndsAt - Date.now()) / 1000));
       if (screen === 'focus') requestRender();
-      if (!focusRemaining) { focusRunning = false; clearInterval(focusTimer); toast('专注完成'); requestRender(); }
+      if (!focusRemaining) { focusRunning = false; clearInterval(focusTimer); toast('Focus session complete'); requestRender(); }
     }, 1000);
   }
   requestRender();
@@ -762,7 +762,7 @@ async function fetchWeather() {
     if (cache?.weather) { weather = cache.weather; place = cache.place || place; }
   }
   $('#cityInput').value = place.name;
-  $('#dataState').textContent = weather ? `天气已更新 · ${place.name}` : '天气暂不可用';
+  $('#dataState').textContent = weather ? `Weather updated · ${place.name}` : 'Weather unavailable';
   if (screen === 'home' || screen === 'weather') requestRender();
 }
 
@@ -786,14 +786,14 @@ async function fetchStorms() {
     storms = cache?.storms || [];
   }
   stormIndex = Math.min(stormIndex, Math.max(0, storms.length - 1));
-  $('#dataState').textContent = `${weather ? `天气已更新 · ${place.name}` : '天气暂不可用'} · ${storms.length} 个活跃气旋`;
+  $('#dataState').textContent = `${weather ? `Weather updated · ${place.name}` : 'Weather unavailable'} · ${storms.length} active cyclones`;
   if (screen === 'home' || screen === 'typhoon') requestRender();
 }
 
 async function updateCity(query) {
   if (!query.trim()) return;
   try {
-    $('#saveState').textContent = '正在查询…';
+    $('#saveState').textContent = 'Searching…';
     const params = new URLSearchParams({ name: query.trim(), count: '5', language: 'zh', format: 'json' });
     const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params}`);
     const data = await response.json();
@@ -802,9 +802,9 @@ async function updateCity(query) {
     place = { name: result.name, latitude: result.latitude, longitude: result.longitude, country: result.country };
     await storageSet('weather-place', place);
     await fetchWeather();
-    $('#saveState').textContent = '已保存';
-    toast(`设备天气已切换到${place.name}`);
-  } catch { $('#saveState').textContent = '查询失败'; toast('没有找到这个城市'); }
+    $('#saveState').textContent = 'Saved';
+    toast(`Device weather changed to ${place.name}`);
+  } catch { $('#saveState').textContent = 'Search failed'; toast('City not found'); }
 }
 
 function toast(message) {
@@ -829,7 +829,7 @@ async function initializeBridge() {
     $('#cityInput').value = place.name;
     $('#memoInput').value = memo;
     $('#deviceState').classList.add('ready');
-    $('#deviceState span').textContent = '设备已就绪';
+    $('#deviceState span').textContent = 'Device ready';
     gm.device.onButton((event) => {
       if (event.action === 'single') activateSelection();
       else if (event.action === 'double') setScreen('home');
@@ -849,27 +849,27 @@ async function initializeBridge() {
       pageCreated = false;
       presentedTiles = new Map();
       $('#deviceState').classList.toggle('ready', event.connected);
-      $('#deviceState span').textContent = event.connected ? '设备已就绪' : '设备已断开';
+      $('#deviceState span').textContent = event.connected ? 'Device ready' : 'Device disconnected';
       if (event.connected) requestRender();
     });
     await gm.device.subscribeEvents(['button', 'imuGesture', 'connection']);
     requestRender();
   } catch (error) {
-    $('#deviceState span').textContent = '仅配置模式';
+    $('#deviceState span').textContent = 'Configuration only';
     console.warn('GM Bridge unavailable', error);
   }
 }
 
-$('#wakeDevice').addEventListener('click', () => { setScreen('home'); toast('设备桌面已点亮'); });
+$('#wakeDevice').addEventListener('click', () => { setScreen('home'); toast('Device desktop is awake'); });
 $('#cityForm').addEventListener('submit', (event) => { event.preventDefault(); void updateCity($('#cityInput').value); });
 let memoTimer;
 $('#memoInput').addEventListener('input', (event) => {
   memo = event.target.value;
-  $('#saveState').textContent = '正在保存…';
+  $('#saveState').textContent = 'Saving…';
   clearTimeout(memoTimer);
   memoTimer = setTimeout(async () => {
     await storageSet('memo', memo);
-    $('#saveState').textContent = '已保存';
+    $('#saveState').textContent = 'Saved';
     if (screen === 'memo') requestRender();
   }, 400);
 });

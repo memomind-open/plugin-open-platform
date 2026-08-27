@@ -46,7 +46,7 @@ Happiness, fullness, and energy each decay by one point every three seconds whil
 the plugin is open; interactions raise or lower them and immediately sync the
 new state to the glasses.
 
-The dedicated `talking_pet_bridge` glasses example renders Momo through its
+The dedicated `talking_pet` glasses example renders Momo through its
 native GRAY4 framebuffer and overlays its text using native LVGL labels. The
 Web plugin sends only a seven-byte state packet; it never sends a bitmap. Eight
 embedded poses let the glasses animate idle

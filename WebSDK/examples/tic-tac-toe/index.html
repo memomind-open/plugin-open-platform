@@ -7,60 +7,60 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; font-src 'self'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'"
     >
-    <title>中文井字棋</title>
+    <title>Tic-Tac-Toe</title>
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
     <main class="shell">
       <header>
-        <p class="eyebrow">APHRODITE WEB 插件</p>
-        <h1>中文井字棋</h1>
-        <p id="bridge-status" class="bridge-status">正在连接 App…</p>
+        <p class="eyebrow">APHRODITE WEB PLUGIN</p>
+        <h1>Tic-Tac-Toe</h1>
+        <p id="bridge-status" class="bridge-status">Connecting to App…</p>
       </header>
 
       <div class="game-layout">
-        <aside class="guide-panel" aria-label="游戏规则">
+        <aside class="guide-panel" aria-label="Game rules">
           <div>
-            <p class="panel-label">游戏规则</p>
-            <h2>三枚连成一线即可获胜</h2>
-            <p>玩家使用 <strong>叉 X</strong>，电脑使用 <strong>圈 O</strong>，每局由玩家先手。</p>
+            <p class="panel-label">GAME RULES</p>
+            <h2>Get three in a row to win</h2>
+            <p>You play <strong>X</strong>, the computer plays <strong>O</strong>, and you move first.</p>
           </div>
           <dl class="controls-list">
-            <div><dt>抬头 / 低头</dt><dd>向上 / 向下移动</dd></div>
-            <div><dt>向左转头 / 向右转头</dt><dd>向左 / 向右移动</dd></div>
-            <div><dt>单击主按钮</dt><dd>在选中格落子</dd></div>
-            <div><dt>双击主按钮</dt><dd>随时重新开始</dd></div>
+            <div><dt>Look up / down</dt><dd>Move up / down</dd></div>
+            <div><dt>Turn head left / right</dt><dd>Move left / right</dd></div>
+            <div><dt>Single-click main button</dt><dd>Place a mark in the selected cell</dd></div>
+            <div><dt>Double-click main button</dt><dd>Restart at any time</dd></div>
           </dl>
-          <section class="input-monitor" aria-label="设备输入诊断" aria-live="polite">
-            <p class="panel-label">设备输入诊断</p>
-            <p><span>最近指令</span><strong id="last-command">暂未收到设备指令</strong></p>
-            <p><span>处理结果</span><strong id="last-operation">等待操作</strong></p>
+          <section class="input-monitor" aria-label="Device input diagnostics" aria-live="polite">
+            <p class="panel-label">DEVICE INPUT</p>
+            <p><span>Latest command</span><strong id="last-command">No device command received</strong></p>
+            <p><span>Result</span><strong id="last-operation">Waiting for input</strong></p>
           </section>
-          <p class="guide-tip">发亮方框表示当前选中的空格。你和电脑轮流落子，横、竖或斜线率先连成三个棋子的一方获胜。</p>
+          <p class="guide-tip">The glowing frame marks the selected empty cell. You and the computer take turns; the first to connect three horizontally, vertically, or diagonally wins.</p>
         </aside>
 
         <section id="game-card" class="game-card" aria-labelledby="game-status">
-          <p class="panel-label">当前棋局</p>
-          <p id="game-status" class="game-status" aria-live="assertive">轮到你落子</p>
+          <p class="panel-label">CURRENT GAME</p>
+          <p id="game-status" class="game-status" aria-live="assertive">Your turn</p>
           <div class="board-stage">
-            <div id="board" class="board" role="grid" aria-label="井字棋棋盘"></div>
+            <div id="board" class="board" role="grid" aria-label="Tic-tac-toe board"></div>
             <div id="result-overlay" class="result-overlay" role="status" aria-live="assertive" hidden>
-              <span class="result-label">本局结束</span>
-              <strong id="result-title">你赢了！</strong>
-              <span>双击主按钮重新开始</span>
+              <span class="result-label">GAME OVER</span>
+              <strong id="result-title">You won!</strong>
+              <span>Double-click the main button to restart</span>
             </div>
           </div>
-          <p id="selection" class="selection">当前选择：中间</p>
+          <p id="selection" class="selection">Selected: center</p>
         </section>
       </div>
 
       <div class="actions">
-        <button id="up" type="button" disabled>向上</button>
-        <button id="down" type="button" disabled>向下</button>
-        <button id="left" type="button" disabled>向左</button>
-        <button id="right" type="button" disabled>向右</button>
-        <button id="place" type="button" class="primary" disabled>落子</button>
-        <button id="restart" type="button" class="danger" disabled>重新开始</button>
+        <button id="up" type="button" disabled>Up</button>
+        <button id="down" type="button" disabled>Down</button>
+        <button id="left" type="button" disabled>Left</button>
+        <button id="right" type="button" disabled>Right</button>
+        <button id="place" type="button" class="primary" disabled>Place</button>
+        <button id="restart" type="button" class="danger" disabled>Restart</button>
       </div>
 
       <pre id="log" aria-live="polite"></pre>

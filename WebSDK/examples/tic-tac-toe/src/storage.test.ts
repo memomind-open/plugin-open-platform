@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { newGame, placeAtCursor } from './game';
 import { GamePersistence } from './storage';
 
-describe('井字棋存档队列', () => {
-  it('按动作顺序串行写入，较旧状态不会后完成', async () => {
+describe('tic-tac-toe save queue', () => {
+  it('writes serially in action order so an older state cannot finish later', async () => {
     const calls: string[] = [];
     const resolvers: Array<() => void> = [];
     const bridge = {
@@ -32,7 +32,7 @@ describe('井字棋存档队列', () => {
     await secondSave;
   });
 
-  it('加载时解析 App storage 返回值', async () => {
+  it('parses the App storage value when loading', async () => {
     const saved = placeAtCursor(newGame());
     const bridge = {
       call: async <T>(): Promise<T> => ({ value: JSON.stringify(saved) }) as T,

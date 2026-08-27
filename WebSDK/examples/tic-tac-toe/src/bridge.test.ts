@@ -24,7 +24,7 @@ function setup(timeoutMs = 7000): {
 afterEach(() => vi.useRealTimers());
 
 describe('Aphrodite Bridge v1 SDK', () => {
-  it('安装 bootstrap、resolve、emit 与 heartbeat 全局入口', () => {
+  it('installs global bootstrap, resolve, emit, and heartbeat entry points', () => {
     const { target } = setup();
     expect(target.__memoPluginBootstrap).toBeTypeOf('function');
     expect(target.__memoPluginResolve).toBeTypeOf('function');
@@ -34,7 +34,7 @@ describe('Aphrodite Bridge v1 SDK', () => {
     expect(target.__memoPluginHeartbeat?.()).toBe(true);
   });
 
-  it('发送完整请求并使用 result resolve', async () => {
+  it('sends a complete request and resolves with result', async () => {
     const { target, messages, client } = setup();
     target.__memoPluginBootstrap?.('token-a', 3);
     const promise = client.call<{ ready: boolean }>('runtime.ready');
@@ -46,20 +46,20 @@ describe('Aphrodite Bridge v1 SDK', () => {
     await expect(promise).resolves.toEqual({ ready: true });
   });
 
-  it('使用 error code 与 message reject', async () => {
+  it('rejects with the error code and message', async () => {
     const { target, messages, client } = setup();
     target.__memoPluginBootstrap?.('token-a', 1);
-    const promise = client.call('display.updateText', { text: '中文' });
+    const promise = client.call('display.updateText', { text: 'English' });
     target.__memoPluginResolve?.({
       requestId: messages[0].requestId as string,
       ok: false,
-      error: { code: 'DEVICE_DISCONNECTED', message: '设备已断开' },
+      error: { code: 'DEVICE_DISCONNECTED', message: 'Device disconnected' },
       runtimeGeneration: 1,
     });
-    await expect(promise).rejects.toMatchObject({ code: 'DEVICE_DISCONNECTED', message: '设备已断开' });
+    await expect(promise).rejects.toMatchObject({ code: 'DEVICE_DISCONNECTED', message: 'Device disconnected' });
   });
 
-  it('7 秒超时并清理 pending，使迟到响应无效', async () => {
+  it('times out after seven seconds and clears pending so a late response is ignored', async () => {
     vi.useFakeTimers();
     const { target, messages, client } = setup(7000);
     target.__memoPluginBootstrap?.('token-a', 1);
@@ -72,7 +72,7 @@ describe('Aphrodite Bridge v1 SDK', () => {
     })).not.toThrow();
   });
 
-  it('generation 切换会拒绝旧 pending，旧响应被丢弃', async () => {
+  it('rejects old pending calls on generation change and drops old responses', async () => {
     const { target, messages, client } = setup();
     target.__memoPluginBootstrap?.('token-a', 1);
     const oldPromise = client.call('runtime.ping');
@@ -84,7 +84,7 @@ describe('Aphrodite Bridge v1 SDK', () => {
     expect(target.__memoPluginHeartbeat?.()).toBe(true);
   });
 
-  it('按事件名分发设备事件并丢弃旧 generation', () => {
+  it('dispatches device events by name and drops old generations', () => {
     const { target, client } = setup();
     target.__memoPluginBootstrap?.('token-a', 2);
     const listener = vi.fn();
@@ -94,7 +94,7 @@ describe('Aphrodite Bridge v1 SDK', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it('空 subscriptionIds 的 lifecycle 事件仍会分发', () => {
+  it('dispatches lifecycle events even with empty subscriptionIds', () => {
     const { target, client } = setup();
     target.__memoPluginBootstrap?.('token-a', 1);
     const listener = vi.fn();
@@ -105,7 +105,7 @@ describe('Aphrodite Bridge v1 SDK', () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
-  it('事件订阅、取消订阅与本地 listener 清理均可关联', async () => {
+  it('correlates event subscription, unsubscription, and local listener cleanup', async () => {
     const { target, messages, client } = setup();
     target.__memoPluginBootstrap?.('token-a', 1);
     const listener = vi.fn();
@@ -135,10 +135,10 @@ describe('Aphrodite Bridge v1 SDK', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it('未配置时调用明确失败', async () => {
+  it('fails explicitly when not configured', async () => {
     const { client } = setup();
     await expect(client.call('runtime.ready')).rejects.toEqual(
-      new MemoBridgeError('BRIDGE_UNAVAILABLE', 'App Bridge 尚未就绪'),
+      new MemoBridgeError('BRIDGE_UNAVAILABLE', 'App Bridge is not ready'),
     );
   });
 });

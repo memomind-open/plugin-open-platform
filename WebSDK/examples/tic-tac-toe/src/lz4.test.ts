@@ -107,7 +107,7 @@ describe('strict raw LZ4 block encoder', () => {
     expect(() => decodeStrict(Uint8Array.of(0x10, 1), 2)).toThrow('decoded length mismatch');
   });
 
-  it('井字棋整图可严格解码且显著小于原图', () => {
+  it('strictly decodes the complete board and remains significantly smaller than the source', () => {
     const pixels = renderBoardImage(newGame()).pixels;
     const compressed = compressLz4(pixels);
     expect(compressed.length).toBeLessThan(pixels.length);

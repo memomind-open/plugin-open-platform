@@ -1,24 +1,24 @@
 (() => {
   const apiOrigin = 'https://api.open-meteo.com';
   const cities = {
-    beijing: { name: '北京', latitude: 39.9042, longitude: 116.4074 },
-    shanghai: { name: '上海', latitude: 31.2304, longitude: 121.4737 },
-    shenzhen: { name: '深圳', latitude: 22.5431, longitude: 114.0579 },
-    hangzhou: { name: '杭州', latitude: 30.2741, longitude: 120.1551 },
-    chengdu: { name: '成都', latitude: 30.5728, longitude: 104.0668 },
+    beijing: { name: 'Beijing', latitude: 39.9042, longitude: 116.4074 },
+    shanghai: { name: 'Shanghai', latitude: 31.2304, longitude: 121.4737 },
+    shenzhen: { name: 'Shenzhen', latitude: 22.5431, longitude: 114.0579 },
+    hangzhou: { name: 'Hangzhou', latitude: 30.2741, longitude: 120.1551 },
+    chengdu: { name: 'Chengdu', latitude: 30.5728, longitude: 104.0668 },
   };
 
   const weatherLabels = new Map([
-    [0, '晴'], [1, '大部晴朗'], [2, '多云'], [3, '阴'],
-    [45, '有雾'], [48, '雾凇'],
-    [51, '小毛毛雨'], [53, '毛毛雨'], [55, '强毛毛雨'],
-    [56, '冻毛毛雨'], [57, '强冻毛毛雨'],
-    [61, '小雨'], [63, '中雨'], [65, '大雨'],
-    [66, '冻雨'], [67, '强冻雨'],
-    [71, '小雪'], [73, '中雪'], [75, '大雪'], [77, '米雪'],
-    [80, '小阵雨'], [81, '阵雨'], [82, '强阵雨'],
-    [85, '小阵雪'], [86, '强阵雪'],
-    [95, '雷雨'], [96, '雷雨伴小冰雹'], [99, '雷雨伴大冰雹'],
+    [0, 'Clear'], [1, 'Mostly clear'], [2, 'Partly cloudy'], [3, 'Overcast'],
+    [45, 'Fog'], [48, 'Rime fog'],
+    [51, 'Light drizzle'], [53, 'Drizzle'], [55, 'Heavy drizzle'],
+    [56, 'Freezing drizzle'], [57, 'Heavy freezing drizzle'],
+    [61, 'Light rain'], [63, 'Rain'], [65, 'Heavy rain'],
+    [66, 'Freezing rain'], [67, 'Heavy freezing rain'],
+    [71, 'Light snow'], [73, 'Snow'], [75, 'Heavy snow'], [77, 'Snow grains'],
+    [80, 'Light showers'], [81, 'Showers'], [82, 'Heavy showers'],
+    [85, 'Light snow showers'], [86, 'Heavy snow showers'],
+    [95, 'Thunderstorm'], [96, 'Thunderstorm with light hail'], [99, 'Thunderstorm with heavy hail'],
   ]);
 
   const pendingBridgeCalls = new Map();
@@ -39,13 +39,13 @@
   function bridgeCall(method, params = {}) {
     return new Promise((resolve, reject) => {
       if (!bridgeToken || !window.MemoPluginBridge) {
-        reject(new Error('App Bridge 尚未就绪'));
+        reject(new Error('App Bridge is not ready'));
         return;
       }
       const requestId = `weather-${Date.now()}-${++bridgeSequence}`;
       const timer = window.setTimeout(() => {
         pendingBridgeCalls.delete(requestId);
-        reject(new Error(`${method} 调用超时`));
+        reject(new Error(`${method} timed out`));
       }, 7000);
       pendingBridgeCalls.set(requestId, { resolve, reject, timer });
       window.MemoPluginBridge.postMessage(JSON.stringify({
@@ -79,7 +79,7 @@
     if (response.ok) {
       pending.resolve(response.result);
     } else {
-      pending.reject(new Error(response.error?.message || 'Bridge 调用失败'));
+      pending.reject(new Error(response.error?.message || 'Bridge call failed'));
     }
   };
 
@@ -118,18 +118,18 @@
         headers: { Accept: 'application/json' },
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error(`天气接口返回 HTTP ${response.status}`);
+      if (!response.ok) throw new Error(`Weather service returned HTTP ${response.status}`);
       const payload = await response.json();
       const weather = parseWeather(payload, city);
       renderWeather(weather);
-      setBadge('请求成功', 'success');
-      elements.updatedAt.textContent = `${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 更新`;
+      setBadge('Request succeeded', 'success');
+      elements.updatedAt.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       await syncToGlasses(weather);
     } catch (error) {
       if (controller.signal.aborted && requestController !== controller) return;
       renderError(
         controller.signal.aborted
-          ? new Error('天气请求超时，请重试')
+          ? new Error('Weather request timed out; please try again')
           : error,
       );
     } finally {
@@ -159,7 +159,7 @@
       !Number.isFinite(current.wind_speed_10m) ||
       requiredDaily.some((value) => !Array.isArray(value) || value.length < 3)
     ) {
-      throw new Error('天气接口响应缺少必要字段');
+      throw new Error('Weather response is missing required fields');
     }
     return {
       city: city.name,
@@ -187,7 +187,7 @@
       <div class="hero">
         <div class="hero-top">
           <p class="location">${escapeHtml(weather.city)}</p>
-          <p class="summary">${escapeHtml(weather.condition)} · 今日 ${weather.days[0].low}° / ${weather.days[0].high}°</p>
+          <p class="summary">${escapeHtml(weather.condition)} · Today ${weather.days[0].low}° / ${weather.days[0].high}°</p>
         </div>
         <div class="temperature">${weather.temperature}<sup>°C</sup></div>
         <div class="weather-art ${theme}" aria-label="${escapeHtml(weather.condition)}">
@@ -196,17 +196,17 @@
           <div class="drops"><i></i><i></i><i></i></div>
         </div>
         <div class="metrics">
-          <div class="metric"><span class="metric-icon">◒</span><strong>${weather.apparent}°</strong><span>体感</span></div>
-          <div class="metric"><span class="metric-icon">◉</span><strong>${weather.humidity}%</strong><span>湿度</span></div>
-          <div class="metric"><span class="metric-icon">≋</span><strong>${weather.wind}</strong><span>km/h 风速</span></div>
+          <div class="metric"><span class="metric-icon">◒</span><strong>${weather.apparent}°</strong><span>Feels like</span></div>
+          <div class="metric"><span class="metric-icon">◉</span><strong>${weather.humidity}%</strong><span>Humidity</span></div>
+          <div class="metric"><span class="metric-icon">≋</span><strong>${weather.wind}</strong><span>km/h wind</span></div>
         </div>
       </div>`;
     elements.forecast.innerHTML = weather.days.map((day, index) => `
       <div class="forecast-row">
-        <span class="forecast-day">${index === 0 ? '今天' : index === 1 ? '明天' : weekday(day.date)}</span>
+        <span class="forecast-day">${index === 0 ? 'Today' : index === 1 ? 'Tomorrow' : weekday(day.date)}</span>
         <span class="forecast-icon" title="${escapeHtml(day.condition)}">${weatherIcon(day.code)}</span>
         <span class="forecast-temp">${day.high}° <span class="forecast-low">${day.low}°</span></span>
-        <span class="forecast-rain">${day.rain > 0 ? `降水 ${day.rain}%` : '&nbsp;'}</span>
+        <span class="forecast-rain">${day.rain > 0 ? `Rain ${day.rain}%` : '&nbsp;'}</span>
       </div>`).join('');
   }
 
@@ -234,7 +234,7 @@
         });
       }
     } catch (error) {
-      setBadge('天气已更新 · 眼镜同步失败', 'error');
+      setBadge('Weather updated · Glasses sync failed', 'error');
     }
   }
 
@@ -245,7 +245,7 @@
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext('2d', { alpha: false });
-    if (!context) throw new Error('无法创建眼镜天气画布');
+    if (!context) throw new Error('Could not create the glasses weather canvas');
 
     context.fillStyle = '#000';
     context.fillRect(0, 0, width, height);
@@ -272,20 +272,20 @@
     context.lineTo(326, 188);
     context.stroke();
 
-    drawMetric(context, 24, 208, '体感', `${weather.apparent}°`);
-    drawMetric(context, 130, 208, '湿度', `${weather.humidity}%`);
-    drawMetric(context, 236, 208, '风速', `${weather.wind} km/h`);
+    drawMetric(context, 24, 208, 'FEELS', `${weather.apparent}°`);
+    drawMetric(context, 130, 208, 'HUMIDITY', `${weather.humidity}%`);
+    drawMetric(context, 236, 208, 'WIND', `${weather.wind} km/h`);
 
     context.fillStyle = '#141414';
     roundedRect(context, 346, 14, 200, 244, 20);
     context.fill();
     context.fillStyle = '#fff';
     context.font = '700 18px sans-serif';
-    context.fillText('未来 3 天', 364, 43);
+    context.fillText('NEXT 3 DAYS', 364, 43);
 
     weather.days.forEach((day, index) => {
       const top = 59 + index * 62;
-      const label = index === 0 ? '今天' : index === 1 ? '明天' : weekday(day.date);
+      const label = index === 0 ? 'TODAY' : index === 1 ? 'TOMORROW' : weekday(day.date);
       context.fillStyle = '#aaa';
       context.font = '15px sans-serif';
       context.fillText(label, 364, top + 21);
@@ -301,7 +301,7 @@
       if (day.rain > 0) {
         context.fillStyle = '#999';
         context.font = '12px sans-serif';
-        context.fillText(`降水 ${day.rain}%`, 456, top + 42);
+        context.fillText(`RAIN ${day.rain}%`, 456, top + 42);
       }
       if (index < weather.days.length - 1) {
         context.strokeStyle = '#3d3d3d';
@@ -498,7 +498,7 @@
   }
 
   function renderError(error) {
-    setBadge('请求失败', 'error');
+    setBadge('Request failed', 'error');
     const message = error instanceof Error ? error.message : String(error);
     if (!elements.card.querySelector('.hero')) {
       elements.card.innerHTML = `
@@ -514,7 +514,7 @@
     elements.refresh.disabled = loading;
     elements.city.disabled = loading;
     elements.refresh.classList.toggle('is-loading', loading);
-    if (loading) setBadge('正在请求', 'loading');
+    if (loading) setBadge('Requesting', 'loading');
   }
 
   function setBadge(label, state) {
@@ -523,7 +523,7 @@
   }
 
   function weatherLabel(code) {
-    return weatherLabels.get(Number(code)) || `天气代码 ${code}`;
+    return weatherLabels.get(Number(code)) || `Weather code ${code}`;
   }
 
   function weatherTheme(code) {

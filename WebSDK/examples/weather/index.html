@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'none'; connect-src https://api.open-meteo.com; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'"
     >
-    <title>城市天气</title>
+    <title>City Weather</title>
     <link rel="stylesheet" href="style.css">
     <script src="plugin.js" defer></script>
   </head>
@@ -16,20 +16,20 @@
       <header class="appbar">
         <div class="brand">
           <span class="brand-mark" aria-hidden="true"></span>
-          <span>天气</span>
+          <span>Weather</span>
         </div>
         <div class="app-actions">
           <label class="city-picker" for="city">
             <span class="pin" aria-hidden="true"></span>
-            <select id="city" aria-label="选择城市">
-              <option value="beijing">北京</option>
-              <option value="shanghai">上海</option>
-              <option value="shenzhen">深圳</option>
-              <option value="hangzhou">杭州</option>
-              <option value="chengdu">成都</option>
+            <select id="city" aria-label="Select city">
+              <option value="beijing">Beijing</option>
+              <option value="shanghai">Shanghai</option>
+              <option value="shenzhen">Shenzhen</option>
+              <option value="hangzhou">Hangzhou</option>
+              <option value="chengdu">Chengdu</option>
             </select>
           </label>
-          <button id="refresh" class="refresh" type="button" aria-label="刷新天气">
+          <button id="refresh" class="refresh" type="button" aria-label="Refresh weather">
             <span aria-hidden="true">↻</span>
           </button>
         </div>
@@ -38,14 +38,14 @@
       <section id="weather-card" class="weather-card" aria-live="polite">
         <div class="placeholder">
           <div class="loading-orb" aria-hidden="true"></div>
-          <p>正在连接天气服务</p>
+          <p>Connecting to the weather service</p>
         </div>
       </section>
 
       <section class="forecast-section">
         <div class="section-heading">
-          <h2>未来三天</h2>
-          <span id="updated-at">--:-- 更新</span>
+          <h2>Next three days</h2>
+          <span id="updated-at">Updated --:--</span>
         </div>
         <div id="forecast" class="forecast-list">
           <div class="forecast-skeleton"></div>
@@ -55,7 +55,7 @@
       </section>
 
       <footer>
-        <span id="network-badge" class="badge badge-idle">准备中</span>
+        <span id="network-badge" class="badge badge-idle">Preparing</span>
         <span>OPEN-METEO</span>
       </footer>
     </main>

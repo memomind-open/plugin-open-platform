@@ -9,8 +9,8 @@ const context = {
   },
 };
 
-test('wraps CJK text at the device label width', () => {
-  assert.deepEqual(wrapOverlayText(context, '眼镜文字', 20, true), ['眼镜', '文字']);
+test('wraps text at the device label width', () => {
+  assert.deepEqual(wrapOverlayText(context, 'ABCD', 20, true), ['AB', 'CD']);
 });
 
 test('preserves explicit line breaks when wrapping is disabled', () => {

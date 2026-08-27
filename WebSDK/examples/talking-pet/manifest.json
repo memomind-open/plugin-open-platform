@@ -6,7 +6,7 @@
   "bridgeVersion": "1.0",
   "permissions": ["device.events", "storage", "audio.capture"],
   "deviceRequirements": {
-    "preferredPluginId": "com.memomind.example.talking-pet-bridge",
+    "preferredPluginId": "com.memomind.example.talking-pet",
     "protocols": [
       { "id": "gm.talking-pet", "minVersion": "1.0" },
       { "id": "gm.device-events", "minVersion": "1.0" }

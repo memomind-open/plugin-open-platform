@@ -5,43 +5,43 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07110e">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://api.open-meteo.com https://geocoding-api.open-meteo.com https://www.gdacs.org; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'">
-  <title>浮光 OS · 设备控制台</title>
+  <title>Glow OS · Device Console</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <main class="console">
     <header class="console-head">
       <div class="logo">◌</div>
-      <div><p>GM DEVICE SYSTEM</p><h1>浮光 OS</h1></div>
-      <div class="device-state" id="deviceState"><i></i><span>正在连接</span></div>
+      <div><p>GM DEVICE SYSTEM</p><h1>Glow OS</h1></div>
+      <div class="device-state" id="deviceState"><i></i><span>Connecting</span></div>
     </header>
     <section class="device-first">
       <p class="eyebrow">DEVICE FIRST EXPERIENCE</p>
-      <h2>请在右侧眼镜画面操作</h2>
-      <p>手机页面只负责配置；完整桌面、应用界面与交互都运行在设备端。</p>
-      <button class="primary" id="wakeDevice" type="button">点亮设备桌面</button>
+      <h2>Use the glasses display on the right</h2>
+      <p>The phone page handles configuration; the full desktop, apps, and interactions run on the device.</p>
+      <button class="primary" id="wakeDevice" type="button">Wake device desktop</button>
     </section>
     <section class="guide-card">
-      <div class="section-title"><span>设备手势</span><small>Studio 可直接模拟</small></div>
+      <div class="section-title"><span>Device gestures</span><small>Simulate directly in Studio</small></div>
       <div class="gesture-grid">
-        <div><b>← →</b><span>左右选择</span></div>
-        <div><b>↑ ↓</b><span>换行 / 翻页</span></div>
-        <div><b>单击</b><span>确认 / 打开</span></div>
-        <div><b>双击</b><span>返回桌面</span></div>
-        <div><b>长按</b><span>快捷操作</span></div>
+        <div><b>← →</b><span>Select left / right</span></div>
+        <div><b>↑ ↓</b><span>Move row / page</span></div>
+        <div><b>Click</b><span>Confirm / open</span></div>
+        <div><b>Double</b><span>Return home</span></div>
+        <div><b>Hold</b><span>Quick action</span></div>
       </div>
     </section>
     <section class="settings-card">
-      <div class="section-title"><span>设备设置</span><small id="saveState">自动保存</small></div>
+      <div class="section-title"><span>Device settings</span><small id="saveState">Auto-save</small></div>
       <form id="cityForm">
-        <label for="cityInput">天气城市</label>
-        <div class="input-row"><input id="cityInput" value="上海" maxlength="40"><button type="submit">更新</button></div>
+        <label for="cityInput">Weather city</label>
+        <div class="input-row"><input id="cityInput" value="Shanghai" maxlength="40"><button type="submit">Update</button></div>
       </form>
-      <label for="memoInput">眼镜便签</label>
-      <textarea id="memoInput" maxlength="240" rows="5" placeholder="写下要在眼镜中查看的内容…"></textarea>
+      <label for="memoInput">Glasses memo</label>
+      <textarea id="memoInput" maxlength="240" rows="5" placeholder="Write something to view on the glasses…"></textarea>
     </section>
     <section class="screen-status">
-      <span>当前设备页面</span><strong id="screenName">桌面</strong><small id="dataState">天气与台风数据载入中</small>
+      <span>Current device page</span><strong id="screenName">Home</strong><small id="dataState">Loading weather and cyclone data</small>
     </section>
     <canvas id="deviceCanvas" width="600" height="350" aria-hidden="true"></canvas>
     <div class="toast" id="toast" role="status"></div>
