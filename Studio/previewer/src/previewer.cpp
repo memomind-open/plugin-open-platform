@@ -106,7 +106,8 @@ bool roundedRectContains(int pixel_x, int pixel_y,
 
 Previewer::Previewer()
     : frame_(kDisplayWidth * kDisplayHeight, 0),
-      presented_framebuffer_(320u * kDisplayHeight, 0)
+      presented_framebuffer_(320u * kDisplayHeight, 0),
+      staged_framebuffer_(320u * kDisplayHeight, 0)
 {
     lvgl_ = std::make_unique<LvglHost>(presented_framebuffer_, kRootObject,
                                       kObjectBase + 0x104, kFontDefault,
@@ -272,10 +273,12 @@ void Previewer::initializeMemory(uint32_t plugin_memory_size)
     nodes_.clear();
     next_object_ = kObjectBase + 0x104;
     framebuffer_locked_ = false;
+    pending_framebuffer_dirty_.clear();
     imu_modes_ = 0;
     auto_brightness_blocked_ = false;
     std::fill(frame_.begin(), frame_.end(), 0);
     std::fill(presented_framebuffer_.begin(), presented_framebuffer_.end(), 0);
+    std::fill(staged_framebuffer_.begin(), staged_framebuffer_.end(), 0);
 }
 
 void Previewer::validateCallback(uint32_t callback) const
@@ -332,6 +335,7 @@ void Previewer::stop()
     imu_modes_ = 0;
     auto_brightness_blocked_ = false;
     framebuffer_locked_ = false;
+    pending_framebuffer_dirty_.clear();
     lvgl_->stop();
     appendLog("[Previewer] Plugin stopped");
 }
@@ -372,6 +376,7 @@ void Previewer::unload()
     std::fill(std::begin(callbacks_), std::end(callbacks_), 0);
     context_ = 0;
     nodes_.clear();
+    pending_framebuffer_dirty_.clear();
     lvgl_->stop();
     allocations_.clear();
 }
@@ -906,37 +911,57 @@ bool Previewer::handleTrap(Rv32 &cpu, uint32_t address)
         if (!framebuffer_locked_) { finish(static_cast<uint32_t>(GM_ESTATE)); return true; }
         int32_t result = OK;
         const uint32_t dirty = cpu.argument(0);
+        FramebufferDirtyRect current_dirty;
         if (dirty) {
-            const int16_t x = static_cast<int16_t>(cpu.memory.read16(dirty));
-            const int16_t y = static_cast<int16_t>(cpu.memory.read16(dirty + 2));
-            const uint16_t width = cpu.memory.read16(dirty + 4);
-            const uint16_t height = cpu.memory.read16(dirty + 6);
-            if (x < 0 || y < locked_y_ || width == 0 || height == 0 ||
-                static_cast<uint32_t>(x) + width > kDisplayWidth ||
-                static_cast<uint32_t>(y) + height > static_cast<uint32_t>(locked_y_) + locked_height_)
+            current_dirty.x = static_cast<int16_t>(cpu.memory.read16(dirty));
+            current_dirty.y = static_cast<int16_t>(cpu.memory.read16(dirty + 2));
+            current_dirty.width = cpu.memory.read16(dirty + 4);
+            current_dirty.height = cpu.memory.read16(dirty + 6);
+            if (current_dirty.x < 0 || current_dirty.y < locked_y_ ||
+                current_dirty.width == 0 || current_dirty.height == 0 ||
+                static_cast<uint32_t>(current_dirty.x) + current_dirty.width > kDisplayWidth ||
+                static_cast<uint32_t>(current_dirty.y) + current_dirty.height >
+                    static_cast<uint32_t>(locked_y_) + locked_height_)
                 result = GM_EINVAL;
         }
         if (result == OK && dirty) {
             const GuestMemory::Region *framebuffer = cpu_.memory.find(kFramebufferBase);
-            if (framebuffer && framebuffer->bytes.size() >= presented_framebuffer_.size()) {
-                const int16_t x = static_cast<int16_t>(cpu.memory.read16(dirty));
-                const int16_t y = static_cast<int16_t>(cpu.memory.read16(dirty + 2));
-                const uint16_t width = cpu.memory.read16(dirty + 4);
-                const uint16_t height = cpu.memory.read16(dirty + 6);
-                for (int32_t row = y; row < static_cast<int32_t>(y) + height; ++row) {
-                    for (int32_t column = x;
-                         column < static_cast<int32_t>(x) + width; ++column) {
+            if (framebuffer && framebuffer->bytes.size() >= staged_framebuffer_.size()) {
+                for (int32_t row = current_dirty.y;
+                     row < static_cast<int32_t>(current_dirty.y) + current_dirty.height; ++row) {
+                    for (int32_t column = current_dirty.x;
+                         column < static_cast<int32_t>(current_dirty.x) + current_dirty.width; ++column) {
                         const size_t offset = static_cast<size_t>(row) * 320u +
                                               static_cast<size_t>(column / 2);
                         const uint8_t source = framebuffer->bytes[offset];
-                        uint8_t &target = presented_framebuffer_[offset];
+                        uint8_t &target = staged_framebuffer_[offset];
                         if ((column & 1) == 0)
-                            target = static_cast<uint8_t>((target & 0x0f) |
-                                                         (source & 0xf0));
+                            target = static_cast<uint8_t>((target & 0x0f) | (source & 0xf0));
                         else
-                            target = static_cast<uint8_t>((target & 0xf0) |
-                                                         (source & 0x0f));
+                            target = static_cast<uint8_t>((target & 0xf0) | (source & 0x0f));
                     }
+                }
+                pending_framebuffer_dirty_.push_back(current_dirty);
+                if (cpu.argument(1)) {
+                    for (const FramebufferDirtyRect &region : pending_framebuffer_dirty_) {
+                        for (int32_t row = region.y;
+                             row < static_cast<int32_t>(region.y) + region.height; ++row) {
+                            for (int32_t column = region.x;
+                                 column < static_cast<int32_t>(region.x) + region.width; ++column) {
+                                const size_t offset = static_cast<size_t>(row) * 320u +
+                                                      static_cast<size_t>(column / 2);
+                                const uint8_t source = staged_framebuffer_[offset];
+                                uint8_t &target = presented_framebuffer_[offset];
+                                if ((column & 1) == 0)
+                                    target = static_cast<uint8_t>((target & 0x0f) |
+                                                                 (source & 0xf0));
+                                else
+                                    target = static_cast<uint8_t>((target & 0xf0) |
+                                                                 (source & 0x0f));
+                            }
+                        }
+                    }
+                    pending_framebuffer_dirty_.clear();
                 }
             }
         }

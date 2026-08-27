@@ -146,6 +146,13 @@ private:
         size_t bitmap_size = 0;
     };
 
+    struct FramebufferDirtyRect {
+        int16_t x = 0;
+        int16_t y = 0;
+        uint16_t width = 0;
+        uint16_t height = 0;
+    };
+
     static constexpr uint32_t kPluginBase = 0x10000000u;
     static constexpr uint32_t kStackBase = 0x20000000u;
     static constexpr uint32_t kStackSize = 128u * 1024u;
@@ -202,6 +209,8 @@ private:
     std::vector<BluetoothMessage> bt_outbox_;
     std::vector<uint8_t> frame_;
     std::vector<uint8_t> presented_framebuffer_;
+    std::vector<uint8_t> staged_framebuffer_;
+    std::vector<FramebufferDirtyRect> pending_framebuffer_dirty_;
     std::vector<TextOverlay> text_overlays_;
     std::vector<uint8_t> font_default_data_;
     std::vector<uint8_t> font_large_data_;
