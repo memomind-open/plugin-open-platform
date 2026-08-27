@@ -25,6 +25,17 @@ fn emit_header_dependencies(directory: &Path) {
     }
 }
 
+fn emit_file_dependencies(directory: &Path) {
+    for entry in fs::read_dir(directory).expect("could not enumerate frontend files") {
+        let path = entry.expect("could not read frontend entry").path();
+        if path.is_dir() {
+            emit_file_dependencies(&path);
+        } else {
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
+    }
+}
+
 fn main() {
     let previewer = Path::new("../../previewer/src");
     let lvgl = Path::new("../../previewer/third_party/lvgl");
@@ -35,6 +46,7 @@ fn main() {
     cc::Build::new()
         .cpp(true)
         .std("c++17")
+        .static_crt(true)
         .include(previewer)
         .include(lvgl)
         .file(previewer.join("lvgl_host.cpp"))
@@ -49,6 +61,7 @@ fn main() {
     let mut lvgl_build = cc::Build::new();
     lvgl_build
         .include(lvgl)
+        .static_crt(true)
         .define("LV_CONF_INCLUDE_SIMPLE", "1")
         .define("CONFIG_XGIMI_PATCH", "1")
         .flag_if_supported("/utf-8")
@@ -87,5 +100,6 @@ fn main() {
         "cargo:rerun-if-changed={}",
         lvgl.join("fonts/lv_font_xgimi_20.bin").display()
     );
+    emit_file_dependencies(Path::new("../ui"));
     tauri_build::build();
 }

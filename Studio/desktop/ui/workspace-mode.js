@@ -1,5 +1,23 @@
 export const WEB_BRIDGE_PLUGIN_ID = 'com.gm.example.web-bridge';
 
+export function chooseWebPlugin(plugins, devicePlugin) {
+  if (!devicePlugin) return '';
+  const matches = plugins
+    .map((plugin) => {
+      const requirements = plugin.deviceRequirements ?? {};
+      const result = evaluateCompatibility(plugin, devicePlugin);
+      const exactRequired = requirements.requiredPluginId === devicePlugin.id;
+      const exactPreferred = requirements.preferredPluginId === devicePlugin.id;
+      const protocolMatch = (requirements.protocols?.length ?? 0) > 0 && result.compatible;
+      const score = Number(exactRequired) * 4 + Number(exactPreferred) * 2 + Number(protocolMatch);
+      return { plugin, result, score };
+    })
+    .filter(({ result, score }) => result.compatible && score > 0)
+    .sort((left, right) => right.score - left.score ||
+      Number(right.plugin.updatedAtMs ?? 0) - Number(left.plugin.updatedAtMs ?? 0));
+  return matches[0]?.plugin.path ?? '';
+}
+
 export function chooseDevicePlugin(plugins, options = {}) {
   const {
     previousPath = '', explicitSelection = false, webEnabled = false, webPlugin = null,

@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use qrcode::{types::Color, QrCode};
 use serde::{Deserialize, Serialize};
@@ -210,6 +212,8 @@ struct WebPluginServer {
 }
 
 struct ActivePackageShare {
+    package: PathBuf,
+    port: u16,
     stop: Arc<AtomicBool>,
     thread: Option<thread::JoinHandle<()>>,
 }
@@ -234,7 +238,8 @@ impl Drop for ActivePackageShare {
 
 #[derive(Default)]
 struct PackageShareState {
-    active: Mutex<Option<ActivePackageShare>>,
+    web_active: Mutex<Option<ActivePackageShare>>,
+    device_active: Mutex<Option<ActivePackageShare>>,
 }
 
 #[derive(Deserialize)]
@@ -301,6 +306,7 @@ struct DiscoveredWebPlugin {
     name: String,
     version: String,
     path: String,
+    updated_at_ms: u64,
     permissions: Vec<String>,
     device_requirements: DeviceRequirements,
 }
@@ -589,6 +595,27 @@ fn read_discovered_manifest(directory: &Path) -> Result<DiscoveredManifest, Stri
     Ok(manifest)
 }
 
+fn latest_modified_millis(path: &Path) -> Result<u64, String> {
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|error| format!("Could not inspect {}: {error}", path.display()))?;
+    let mut latest = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0);
+    if metadata.is_dir() {
+        for entry in fs::read_dir(path)
+            .map_err(|error| format!("Could not enumerate {}: {error}", path.display()))?
+        {
+            let entry =
+                entry.map_err(|error| format!("Could not read Web plugin entry: {error}"))?;
+            latest = latest.max(latest_modified_millis(&entry.path())?);
+        }
+    }
+    Ok(latest)
+}
+
 fn discover_web_plugins_in(root: &Path) -> Result<Vec<DiscoveredWebPlugin>, String> {
     let examples_root = root.join("examples");
     if !examples_root.is_dir() {
@@ -624,6 +651,7 @@ fn discover_web_plugins_in(root: &Path) -> Result<Vec<DiscoveredWebPlugin>, Stri
             name: manifest.name,
             version: manifest.version,
             path: source.to_string_lossy().into_owned(),
+            updated_at_ms: latest_modified_millis(&source)?,
             permissions: manifest.permissions,
             device_requirements: manifest.device_requirements,
         });
@@ -674,6 +702,7 @@ fn inspect_web_plugin(path: String) -> Result<DiscoveredWebPlugin, String> {
         name: manifest.name,
         version: manifest.version,
         path: source.to_string_lossy().into_owned(),
+        updated_at_ms: latest_modified_millis(&source)?,
         permissions: manifest.permissions,
         device_requirements: manifest.device_requirements,
     })
@@ -1246,6 +1275,7 @@ fn serve_mmpkg_client(mut stream: TcpStream, package: &Path) -> Result<(), Strin
 
 fn start_mmpkg_server(package: PathBuf) -> Result<(ActivePackageShare, u16), String> {
     checked_mmpkg(&package)?;
+    let shared_package = package.clone();
     let listener = TcpListener::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, MMPKG_SHARE_PORT))
         .or_else(|_| TcpListener::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0)))
         .map_err(|error| format!("Could not start Web package server: {error}"))?;
@@ -1281,6 +1311,8 @@ fn start_mmpkg_server(package: PathBuf) -> Result<(ActivePackageShare, u16), Str
         .map_err(|error| format!("Could not start Web package server thread: {error}"))?;
     Ok((
         ActivePackageShare {
+            package: shared_package,
+            port,
             stop,
             thread: Some(thread),
         },
@@ -1352,6 +1384,7 @@ fn serve_gmp_client(mut stream: TcpStream, package: &Path) -> Result<(), String>
 
 fn start_gmp_server(package: PathBuf) -> Result<(ActivePackageShare, u16), String> {
     checked_gmp(&package)?;
+    let shared_package = package.clone();
     let listener = TcpListener::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, GMP_SHARE_PORT))
         .or_else(|_| TcpListener::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0)))
         .map_err(|error| format!("Could not start device package server: {error}"))?;
@@ -1387,6 +1420,8 @@ fn start_gmp_server(package: PathBuf) -> Result<(ActivePackageShare, u16), Strin
         .map_err(|error| format!("Could not start device package server thread: {error}"))?;
     Ok((
         ActivePackageShare {
+            package: shared_package,
+            port,
             stop,
             thread: Some(thread),
         },
@@ -1416,11 +1451,44 @@ fn safe_output_stem(path: &Path) -> String {
         .collect()
 }
 
-#[tauri::command]
-fn build_and_share_web_plugin(
-    path: String,
-    state: tauri::State<'_, PackageShareState>,
-) -> Result<PackageShareResult, String> {
+fn source_tree_changed_after(
+    directory: &Path,
+    cutoff: std::time::SystemTime,
+) -> Result<bool, String> {
+    let directory_modified = fs::metadata(directory)
+        .and_then(|metadata| metadata.modified())
+        .map_err(|error| format!("Could not inspect {}: {error}", directory.display()))?;
+    if directory_modified >= cutoff {
+        return Ok(true);
+    }
+    for entry in fs::read_dir(directory)
+        .map_err(|error| format!("Could not enumerate {}: {error}", directory.display()))?
+    {
+        let entry = entry.map_err(|error| format!("Could not read Web plugin entry: {error}"))?;
+        let file_type = entry
+            .file_type()
+            .map_err(|error| format!("Could not inspect {}: {error}", entry.path().display()))?;
+        if file_type.is_symlink() || !file_type.is_file() && !file_type.is_dir() {
+            return Ok(true);
+        }
+        if file_type.is_dir() {
+            if source_tree_changed_after(&entry.path(), cutoff)? {
+                return Ok(true);
+            }
+            continue;
+        }
+        let modified = entry
+            .metadata()
+            .and_then(|metadata| metadata.modified())
+            .map_err(|error| format!("Could not inspect {}: {error}", entry.path().display()))?;
+        if modified >= cutoff {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn prepare_web_package(path: String) -> Result<PathBuf, String> {
     let source = PathBuf::from(path)
         .canonicalize()
         .map_err(|error| format!("Could not resolve Web plugin: {error}"))?;
@@ -1432,24 +1500,52 @@ fn build_and_share_web_plugin(
             safe_output_stem(&source),
             manifest.version
         ));
-        build_mmpkg(&source, &output)?;
+        let can_reuse = output
+            .metadata()
+            .and_then(|metadata| metadata.modified())
+            .ok()
+            .map(|modified| source_tree_changed_after(&source, modified))
+            .transpose()?
+            .is_some_and(|changed| !changed);
+        if !can_reuse {
+            build_mmpkg(&source, &output)?;
+        }
         output
     } else {
         checked_mmpkg(&source)?;
         source
     };
     checked_mmpkg(&output)?;
+    Ok(output)
+}
+
+#[tauri::command]
+async fn build_and_share_web_plugin(
+    path: String,
+    state: tauri::State<'_, PackageShareState>,
+) -> Result<PackageShareResult, String> {
+    let output = tauri::async_runtime::spawn_blocking(move || prepare_web_package(path))
+        .await
+        .map_err(|error| format!("Could not join Web package build task: {error}"))??;
     let host = choose_lan_address()?;
 
     let mut active = state
-        .active
+        .web_active
         .lock()
         .map_err(|_| "Web package share lock is poisoned".to_string())?;
-    if let Some(previous) = active.take() {
-        previous.stop();
-    }
-    let (server, port) = start_mmpkg_server(output.clone())?;
-    *active = Some(server);
+    let port = if active
+        .as_ref()
+        .is_some_and(|server| server.package == output)
+    {
+        active.as_ref().expect("active server checked above").port
+    } else {
+        if let Some(previous) = active.take() {
+            previous.stop();
+        }
+        let (server, port) = start_mmpkg_server(output.clone())?;
+        *active = Some(server);
+        port
+    };
 
     let name = output
         .file_name()
@@ -1483,23 +1579,38 @@ fn build_and_share_web_plugin(
     })
 }
 
+fn prepare_device_package(path: String) -> Result<PathBuf, String> {
+    let package = canonical_gmp(&path)?;
+    checked_gmp(&package)?;
+    Ok(package)
+}
+
 #[tauri::command]
-fn share_device_plugin(
+async fn share_device_plugin(
     path: String,
     state: tauri::State<'_, PackageShareState>,
 ) -> Result<PackageShareResult, String> {
-    let package = canonical_gmp(&path)?;
-    checked_gmp(&package)?;
+    let package = tauri::async_runtime::spawn_blocking(move || prepare_device_package(path))
+        .await
+        .map_err(|error| format!("Could not join device package validation task: {error}"))??;
     let host = choose_lan_address()?;
     let mut active = state
-        .active
+        .device_active
         .lock()
         .map_err(|_| "Package share lock is poisoned".to_string())?;
-    if let Some(previous) = active.take() {
-        previous.stop();
-    }
-    let (server, port) = start_gmp_server(package.clone())?;
-    *active = Some(server);
+    let port = if active
+        .as_ref()
+        .is_some_and(|server| server.package == package)
+    {
+        active.as_ref().expect("active server checked above").port
+    } else {
+        if let Some(previous) = active.take() {
+            previous.stop();
+        }
+        let (server, port) = start_gmp_server(package.clone())?;
+        *active = Some(server);
+        port
+    };
     let name = package
         .file_name()
         .and_then(|value| value.to_str())
@@ -1535,9 +1646,21 @@ fn share_device_plugin(
 #[tauri::command]
 fn stop_web_package_share(state: tauri::State<'_, PackageShareState>) -> Result<(), String> {
     let mut active = state
-        .active
+        .web_active
         .lock()
         .map_err(|_| "Web package share lock is poisoned".to_string())?;
+    if let Some(server) = active.take() {
+        server.stop();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn stop_device_package_share(state: tauri::State<'_, PackageShareState>) -> Result<(), String> {
+    let mut active = state
+        .device_active
+        .lock()
+        .map_err(|_| "Device package share lock is poisoned".to_string())?;
     if let Some(server) = active.take() {
         server.stop();
     }
@@ -1550,14 +1673,6 @@ fn pick_web_package() -> Option<String> {
         .set_title("Choose a Web plugin package")
         .add_filter("GM Web plugin", &["mmpkg"])
         .pick_file()
-        .map(|path| path.to_string_lossy().into_owned())
-}
-
-#[tauri::command]
-fn pick_web_directory() -> Option<String> {
-    rfd::FileDialog::new()
-        .set_title("Choose an unpacked Web plugin directory")
-        .pick_folder()
         .map(|path| path.to_string_lossy().into_owned())
 }
 
@@ -2062,8 +2177,8 @@ fn main() {
             build_and_share_web_plugin,
             share_device_plugin,
             stop_web_package_share,
+            stop_device_package_share,
             pick_web_package,
-            pick_web_directory,
             pick_device_plugin,
             pick_device_directory,
             resolve_web_entry,
@@ -2087,7 +2202,7 @@ mod tests {
     use std::io::Write;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn write_test_mmpkg(package: &Path) {
+    fn write_test_mmpkg_with_title(package: &Path, title: &str) {
         let source = package
             .parent()
             .expect("package must have a parent")
@@ -2101,10 +2216,14 @@ mod tests {
         fs::create_dir_all(source.join("web")).expect("entry directory must be created");
         fs::write(
             source.join("web/start.html"),
-            "<!doctype html><title>sample</title>",
+            format!("<!doctype html><title>{title}</title>"),
         )
         .expect("entry must be written");
         build_mmpkg(&source, package).expect("test package must build");
+    }
+
+    fn write_test_mmpkg(package: &Path) {
+        write_test_mmpkg_with_title(package, "sample");
     }
 
     #[test]
@@ -2202,7 +2321,7 @@ mod tests {
         write_test_mmpkg(&package);
         let expected = fs::read(&package).expect("package must be readable");
 
-        let (server, port) = start_mmpkg_server(package).expect("server must start");
+        let (server, port) = start_mmpkg_server(package.clone()).expect("server must start");
         let mut client = TcpStream::connect((Ipv4Addr::LOCALHOST, port))
             .expect("client must connect to package server");
         client
@@ -2226,6 +2345,32 @@ mod tests {
             .read_to_end(&mut body)
             .expect("package body must be readable");
         assert_eq!(body, expected);
+
+        write_test_mmpkg_with_title(&package, "updated");
+        let updated = fs::read(&package).expect("updated package must be readable");
+        let mut client = TcpStream::connect((Ipv4Addr::LOCALHOST, port))
+            .expect("client must reconnect to the same package server");
+        client
+            .write_all(MMPKG_REQUEST_LINE)
+            .expect("updated request must be written");
+        let mut response = BufReader::new(client);
+        let mut header = String::new();
+        response
+            .read_line(&mut header)
+            .expect("updated response header must be readable");
+        assert_eq!(
+            header,
+            format!(
+                "MMPKG/1 OK {} {:x}\n",
+                updated.len(),
+                Sha256::digest(&updated)
+            )
+        );
+        let mut body = Vec::new();
+        response
+            .read_to_end(&mut body)
+            .expect("updated package body must be readable");
+        assert_eq!(body, updated);
         server.stop();
         fs::remove_dir_all(root).expect("test directory must be removable");
     }

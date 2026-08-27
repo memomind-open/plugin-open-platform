@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   chooseDevicePlugin,
+  chooseWebPlugin,
   describeWorkspace,
   evaluateCompatibility,
   WEB_BRIDGE_PLUGIN_ID,
@@ -31,6 +32,39 @@ test('Web development defaults to web_bridge when device selection is implicit',
     webEnabled: true,
     webPlugin: sceneWebPlugin,
   }), plugins[1].path);
+});
+
+test('Device selection chooses the newest Web plugin from a many-to-one pairing', () => {
+  const device = plugins[1];
+  const webPlugins = [
+    { path: '/web/older', updatedAtMs: 100, deviceRequirements: {
+      preferredPluginId: WEB_BRIDGE_PLUGIN_ID,
+      protocols: [{ id: 'gm.scene', minVersion: '1.0' }],
+    } },
+    { path: '/web/newer', updatedAtMs: 200, deviceRequirements: {
+      preferredPluginId: WEB_BRIDGE_PLUGIN_ID,
+      protocols: [{ id: 'gm.scene', minVersion: '1.0' }],
+    } },
+  ];
+  assert.equal(chooseWebPlugin(webPlugins, device), '/web/newer');
+});
+
+test('An exact device ID match outranks a newer protocol-only Web plugin', () => {
+  const device = plugins[2];
+  const webPlugins = [
+    { path: '/web/protocol-newer', updatedAtMs: 300, deviceRequirements: {
+      protocols: [{ id: 'gm.fighter-control', minVersion: '2.0' }],
+    } },
+    { path: '/web/exact-older', updatedAtMs: 100, deviceRequirements: {
+      requiredPluginId: device.id,
+      protocols: [{ id: 'gm.fighter-control', minVersion: '2.0' }],
+    } },
+  ];
+  assert.equal(chooseWebPlugin(webPlugins, device), '/web/exact-older');
+});
+
+test('A device without a related Web plugin resolves to device-only mode', () => {
+  assert.equal(chooseWebPlugin([sceneWebPlugin], plugins[2]), '');
 });
 
 test('protocol metadata distinguishes recommended and incompatible devices', () => {
