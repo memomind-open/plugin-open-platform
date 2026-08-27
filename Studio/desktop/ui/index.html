@@ -97,7 +97,13 @@
             </div>
           </div>
           <div class="device-stage">
-            <div class="glasses-shell"><canvas id="device-canvas" width="600" height="350"></canvas></div>
+            <div class="glasses-shell">
+              <canvas id="device-canvas" width="600" height="350"></canvas>
+              <div id="device-runtime-overlay" class="device-runtime-overlay" role="status" aria-live="polite" hidden>
+                <strong>Plugin exited</strong>
+                <span>Run the glass plugin to start again.</span>
+              </div>
+            </div>
           </div>
         </div>
         <div class="device-meta">

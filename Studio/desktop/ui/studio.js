@@ -22,6 +22,7 @@ import {
 } from './bridge-security.js';
 import { drawTextOverlays } from './text-overlay.js';
 import { displayPath } from './path-display.js';
+import { describeDeviceFrameTransition } from './device-runtime.js';
 
 const { invoke } = window.__TAURI__.core;
 
@@ -34,6 +35,7 @@ const webPlugin = document.querySelector('#web-plugin');
 const devicePlugin = document.querySelector('#device-plugin');
 const webState = document.querySelector('#web-state');
 const deviceState = document.querySelector('#device-state');
+const deviceRuntimeOverlay = document.querySelector('#device-runtime-overlay');
 const pairStatus = document.querySelector('#pair-status');
 const webShareQr = document.querySelector('#web-share-qr');
 const webSharePlaceholder = document.querySelector('#web-share-placeholder');
@@ -586,6 +588,7 @@ async function runDevicePlugin() {
     deviceRunning = status.running;
     runningDevicePath = status.source ?? devicePlugin.value;
     deviceState.textContent = status.running ? 'Running' : 'Loaded';
+    deviceRuntimeOverlay.hidden = true;
     updateDeviceControls();
     emitConnection();
     updatePairStatus();
@@ -935,13 +938,23 @@ setInterval(async () => {
   try {
     const result = await invoke('tick_frame', { elapsedMs: 33 });
     const wasRunning = deviceRunning;
+    const transition = describeDeviceFrameTransition(wasRunning, result.running);
     deviceRunning = result.running;
+    if (transition.exited) {
+      deviceState.textContent = 'Exited';
+      deviceRuntimeOverlay.hidden = false;
+      clearDirectionInputUi();
+      renderedFrames = 0;
+      fpsWindow = performance.now();
+      document.querySelector('#frame-rate').textContent = '0 FPS';
+      log('DEVICE', 'Glass plugin exited');
+    }
     if (deviceRunning !== wasRunning) {
       updateDeviceControls();
       updatePairStatus();
     }
     for (const message of result.messages) consumeOutboundMessage(message);
-    drawFrame(result);
+    if (transition.drawFrame) drawFrame(result);
   } catch (error) {
     log('FRAME ERROR', String(error));
   } finally {
