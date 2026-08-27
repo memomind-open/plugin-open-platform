@@ -1,14 +1,14 @@
 {
   "id": "com.memomind.example.talking-pet",
   "name": "Momo Talking Pet",
-  "version": "0.4.1",
+  "version": "0.7.2",
   "entry": "index.html",
   "bridgeVersion": "1.0",
-  "permissions": ["display", "device.events", "storage", "audio.capture"],
+  "permissions": ["device.events", "storage", "audio.capture"],
   "deviceRequirements": {
-    "preferredPluginId": "com.gm.example.web-bridge",
+    "preferredPluginId": "com.memomind.example.talking-pet-bridge",
     "protocols": [
-      { "id": "gm.scene", "minVersion": "1.0" },
+      { "id": "gm.talking-pet", "minVersion": "1.0" },
       { "id": "gm.device-events", "minVersion": "1.0" }
     ]
   }

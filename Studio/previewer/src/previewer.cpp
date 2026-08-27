@@ -681,11 +681,28 @@ bool Previewer::handleTrap(Rv32 &cpu, uint32_t address)
                 static_cast<uint32_t>(y) + height > static_cast<uint32_t>(locked_y_) + locked_height_)
                 result = GM_EINVAL;
         }
-        if (result == OK && dirty && cpu.argument(1)) {
+        if (result == OK && dirty) {
             const GuestMemory::Region *framebuffer = cpu_.memory.find(kFramebufferBase);
             if (framebuffer && framebuffer->bytes.size() >= presented_framebuffer_.size()) {
-                std::copy_n(framebuffer->bytes.begin(), presented_framebuffer_.size(),
-                            presented_framebuffer_.begin());
+                const int16_t x = static_cast<int16_t>(cpu.memory.read16(dirty));
+                const int16_t y = static_cast<int16_t>(cpu.memory.read16(dirty + 2));
+                const uint16_t width = cpu.memory.read16(dirty + 4);
+                const uint16_t height = cpu.memory.read16(dirty + 6);
+                for (int32_t row = y; row < static_cast<int32_t>(y) + height; ++row) {
+                    for (int32_t column = x;
+                         column < static_cast<int32_t>(x) + width; ++column) {
+                        const size_t offset = static_cast<size_t>(row) * 320u +
+                                              static_cast<size_t>(column / 2);
+                        const uint8_t source = framebuffer->bytes[offset];
+                        uint8_t &target = presented_framebuffer_[offset];
+                        if ((column & 1) == 0)
+                            target = static_cast<uint8_t>((target & 0x0f) |
+                                                         (source & 0xf0));
+                        else
+                            target = static_cast<uint8_t>((target & 0xf0) |
+                                                         (source & 0x0f));
+                    }
+                }
             }
         }
         framebuffer_locked_ = false;

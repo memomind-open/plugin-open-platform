@@ -1,8 +1,10 @@
 import { createGMPlugin } from './vendor/gm-plugin-web-sdk.esm.js';
+import { encodePetState, PET_STATE_CHANNEL } from './device-protocol.js';
 
 const gm = createGMPlugin();
 const pet = document.querySelector('#pet');
 const petImage = document.querySelector('#pet-image');
+const room = document.querySelector('#room');
 const speech = document.querySelector('#speech');
 const status = document.querySelector('#status');
 const connectionDot = document.querySelector('#connection-dot');
@@ -15,6 +17,10 @@ const DEVICE_WIDTH = 600;
 const DEVICE_HEIGHT = 350;
 const petVisuals = {
   idle: './assets/momo-festive.png',
+  blink: './assets/momo-blink-v2.webp',
+  eating: './assets/momo-eating-v2.png',
+  playing: './assets/momo-playing-v2.png',
+  sleeping: './assets/momo-sleeping-v2.png',
   listening: './assets/momo-listening-v2.png',
   talking: './assets/momo-talking-v2.png',
 };
@@ -38,6 +44,14 @@ const lines = {
   play: ['接住啦！', '再来一局！', '看我超级弹跳！'],
   sleep: ['晚安，做个甜甜的梦…', 'Zzz…云朵是棉花糖。'],
 };
+const ACTION_TIMING = Object.freeze({
+  happy: 1600,
+  feed: 2200,
+  feedBite: 480,
+  play: 2400,
+  playCatch: 520,
+  sleep: 3000,
+});
 
 let recorder;
 let recordingStream;
@@ -49,11 +63,14 @@ let glassesConnected = false;
 let glassesSyncTimer;
 let glassesSyncInFlight = false;
 let glassesSyncPending = false;
-let devicePageCreated = false;
 let deviceMood = 'idle';
 let deviceMoodTimer;
-let presentedDeviceTiles = new Map();
 let mouthAnimationTimer;
+let petAnimationTimer;
+let petAnimationGeneration = 0;
+let idleBlinkTimer;
+let idleBlinkFrameTimer;
+let idleBlinkGeneration = 0;
 let nativeAudioAvailable = false;
 let nativeAudioState = 'idle';
 let nativeAudioConfigurePromise;
@@ -74,9 +91,11 @@ gm.audio.onState((audioState) => {
     showListeningState();
   } else if (audioState.state === 'stopped') {
     nativeRecordingId = audioState.latestRecordingId ?? audioState.recordingId;
-    resetTalkButton();
     if (nativeRecordingId) {
+      showProcessingState();
       void gm.audio.playRecording({ recordingId: nativeRecordingId, voice: 'cute' }).catch(showNativeAudioError);
+    } else {
+      resetTalkButton();
     }
   } else if (audioState.state === 'error') {
     resetTalkButton();
@@ -89,33 +108,51 @@ gm.audio.onState((audioState) => {
 });
 
 gm.audio.onPlaybackState((playback) => {
-  if (playback.state === 'playing') {
+  if (playback.state === 'preparing') {
+    showProcessingState();
+  } else if (playback.state === 'playing') {
+    resetTalkButton();
     say('Momo 用眼镜听到后学你说：');
     startMouthAnimation();
-    setDeviceMood('talking', 4000);
-    burst('♪', 6);
+    // Playback completion is authoritative. Keep a generous timeout only as
+    // a fallback in case the native host cannot deliver the terminal event.
+    setDeviceMood('talking', 15000);
+    burst('♪', 9, 'note');
     change({ happy: 10, energy: -2 }, 15);
   } else if (playback.state === 'completed' || playback.state === 'stopped') {
     stopMouthAnimation();
+    resetDeviceMood();
   } else if (playback.state === 'error') {
     stopMouthAnimation();
+    resetDeviceMood();
     showNativeAudioError(playback);
   }
 });
 
 function resetTalkButton() {
-  talkButton.classList.remove('recording');
+  talkButton.classList.remove('recording', 'processing');
   talkButton.querySelector('strong').textContent = '按住说话';
   pet.classList.remove('listening');
+  room.classList.remove('is-listening');
 }
 
 function showListeningState() {
   talkButton.classList.add('recording');
   talkButton.querySelector('strong').textContent = '松开让我学';
   stopMouthAnimation('listening');
-  pet.classList.add('listening');
+  animate('listening');
   setDeviceMood('listening', 15000);
   say('眼镜耳朵竖起来啦，我在认真听…');
+}
+
+function showProcessingState() {
+  resetTalkButton();
+  talkButton.classList.add('processing');
+  talkButton.querySelector('strong').textContent = '正在变声…';
+  stopMouthAnimation('idle');
+  animate('processing');
+  resetDeviceMood();
+  say('Momo 正在把你的声音变可爱…');
 }
 
 function showNativeAudioError(error) {
@@ -149,15 +186,60 @@ function setPetVisual(stateName) {
   petImage.src = petVisuals[stateName] ?? petVisuals.idle;
 }
 
+function canIdleBlink() {
+  const activeActions = ['happy', 'eating', 'playing', 'sleeping', 'listening', 'processing', 'talking'];
+  return deviceMood === 'idle'
+    && !talkInputActive
+    && (nativeAudioState === 'idle' || nativeAudioState === 'stopped' || nativeAudioState === 'error')
+    && !activeActions.some((action) => pet.classList.contains(action));
+}
+
+function scheduleIdleBlink(delay = 2500 + Math.random() * 2500) {
+  window.clearTimeout(idleBlinkTimer);
+  idleBlinkTimer = window.setTimeout(() => {
+    if (!canIdleBlink()) {
+      scheduleIdleBlink(900);
+      return;
+    }
+    const generation = ++idleBlinkGeneration;
+    const doubleBlink = Math.random() < .35;
+    setPetVisual('blink');
+    idleBlinkFrameTimer = window.setTimeout(() => {
+      if (generation !== idleBlinkGeneration || !canIdleBlink()) {
+        scheduleIdleBlink();
+        return;
+      }
+      setPetVisual('idle');
+      if (!doubleBlink) {
+        scheduleIdleBlink();
+        return;
+      }
+      idleBlinkFrameTimer = window.setTimeout(() => {
+        if (generation !== idleBlinkGeneration || !canIdleBlink()) {
+          scheduleIdleBlink();
+          return;
+        }
+        setPetVisual('blink');
+        idleBlinkFrameTimer = window.setTimeout(() => {
+          if (generation === idleBlinkGeneration && canIdleBlink()) setPetVisual('idle');
+          scheduleIdleBlink();
+        }, 95);
+      }, 115);
+    }, 95);
+  }, delay);
+}
+
 function stopMouthAnimation(nextState = 'idle') {
   window.clearInterval(mouthAnimationTimer);
   mouthAnimationTimer = undefined;
-  pet.classList.remove('listening');
+  pet.classList.remove('listening', 'talking', 'processing');
+  room.classList.remove('is-listening', 'is-talking', 'is-processing');
   setPetVisual(nextState);
 }
 
 function startMouthAnimation() {
   stopMouthAnimation('talking');
+  animate('talking');
   let mouthOpen = true;
   mouthAnimationTimer = window.setInterval(() => {
     mouthOpen = !mouthOpen;
@@ -184,24 +266,44 @@ function say(message) {
   window.setTimeout(() => speech.classList.remove('pop'), 240);
 }
 
-function animate(name, duration = 1000) {
-  pet.classList.remove('happy', 'eating', 'playing', 'sleeping', 'talking');
+function animate(name, duration = 0) {
+  const actions = ['happy', 'eating', 'playing', 'sleeping', 'listening', 'processing', 'talking'];
+  const generation = ++petAnimationGeneration;
+  window.clearTimeout(petAnimationTimer);
+  pet.classList.remove(...actions);
+  room.classList.remove(...actions.map((action) => `is-${action}`));
+  room.classList.remove('is-biting', 'is-play-caught');
+  void pet.offsetWidth;
   pet.classList.add(name);
-  window.setTimeout(() => pet.classList.remove(name), duration);
+  room.classList.add(`is-${name}`);
+  if (duration > 0) {
+    petAnimationTimer = window.setTimeout(() => {
+      if (generation !== petAnimationGeneration) return;
+      pet.classList.remove(name);
+      room.classList.remove(`is-${name}`, 'is-biting', 'is-play-caught');
+      setPetVisual('idle');
+    }, duration);
+  }
+  return generation;
 }
 
-function burst(symbol, count = 7) {
+function burst(symbol, count = 7, kind = 'default') {
   const petBox = pet.getBoundingClientRect();
   const roomBox = particles.getBoundingClientRect();
   for (let index = 0; index < count; index += 1) {
     const particle = document.createElement('span');
-    particle.className = 'particle';
+    particle.className = `particle particle-${kind}`;
     particle.textContent = symbol;
     particle.style.left = `${petBox.left - roomBox.left + petBox.width * (.25 + Math.random() * .5)}px`;
     particle.style.top = `${petBox.top - roomBox.top + petBox.height * (.25 + Math.random() * .35)}px`;
+    particle.style.setProperty('--drift-x', `${Math.round(-90 + Math.random() * 180)}px`);
+    particle.style.setProperty('--rise', `${Math.round(80 + Math.random() * 90)}px`);
+    particle.style.setProperty('--spin', `${Math.round(-160 + Math.random() * 320)}deg`);
+    particle.style.setProperty('--particle-size', `${Math.round(18 + Math.random() * 15)}px`);
+    particle.style.setProperty('--particle-duration', `${Math.round(950 + Math.random() * 550)}ms`);
     particle.style.animationDelay = `${index * 45}ms`;
     particles.append(particle);
-    window.setTimeout(() => particle.remove(), 1500);
+    window.setTimeout(() => particle.remove(), 2100);
   }
 }
 
@@ -223,33 +325,52 @@ function setDeviceMood(mood, duration = 1400) {
   }, duration);
 }
 
+function resetDeviceMood() {
+  window.clearTimeout(deviceMoodTimer);
+  deviceMoodTimer = undefined;
+  if (deviceMood === 'idle') return;
+  deviceMood = 'idle';
+  scheduleGlassesSync();
+}
+
 function perform(action) {
   if (action === 'pet') {
-    setDeviceMood('happy');
+    setPetVisual('idle');
+    setDeviceMood('happy', ACTION_TIMING.happy);
     change({ happy: 7, energy: -1 });
-    animate('happy', 700);
-    burst('♥', 6);
+    animate('happy', ACTION_TIMING.happy);
+    burst('♥', 9, 'heart');
   } else if (action === 'feed') {
-    setDeviceMood('eating');
+    setPetVisual('idle');
+    setDeviceMood('eating', ACTION_TIMING.feed);
     change({ food: 18, happy: 3, energy: 2 }, 12);
-    animate('eating', 1100);
-    burst('🍪', 5);
+    const generation = animate('eating', ACTION_TIMING.feed);
+    window.setTimeout(() => {
+      if (generation !== petAnimationGeneration) return;
+      setPetVisual('eating');
+      room.classList.add('is-biting');
+      burst('•', 11, 'feed');
+    }, ACTION_TIMING.feedBite);
   } else if (action === 'play') {
-    if (state.energy < 12) {
-      setDeviceMood('sleeping');
-      say('有点累啦，让我先睡一会儿。');
-      animate('sleeping', 1500);
-      return;
-    }
-    setDeviceMood('playing');
-    change({ happy: 14, food: -5, energy: -10 }, 16);
-    animate('playing', 1800);
-    burst('★', 8);
+    const tired = state.energy < 12;
+    setPetVisual('idle');
+    setDeviceMood('playing', ACTION_TIMING.play);
+    change({ happy: tired ? 8 : 14, food: -5, energy: tired ? -3 : -10 }, 16);
+    const generation = animate('playing', ACTION_TIMING.play);
+    window.setTimeout(() => {
+      if (generation !== petAnimationGeneration) return;
+      setPetVisual('playing');
+      room.classList.add('is-play-caught');
+      burst('★', tired ? 7 : 12, 'play');
+    }, ACTION_TIMING.playCatch);
+    say(tired ? '虽然有点累，也要接住这一球！呼～' : randomLine(action));
+    return;
   } else if (action === 'sleep') {
-    setDeviceMood('sleeping', 2300);
+    setPetVisual('sleeping');
+    setDeviceMood('sleeping', ACTION_TIMING.sleep);
     change({ energy: 22, food: -3, happy: 2 }, 10);
-    animate('sleeping', 2300);
-    burst('Z', 5);
+    animate('sleeping', ACTION_TIMING.sleep);
+    burst('Z', 7, 'sleep');
   }
   say(randomLine(action));
 }
@@ -416,7 +537,7 @@ function renderDeviceFrame() {
   drawDeviceBar('饱腹', state.food, 180, 11);
   drawDeviceBar('能量', state.energy, 230, 8);
   deviceRoundRect(310, 267, 272, 45, 12, 6, 2);
-  deviceText('抬头 玩耍   ·   低头 喂食', 446, 290, 14, 11, 600, 'center');
+  deviceText('手机控制：喂食 · 玩耍 · 睡觉', 446, 290, 14, 11, 600, 'center');
   deviceContext.strokeStyle = gray(4);
   deviceContext.beginPath(); deviceContext.moveTo(18, 324); deviceContext.lineTo(582, 324); deviceContext.stroke();
   deviceText('单击 摸摸   双击 喂食', 300, 338, 11, 7, 500, 'center');
@@ -452,15 +573,9 @@ function deviceBytesToBase64(bytes) {
   return btoa(binary);
 }
 
-function deviceTilesEqual(left, right) {
-  if (!left || left.length !== right.length) return false;
-  for (let index = 0; index < left.length; index += 1) if (left[index] !== right[index]) return false;
-  return true;
-}
-
 async function syncToGlasses(announce = false) {
   if (!glassesConnected) {
-    if (announce) say('请先加载并运行眼镜端 Web Bridge。');
+    if (announce) say('请先连接眼镜并运行 Momo 原生插件。');
     return;
   }
   if (glassesSyncInFlight) {
@@ -470,26 +585,8 @@ async function syncToGlasses(announce = false) {
   glassesSyncInFlight = true;
   syncButton.disabled = true;
   try {
-    if (!devicePageCreated) {
-      await gm.display.createPage();
-      devicePageCreated = true;
-      presentedDeviceTiles = new Map();
-    }
-    renderDeviceFrame();
-    const frame = deviceGray4Bytes();
-    for (let y = 0; y < DEVICE_HEIGHT; y += 175) {
-      for (let x = 0; x < DEVICE_WIDTH; x += 200) {
-        const key = `${x}:${y}`;
-        const tile = extractDeviceTile(frame, x, y, 200, 175);
-        if (deviceTilesEqual(presentedDeviceTiles.get(key), tile)) continue;
-        await gm.display.updateImage({
-          x, y, width: 200, height: 175, stride: 100,
-          dataBase64: deviceBytesToBase64(tile),
-        });
-        presentedDeviceTiles.set(key, tile);
-      }
-    }
-    if (announce) say('状态已经同步到眼镜啦！');
+    await gm.plugin.sendMessage(PET_STATE_CHANNEL, encodePetState(deviceMood, state));
+    if (announce) say('Momo 的状态已经同步到眼镜啦！');
   } catch (error) {
     status.textContent = `眼镜同步失败 · ${error.message}`;
     if (announce) say(`同步失败：${error.message}`);
@@ -566,28 +663,37 @@ function stopRecording(event) {
   window.clearTimeout(recordingTimer);
   if (nativeAudioAvailable) {
     nativePressGeneration += 1;
-    resetTalkButton();
     if (nativeAudioState === 'recording') {
+      showProcessingState();
       requestNativeRecordingStop();
     } else if (nativeAudioState === 'starting') {
       if (nativeStartRequestInFlight) {
         // The bridge has accepted START (or is about to); stop it as soon as
         // that request settles so a quick release cannot leave capture active.
+        showProcessingState();
         return;
       }
       // The user released while only local configuration was pending. No
       // native recording exists yet, so restore the state for the next press.
       nativeAudioState = 'idle';
+      resetTalkButton();
+    } else {
+      resetTalkButton();
     }
     return;
   }
-  if (recorder?.state === 'recording') recorder.stop();
-  resetTalkButton();
+  if (recorder?.state === 'recording') {
+    showProcessingState();
+    recorder.stop();
+  } else {
+    resetTalkButton();
+  }
 }
 
 function repeatRecording() {
   recordingStream?.getTracks().forEach((track) => track.stop());
   if (!recordingChunks.length) {
+    resetTalkButton();
     stopMouthAnimation();
     return;
   }
@@ -596,18 +702,21 @@ function repeatRecording() {
   audio.playbackRate = 1.3;
   audio.preservesPitch = false;
   audio.addEventListener('play', () => {
+    resetTalkButton();
     say('Momo 学你说：');
     startMouthAnimation();
     animate('talking', Math.max(800, (audio.duration || 2) * 770));
     setDeviceMood('talking', Math.max(800, (audio.duration || 2) * 770));
-    burst('♪', 6);
+    burst('♪', 9, 'note');
   });
   audio.addEventListener('ended', () => {
     stopMouthAnimation();
+    resetDeviceMood();
     URL.revokeObjectURL(audioUrl);
   }, { once: true });
   audio.play().catch(() => {
     stopMouthAnimation();
+    resetDeviceMood();
     say('点一下屏幕后再让我学说话吧。');
   });
   change({ happy: 10, energy: -2 }, 15);
@@ -621,6 +730,9 @@ document.querySelectorAll('[data-action]:not([data-action="talk"])').forEach((bu
 talkButton.addEventListener('pointerdown', startRecording);
 talkButton.addEventListener('pointerup', stopRecording);
 talkButton.addEventListener('pointercancel', stopRecording);
+talkButton.addEventListener('contextmenu', (event) => event.preventDefault());
+talkButton.addEventListener('selectstart', (event) => event.preventDefault());
+talkButton.addEventListener('dragstart', (event) => event.preventDefault());
 talkButton.addEventListener('pointerleave', (event) => {
   if (event.buttons) stopRecording(event);
 });
@@ -645,42 +757,40 @@ async function initialize() {
     gm.device.onButton((event) => {
       if (event.action === 'single') perform('pet');
       if (event.action === 'double') perform('feed');
-    });
-    gm.device.onGesture((event) => {
-      if (!event.active) return;
-      if (event.gesture === 'headRaise' || event.gesture === 'right') perform('play');
-      if (event.gesture === 'headLower' || event.gesture === 'left') perform('feed');
+      if (event.action === 'long') perform('sleep');
     });
     gm.device.onConnection((event) => {
       glassesConnected = event.connected;
-      devicePageCreated = false;
-      presentedDeviceTiles = new Map();
       connectionDot.classList.toggle('connected', event.connected);
-      status.textContent = event.connected ? '眼镜已连接 · 正在同步画面' : '眼镜已断开 · 手机端仍可玩';
+      status.textContent = event.connected ? '眼镜已连接 · 原生 Momo 动画已就绪' : '眼镜已断开 · 手机端仍可玩';
       if (event.connected) scheduleGlassesSync();
     });
-    await gm.device.subscribeEvents(['button', 'imuGesture', 'connection']);
+    await gm.device.subscribeEvents(['button', 'connection']);
     const deviceInfo = await gm.device.getInfo();
     glassesConnected = deviceInfo.connected;
     connectionDot.classList.toggle('connected', glassesConnected);
     const audioMode = nativeAudioAvailable ? '眼镜麦克风已就绪' : '使用手机麦克风';
     status.textContent = glassesConnected
-      ? `Bridge v1 已就绪 · ${audioMode} · 正在同步画面`
-      : `Bridge v1 已就绪 · ${audioMode} · 等待眼镜连接`;
+      ? `Momo 原生插件已就绪 · ${audioMode}`
+      : `Momo 原生插件已就绪 · ${audioMode} · 等待眼镜连接`;
     if (glassesConnected) await syncToGlasses();
   } catch (error) {
     status.textContent = `独立试玩模式 · ${error.code ?? 'Bridge 未连接'}`;
   }
 
   decayTimer = window.setInterval(() => {
-    change({ food: -1, energy: -1 }, 0);
-  }, 45000);
+    change({ happy: -1, food: -1, energy: -1 }, 0);
+  }, 3000);
+  scheduleIdleBlink(1400);
 }
 
 window.addEventListener('pagehide', () => {
   window.clearInterval(decayTimer);
   window.clearTimeout(glassesSyncTimer);
   window.clearTimeout(deviceMoodTimer);
+  window.clearTimeout(idleBlinkTimer);
+  window.clearTimeout(idleBlinkFrameTimer);
+  idleBlinkGeneration += 1;
   stopMouthAnimation();
   stopRecording();
   if (nativeAudioAvailable) void gm.audio.stopPlayback();

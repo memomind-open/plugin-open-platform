@@ -5,6 +5,11 @@ be petted, fed, played with, and put to sleep. Hold the microphone button to
 record a short phrase; Momo repeats it with a playful voice effect. In the App,
 the example uses the glasses microphone through `gm.audio`, including native
 noise reduction, Opus streaming, bounded recording, decoding, and playback.
+The phone scene combines character motion, props, particles, lighting, and
+listening or speaking effects so every interaction has a distinct response.
+Feeding, playing, and sleeping use dedicated high-resolution poses. Feeding
+and playing share the same prepare, contact, reaction, and recovery timing as
+the native glasses animation.
 
 ## Run
 
@@ -29,19 +34,25 @@ completed recording with the allowlisted `cute` voice effect.
 
 ## Device controls
 
+- Use the phone buttons for feeding, playing, sleeping, and talking. The
+  glasses plugin does not subscribe to IMU gestures.
 - Single button press: pet Momo.
-- Double button press or head-lower/left gesture: feed Momo.
-- Head-raise/right gesture: play with Momo.
+- Double button press: feed Momo.
 - **Sync to glasses** renders Momo's current stats on the device display.
 
 The pet state is persisted through `gm.storage`. Momo is an original 3D-style
 character asset stored locally under `assets/`, with no external network dependency.
+Happiness, fullness, and energy each decay by one point every three seconds while
+the plugin is open; interactions raise or lower them and immediately sync the
+new state to the glasses.
 
-The glasses UI is rendered independently on a 600×350 offscreen Canvas, quantized
-to GRAY_4, and sent as six cached 200×175 framebuffer tiles. It includes a compact
-star-eyed Momo, live status bars, action feedback, and device control hints.
-Its rounded shapes use Canvas path primitives supported by older embedded
-WebViews instead of relying on `CanvasRenderingContext2D.roundRect()`.
+The dedicated `talking_pet_bridge` glasses example renders Momo through its
+native GRAY4 framebuffer and overlays its text using native LVGL labels. The
+Web plugin sends only a seven-byte state packet; it never sends a bitmap. Eight
+embedded poses let the glasses animate idle
+breathing, blinking, petting, eating, playing, sleeping, listening, and talking
+locally, while live status bars and device controls remain synchronized with
+the phone.
 The package carries a synchronized standalone SDK under `vendor/`, so the same
 relative module graph works in both Desktop Studio and the App's isolated
 loopback asset server.

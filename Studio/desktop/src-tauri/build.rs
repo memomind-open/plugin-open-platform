@@ -41,6 +41,8 @@ fn main() {
         .file(previewer.join("previewer.cpp"))
         .file(previewer.join("previewer_c_api.cpp"))
         .file(previewer.join("rv32.cpp"))
+        .flag_if_supported("/utf-8")
+        .flag_if_supported("/EHsc")
         .warnings(true)
         .compile("gmplugin_previewer_core");
 
@@ -49,6 +51,7 @@ fn main() {
         .include(lvgl)
         .define("LV_CONF_INCLUDE_SIMPLE", "1")
         .define("CONFIG_XGIMI_PATCH", "1")
+        .flag_if_supported("/utf-8")
         .warnings(true);
     for source in &lvgl_sources {
         lvgl_build.file(source);

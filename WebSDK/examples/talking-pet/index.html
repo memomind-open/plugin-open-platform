@@ -6,8 +6,12 @@
     <meta name="theme-color" content="#ffe8a8">
     <title>Momo 会说话</title>
     <link rel="stylesheet" href="./style.css">
+    <link rel="preload" as="image" href="./assets/momo-blink-v2.webp">
     <link rel="preload" as="image" href="./assets/momo-listening-v2.png">
     <link rel="preload" as="image" href="./assets/momo-talking-v2.png">
+    <link rel="preload" as="image" href="./assets/momo-eating-v2.png">
+    <link rel="preload" as="image" href="./assets/momo-playing-v2.png">
+    <link rel="preload" as="image" href="./assets/momo-sleeping-v2.png">
   </head>
   <body>
     <main class="game-shell">
@@ -46,6 +50,19 @@
         <div class="shelf" aria-hidden="true"><span></span><span></span><span></span></div>
         <div class="plant" aria-hidden="true"><i></i><i></i><b></b></div>
         <p class="speech" id="speech" role="status">嗨！摸摸我的脑袋吧～</p>
+
+        <div class="scene-effects" aria-hidden="true">
+          <span class="prop-cookie">🍪</span>
+          <span class="prop-ball">⚽</span>
+          <span class="prop-moon">☾</span>
+          <span class="sleep-cloud"></span>
+          <span class="listen-ring ring-one"></span>
+          <span class="listen-ring ring-two"></span>
+          <span class="listen-ring ring-three"></span>
+          <span class="voice-waves">
+            <i></i><i></i><i></i><i></i><i></i>
+          </span>
+        </div>
 
         <button class="pet" id="pet" type="button" aria-label="摸摸 Momo">
           <span class="pet-glow" aria-hidden="true"></span>
