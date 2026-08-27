@@ -47,6 +47,17 @@ void gm_preview_destroy(gm_preview_handle *handle)
     delete handle;
 }
 
+int gm_preview_set_fonts(gm_preview_handle *handle,
+                         const uint8_t *default_font, size_t default_size,
+                         const uint8_t *large_font, size_t large_size)
+{
+    if (!default_font || !large_font || !default_size || !large_size) return 0;
+    return protect(handle, [&](gmpreview::Previewer &previewer) {
+        previewer.setFontData(std::vector<uint8_t>(default_font, default_font + default_size),
+                              std::vector<uint8_t>(large_font, large_font + large_size));
+    });
+}
+
 int gm_preview_load(gm_preview_handle *handle, const char *path)
 {
     if (!path) return 0;

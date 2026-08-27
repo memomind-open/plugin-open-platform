@@ -29,6 +29,9 @@ typedef struct gm_preview_text_overlay {
 
 gm_preview_handle *gm_preview_create(void);
 void gm_preview_destroy(gm_preview_handle *handle);
+int gm_preview_set_fonts(gm_preview_handle *handle,
+                         const uint8_t *default_font, size_t default_size,
+                         const uint8_t *large_font, size_t large_size);
 
 int gm_preview_load(gm_preview_handle *handle, const char *path);
 int gm_preview_start(gm_preview_handle *handle);

@@ -4,10 +4,13 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace gmpreview {
+
+class LvglHost;
 
 inline constexpr uint8_t kPluginServiceId = 0x0f;
 inline constexpr uint8_t kPluginCommandPhoneToGlasses = 0x28;
@@ -188,6 +191,7 @@ private:
     std::vector<TextOverlay> text_overlays_;
     std::vector<uint8_t> font_default_data_;
     std::vector<uint8_t> font_large_data_;
+    std::unique_ptr<LvglHost> lvgl_;
 
     void initializeMemory(uint32_t plugin_memory_size);
     void buildHostTables();

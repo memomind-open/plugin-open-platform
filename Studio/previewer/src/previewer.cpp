@@ -1,4 +1,5 @@
 #include "previewer.hpp"
+#include "lvgl_host.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -6,6 +7,7 @@
 #include <exception>
 #include <fstream>
 #include <iomanip>
+#include <iterator>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -98,6 +100,18 @@ Previewer::Previewer()
     : frame_(kDisplayWidth * kDisplayHeight, 0),
       presented_framebuffer_(320u * kDisplayHeight, 0)
 {
+    lvgl_ = std::make_unique<LvglHost>(presented_framebuffer_, kRootObject,
+                                      kObjectBase + 0x104, kFontDefault,
+                                      kFontLarge);
+#if defined(GM_PREVIEW_FONT17_PATH) && defined(GM_PREVIEW_FONT20_PATH)
+    auto readFont = [](const char *path) {
+        std::ifstream stream(path, std::ios::binary);
+        if (!stream) throw std::runtime_error(std::string("cannot open LVGL font: ") + path);
+        return std::vector<uint8_t>(std::istreambuf_iterator<char>(stream),
+                                    std::istreambuf_iterator<char>());
+    };
+    setFontData(readFont(GM_PREVIEW_FONT17_PATH), readFont(GM_PREVIEW_FONT20_PATH));
+#endif
     cpu_.setTrapHandler([this](Rv32 &cpu, uint32_t address) {
         return handleTrap(cpu, address);
     });
@@ -123,6 +137,7 @@ void Previewer::setFontData(std::vector<uint8_t> default_font,
         throw std::runtime_error("invalid embedded XGIMI font data");
     font_default_data_ = std::move(default_font);
     font_large_data_ = std::move(large_font);
+    lvgl_->setFontData(&font_default_data_, &font_large_data_);
 }
 
 void Previewer::loadFile(const std::string &path)
@@ -278,26 +293,18 @@ void Previewer::start()
 {
     if (!loaded_) throw std::runtime_error("load a GMP package before starting it");
     if (running_) return;
-    nodes_.clear();
-    Node root;
-    root.handle = kRootObject;
-    root.type = NodeType::Root;
-    root.width = kDisplayWidth;
-    root.height = kDisplayHeight;
-    root.size_set = true;
-    root.flags = 0;
-    nodes_[root.handle] = root;
+    lvgl_->start();
     device_.display_power = true;
     exit_requested_ = false;
     int32_t result = OK;
     try {
         result = callbacks_[1] ? invokeResult(callbacks_[1], {context_}) : OK;
     } catch (...) {
-        nodes_.clear();
+        lvgl_->stop();
         throw;
     }
     if (result != OK) {
-        nodes_.clear();
+        lvgl_->stop();
         throw std::runtime_error("on_start failed: " + std::to_string(result));
     }
     running_ = true;
@@ -315,7 +322,7 @@ void Previewer::stop()
     imu_modes_ = 0;
     auto_brightness_blocked_ = false;
     framebuffer_locked_ = false;
-    nodes_.clear();
+    lvgl_->stop();
     appendLog("[Previewer] Plugin stopped");
 }
 
@@ -353,15 +360,19 @@ void Previewer::unload()
     std::fill(std::begin(callbacks_), std::end(callbacks_), 0);
     context_ = 0;
     nodes_.clear();
+    lvgl_->stop();
     allocations_.clear();
 }
 
 void Previewer::tick(uint32_t elapsed_ms)
 {
     monotonic_ms_ += elapsed_ms;
-    if (running_ && !suspended_ && callbacks_[3]) {
-        invokeVoid(callbacks_[3], {context_, elapsed_ms});
-        honorExitRequest();
+    if (running_ && !suspended_) {
+        if (callbacks_[3]) {
+            invokeVoid(callbacks_[3], {context_, elapsed_ms});
+            honorExitRequest();
+        }
+        if (running_) lvgl_->tick(elapsed_ms);
     }
 }
 
@@ -765,107 +776,91 @@ bool Previewer::handleTrap(Rv32 &cpu, uint32_t address)
 
     case LRootGet:
         requireLvgl();
-        finish(running_ || nodes_.count(kRootObject) ? kRootObject : 0);
+        finish(lvgl_->rootHandle());
         return true;
-    case LObjCreate: requireLvgl(); finish(createNode(NodeType::Object, cpu.argument(0))); return true;
-    case LObjDelete: requireLvgl(); deleteNode(cpu.argument(0)); finish(); return true;
-    case LObjClean: requireLvgl(); cleanNode(cpu.argument(0)); finish(); return true;
+    case LObjCreate: requireLvgl(); finish(lvgl_->createObject(cpu.argument(0), 0)); return true;
+    case LObjDelete: requireLvgl(); lvgl_->deleteObject(cpu.argument(0)); finish(); return true;
+    case LObjClean: requireLvgl(); lvgl_->cleanObject(cpu.argument(0)); finish(); return true;
     case LObjSetPos: {
         requireLvgl();
-        if (Node *object = node(cpu.argument(0))) {
-            object->x = static_cast<int32_t>(cpu.argument(1));
-            object->y = static_cast<int32_t>(cpu.argument(2));
-            object->alignment = 0;
-        }
+        lvgl_->setPosition(cpu.argument(0), static_cast<int32_t>(cpu.argument(1)),
+                           static_cast<int32_t>(cpu.argument(2)));
         finish(); return true;
     }
     case LObjSetSize: {
         requireLvgl();
-        if (Node *object = node(cpu.argument(0))) {
-            object->width = std::max(0, static_cast<int32_t>(cpu.argument(1)));
-            object->height = std::max(0, static_cast<int32_t>(cpu.argument(2)));
-            object->size_set = true;
-        }
+        lvgl_->setSize(cpu.argument(0), static_cast<int32_t>(cpu.argument(1)),
+                       static_cast<int32_t>(cpu.argument(2)));
         finish(); return true;
     }
     case LObjAlign: {
         requireLvgl();
-        if (Node *object = node(cpu.argument(0))) {
-            object->alignment = static_cast<uint8_t>(cpu.argument(1));
-            object->align_x = static_cast<int32_t>(cpu.argument(2));
-            object->align_y = static_cast<int32_t>(cpu.argument(3));
-        }
+        lvgl_->align(cpu.argument(0), static_cast<uint8_t>(cpu.argument(1)),
+                     static_cast<int32_t>(cpu.argument(2)),
+                     static_cast<int32_t>(cpu.argument(3)));
         finish(); return true;
     }
-    case LObjAddFlag: requireLvgl(); if (Node *o = node(cpu.argument(0))) o->flags |= cpu.argument(1); finish(); return true;
-    case LObjClearFlag: requireLvgl(); if (Node *o = node(cpu.argument(0))) o->flags &= ~cpu.argument(1); finish(); return true;
-    case LObjInvalidate: requireLvgl(); finish(); return true;
-    case LObjGetWidth: {
-        requireLvgl();
-        int x, y, w = 0, h;
-        if (const Node *o = node(cpu.argument(0))) absoluteBox(*o, x, y, w, h);
-        finish(static_cast<uint32_t>(w)); return true;
-    }
-    case LObjGetHeight: {
-        requireLvgl();
-        int x, y, w, h = 0;
-        if (const Node *o = node(cpu.argument(0))) absoluteBox(*o, x, y, w, h);
-        finish(static_cast<uint32_t>(h)); return true;
-    }
+    case LObjAddFlag: requireLvgl(); lvgl_->addFlag(cpu.argument(0), cpu.argument(1)); finish(); return true;
+    case LObjClearFlag: requireLvgl(); lvgl_->clearFlag(cpu.argument(0), cpu.argument(1)); finish(); return true;
+    case LObjInvalidate: requireLvgl(); lvgl_->invalidate(cpu.argument(0)); finish(); return true;
+    case LObjGetWidth: requireLvgl(); finish(static_cast<uint32_t>(lvgl_->width(cpu.argument(0)))); return true;
+    case LObjGetHeight: requireLvgl(); finish(static_cast<uint32_t>(lvgl_->height(cpu.argument(0)))); return true;
     case LStyleSet: {
         requireLvgl();
-        if (Node *o = node(cpu.argument(0))) {
-            const uint64_t key = static_cast<uint64_t>(cpu.argument(1)) << 32 | cpu.argument(3);
-            o->styles[key] = cpu.argument(2);
-        }
+        lvgl_->setStyle(cpu.argument(0), cpu.argument(1), cpu.argument(2), cpu.argument(3));
         finish(); return true;
     }
-    case LLabelCreate: requireLvgl(); finish(createNode(NodeType::Label, cpu.argument(0))); return true;
+    case LLabelCreate: requireLvgl(); finish(lvgl_->createObject(cpu.argument(0), 1)); return true;
     case LLabelSetText:
         requireLvgl();
-        if (Node *o = node(cpu.argument(0))) o->text = cpu.argument(1) ? cpu.memory.readString(cpu.argument(1)) : "";
+        {
+            const std::string text = cpu.argument(1) ? cpu.memory.readString(cpu.argument(1)) : "";
+            lvgl_->setLabelText(cpu.argument(0), text.c_str());
+        }
         finish(); return true;
     case LLabelSetLongMode:
-        requireLvgl(); if (Node *o = node(cpu.argument(0))) o->label_mode = static_cast<uint8_t>(cpu.argument(1)); finish(); return true;
-    case LArcCreate: requireLvgl(); finish(createNode(NodeType::Arc, cpu.argument(0))); return true;
+        requireLvgl(); lvgl_->setLabelLongMode(cpu.argument(0), static_cast<uint8_t>(cpu.argument(1))); finish(); return true;
+    case LArcCreate: requireLvgl(); finish(lvgl_->createObject(cpu.argument(0), 2)); return true;
     case LArcSetRange:
-        requireLvgl(); if (Node *o = node(cpu.argument(0))) { o->arc_min = static_cast<int16_t>(cpu.argument(1)); o->arc_max = static_cast<int16_t>(cpu.argument(2)); } finish(); return true;
+        requireLvgl(); lvgl_->setArcRange(cpu.argument(0), static_cast<int16_t>(cpu.argument(1)), static_cast<int16_t>(cpu.argument(2))); finish(); return true;
     case LArcSetValue:
-        requireLvgl(); if (Node *o = node(cpu.argument(0))) o->arc_value = static_cast<int16_t>(cpu.argument(1)); finish(); return true;
-    case LLineCreate: requireLvgl(); finish(createNode(NodeType::Line, cpu.argument(0))); return true;
-    case LLineSetPoints:
-        requireLvgl(); if (Node *o = node(cpu.argument(0))) { o->line_points = cpu.argument(1); o->line_point_count = static_cast<uint16_t>(cpu.argument(2)); } finish(); return true;
-    case LFontLineHeight: finish(fontHeight(cpu.argument(0))); return true;
+        requireLvgl(); lvgl_->setArcValue(cpu.argument(0), static_cast<int16_t>(cpu.argument(1))); finish(); return true;
+    case LLineCreate: requireLvgl(); finish(lvgl_->createObject(cpu.argument(0), 3)); return true;
+    case LLineSetPoints: {
+        requireLvgl();
+        const uint32_t address = cpu.argument(1);
+        const uint16_t count = static_cast<uint16_t>(cpu.argument(2));
+        std::vector<int32_t> points(static_cast<size_t>(count) * 2u);
+        for (uint16_t i = 0; i < count; ++i) {
+            points[i * 2] = static_cast<int32_t>(cpu.memory.read32(address + i * 8u));
+            points[i * 2 + 1] = static_cast<int32_t>(cpu.memory.read32(address + i * 8u + 4));
+        }
+        lvgl_->setLinePoints(cpu.argument(0), points);
+        finish(); return true;
+    }
+    case LFontLineHeight: finish(static_cast<uint32_t>(lvgl_->fontLineHeight(cpu.argument(0)))); return true;
     case LTextGetSize: {
         const uint32_t output = cpu.argument(0);
         const std::string text = cpu.argument(1) ? cpu.memory.readString(cpu.argument(1)) : "";
-        const int height = fontHeight(cpu.argument(2));
-        const int letter = static_cast<int32_t>(cpu.argument(3));
-        const int line_space = static_cast<int32_t>(cpu.argument(4));
-        const int max_width = static_cast<int32_t>(cpu.argument(5));
-        int lines = 1, widest = 0;
-        size_t position = 0;
-        while (position < text.size()) {
-            int used = 0;
-            uint32_t next = utf8NextLine(text.substr(position), height, letter, max_width, &used);
-            widest = std::max(widest, used);
-            position += std::max<uint32_t>(next, 1);
-            if (position < text.size()) ++lines;
-        }
-        if (output) { cpu.memory.write32(output, widest); cpu.memory.write32(output + 4, lines * height + (lines - 1) * line_space); }
+        int32_t width = 0, height = 0;
+        lvgl_->textSize(width, height, text.c_str(), cpu.argument(2),
+                        static_cast<int32_t>(cpu.argument(3)),
+                        static_cast<int32_t>(cpu.argument(4)),
+                        static_cast<int32_t>(cpu.argument(5)));
+        if (output) { cpu.memory.write32(output, static_cast<uint32_t>(width)); cpu.memory.write32(output + 4, static_cast<uint32_t>(height)); }
         finish(); return true;
     }
     case LTextGetNextLine: {
         const std::string text = cpu.argument(0) ? cpu.memory.readString(cpu.argument(0)) : "";
-        int used = 0;
-        const uint32_t next = utf8NextLine(text, fontHeight(cpu.argument(1)),
-                                           static_cast<int32_t>(cpu.argument(2)),
-                                           static_cast<int32_t>(cpu.argument(3)), &used);
+        int32_t used = 0;
+        const uint32_t next = lvgl_->textNextLine(text.c_str(), cpu.argument(1),
+                                                  static_cast<int32_t>(cpu.argument(2)),
+                                                  static_cast<int32_t>(cpu.argument(3)), used);
         if (cpu.argument(4)) cpu.memory.write32(cpu.argument(4), static_cast<uint32_t>(used));
         finish(next); return true;
     }
-    case LSelectionStart: requireLvgl(); if (Node *o = node(cpu.argument(0))) o->selection_start = cpu.argument(1); finish(); return true;
-    case LSelectionEnd: requireLvgl(); if (Node *o = node(cpu.argument(0))) o->selection_end = cpu.argument(1); finish(); return true;
+    case LSelectionStart: requireLvgl(); lvgl_->setSelectionStart(cpu.argument(0), cpu.argument(1)); finish(); return true;
+    case LSelectionEnd: requireLvgl(); lvgl_->setSelectionEnd(cpu.argument(0), cpu.argument(1)); finish(); return true;
 
     case XLz4Bound: {
         const int32_t size = static_cast<int32_t>(cpu.argument(0));
@@ -1426,6 +1421,7 @@ const std::vector<uint8_t> &Previewer::renderFrame()
         std::fill(frame_.begin(), frame_.end(), 0);
         return frame_;
     }
+    lvgl_->refresh();
     for (int y = 0; y < kDisplayHeight; ++y) {
         for (int x = 0; x < kDisplayWidth; ++x) {
             const uint8_t packed = presented_framebuffer_[
@@ -1434,16 +1430,12 @@ const std::vector<uint8_t> &Previewer::renderFrame()
             frame_[y * kDisplayWidth + x] = static_cast<uint8_t>(nibble * 17);
         }
     }
-    if (const Node *root = node(kRootObject)) {
-        for (const auto &entry : nodes_)
-            if (entry.second.parent == root->handle) renderNode(entry.second);
-    }
     return frame_;
 }
 
 size_t Previewer::objectCount() const
 {
-    return nodes_.size() - (nodes_.count(kRootObject) ? 1 : 0);
+    return lvgl_->objectCount();
 }
 
 void Previewer::savePgm(const std::string &path)

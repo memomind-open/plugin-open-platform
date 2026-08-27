@@ -30,6 +30,10 @@ const MAX_GMP_BYTES: u64 = 200 * 1024;
 const MIN_GMP_BYTES: u64 = 28;
 const GMP_SHARE_PORT: u16 = 18_766;
 const GMP_REQUEST_LINE: &[u8] = b"GMP/1 GET\n";
+const DEVICE_FONT_DEFAULT: &[u8] =
+    include_bytes!("../../../previewer/third_party/lvgl/fonts/lv_font_xgimi_17.bin");
+const DEVICE_FONT_LARGE: &[u8] =
+    include_bytes!("../../../previewer/third_party/lvgl/fonts/lv_font_xgimi_20.bin");
 
 #[repr(C)]
 #[derive(Default)]
@@ -55,6 +59,13 @@ struct NativeTextOverlay {
 extern "C" {
     fn gm_preview_create() -> *mut c_void;
     fn gm_preview_destroy(handle: *mut c_void);
+    fn gm_preview_set_fonts(
+        handle: *mut c_void,
+        default_font: *const c_uchar,
+        default_size: usize,
+        large_font: *const c_uchar,
+        large_size: usize,
+    ) -> c_int;
     fn gm_preview_load(handle: *mut c_void, path: *const c_char) -> c_int;
     fn gm_preview_start(handle: *mut c_void) -> c_int;
     fn gm_preview_stop(handle: *mut c_void) -> c_int;
@@ -137,10 +148,20 @@ impl NativePreviewer {
     fn new() -> Result<Self, String> {
         let handle = NonNull::new(unsafe { gm_preview_create() })
             .ok_or_else(|| "could not allocate native previewer".to_string())?;
-        Ok(Self {
+        let previewer = Self {
             handle,
             source: None,
-        })
+        };
+        previewer.require(unsafe {
+            gm_preview_set_fonts(
+                previewer.handle.as_ptr(),
+                DEVICE_FONT_DEFAULT.as_ptr(),
+                DEVICE_FONT_DEFAULT.len(),
+                DEVICE_FONT_LARGE.as_ptr(),
+                DEVICE_FONT_LARGE.len(),
+            )
+        })?;
+        Ok(previewer)
     }
 
     fn error(&self) -> String {
