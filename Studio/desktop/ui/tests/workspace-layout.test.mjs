@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const directory = new URL('.', import.meta.url);
@@ -40,4 +40,15 @@ test('Glass controls place head motion directly below the button controls', asyn
   assert.doesNotMatch(script, /querySelectorAll\('\[data-gesture\]'\)/u);
   assert.doesNotMatch(script, /deviceActionButton\.addEventListener\('lostpointercapture'/u);
   assert.match(script, /window\.addEventListener\('pointerup', finishDeviceButtonPress\)/u);
+});
+
+test('Studio entry module imports resolve inside the source directory', async () => {
+  const script = await readFile(new URL('../src/studio.js', directory), 'utf8');
+  const imports = [...script.matchAll(/from '(\.\/[^']+)'/gu)]
+    .map((match) => match[1]);
+
+  assert.ok(imports.length > 0);
+  await Promise.all(imports.map((specifier) => (
+    access(new URL(`../src/${specifier.slice(2)}`, directory))
+  )));
 });
