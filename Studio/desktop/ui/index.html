@@ -66,11 +66,10 @@
         <div class="device-workbench">
           <div class="device-controls" aria-label="Glass event simulation">
             <div class="device-control-group">
-              <span>BUTTONS</span>
+              <span>BUTTON</span>
               <div class="button-control-row">
-                <button class="secondary action-button" data-button-action="1">Single click</button>
-                <button class="secondary action-button" data-button-action="2">Double click</button>
-                <button class="secondary action-button" data-button-action="3">Long press</button>
+                <button class="secondary action-button" data-device-button type="button" aria-describedby="device-button-hint">Press</button>
+                <small id="device-button-hint" class="control-hint">Once · twice · hold 1s</small>
               </div>
             </div>
             <div class="device-control-group direction-control-group">

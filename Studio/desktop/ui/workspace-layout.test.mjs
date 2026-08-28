@@ -29,11 +29,15 @@ test('Glass controls place head motion directly below the button controls', asyn
     readFile(new URL('index.html', directory), 'utf8'),
     readFile(new URL('studio.js', directory), 'utf8'),
   ]);
-  const buttonsPosition = html.indexOf('<span>BUTTONS</span>');
+  const buttonsPosition = html.indexOf('<span>BUTTON</span>');
   const headMotionPosition = html.indexOf('<span>HEAD MOTION</span>');
 
   assert.ok(buttonsPosition >= 0);
   assert.ok(headMotionPosition > buttonsPosition);
+  assert.equal((html.match(/data-device-button/gu) ?? []).length, 1);
+  assert.doesNotMatch(html, /data-button-action/u);
   assert.doesNotMatch(html.slice(buttonsPosition, headMotionPosition), /GESTURES|data-gesture/u);
   assert.doesNotMatch(script, /querySelectorAll\('\[data-gesture\]'\)/u);
+  assert.doesNotMatch(script, /deviceActionButton\.addEventListener\('lostpointercapture'/u);
+  assert.match(script, /window\.addEventListener\('pointerup', finishDeviceButtonPress\)/u);
 });

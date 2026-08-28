@@ -22,6 +22,11 @@ import {
 } from './bridge-security.js';
 import { drawTextOverlays } from './text-overlay.js';
 import { displayPath } from './path-display.js';
+import {
+  createDeviceButtonInput,
+  DEVICE_BUTTON_ACTION,
+  DEVICE_BUTTON_LONG_PRESS_MS,
+} from './device-button-input.js';
 import { describeDeviceFrameTransition } from './device-runtime.js';
 
 const { invoke } = window.__TAURI__.core;
@@ -53,7 +58,8 @@ const outboundWaiters = new Set();
 const storageNamespaces = new Map();
 const importedWebPlugins = new Map();
 const importedDevicePlugins = new Map();
-const deviceEventButtons = [...document.querySelectorAll('[data-button-action]')];
+const deviceActionButton = document.querySelector('[data-device-button]');
+const deviceButtonHint = document.querySelector('#device-button-hint');
 const directionJoystick = document.querySelector('[data-direction-joystick]');
 const joystickKnob = document.querySelector('[data-joystick-knob]');
 const runtimeGeneration = 1;
@@ -83,6 +89,19 @@ let webPackageQueue = Promise.resolve();
 let pendingWebPackagePath = '';
 let devicePackageGeneration = 0;
 let devicePackageQueue = Promise.resolve();
+let deviceButtonPointerId = null;
+let deviceButtonKeyboardActive = false;
+let deviceButtonFeedbackTimer = null;
+let deviceButtonFeedbackResetTimer = null;
+let deviceButtonFeedbackDeadline = 0;
+let deviceButtonLongPressSent = false;
+
+const deviceButtonInput = createDeviceButtonInput({
+  emit: (action) => {
+    if (action === DEVICE_BUTTON_ACTION.LONG_PRESS) showLongPressFeedback();
+    void simulateDeviceEvent('simulate_button', { action });
+  },
+});
 
 document.querySelector('#refresh-web').addEventListener('click', discoverWebPlugins);
 document.querySelector('#refresh-device').addEventListener('click', discoverDevicePlugins);
@@ -108,20 +127,29 @@ qrZoom.addEventListener('click', (event) => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !qrZoom.hidden) closeQrZoom();
 });
-for (const button of document.querySelectorAll('[data-button-action]')) {
-  button.addEventListener('click', () => simulateDeviceEvent('simulate_button', {
-    action: Number(button.dataset.buttonAction),
-  }));
-}
+deviceActionButton.addEventListener('pointerdown', startDeviceButtonPress);
+deviceActionButton.addEventListener('pointerup', finishDeviceButtonPress);
+deviceActionButton.addEventListener('pointercancel', cancelDeviceButtonPress);
+deviceActionButton.addEventListener('keydown', startDeviceButtonKeyPress);
+deviceActionButton.addEventListener('keyup', finishDeviceButtonKeyPress);
+deviceActionButton.addEventListener('contextmenu', (event) => event.preventDefault());
+window.addEventListener('pointerup', finishDeviceButtonPress);
+window.addEventListener('pointercancel', cancelDeviceButtonPress);
 directionJoystick.addEventListener('pointerdown', startJoystickInput);
 directionJoystick.addEventListener('pointermove', updateJoystickInput);
 directionJoystick.addEventListener('pointerup', stopJoystickInput);
 directionJoystick.addEventListener('pointercancel', stopJoystickInput);
 directionJoystick.addEventListener('lostpointercapture', stopJoystickInput);
 directionJoystick.addEventListener('contextmenu', (event) => event.preventDefault());
-window.addEventListener('blur', () => stopJoystickInput());
+window.addEventListener('blur', () => {
+  clearDeviceButtonInputUi();
+  stopJoystickInput();
+});
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) stopJoystickInput();
+  if (document.hidden) {
+    clearDeviceButtonInputUi();
+    stopJoystickInput();
+  }
 });
 frame.addEventListener('load', () => {
   if (!webActive) return;
@@ -576,6 +604,7 @@ async function runWebPlugin() {
 
 async function runDevicePlugin() {
   if (!devicePlugin.value) return;
+  clearDeviceButtonInputUi();
   clearDirectionInputUi();
   try {
     const status = await invoke('load_device_plugin', { path: devicePlugin.value });
@@ -601,9 +630,121 @@ async function simulateDeviceEvent(command, params) {
   try {
     const result = await invoke(command, params);
     if (!result.handled) throw bridgeError('CAPABILITY_UNAVAILABLE', 'Glass plugin did not handle the simulated event');
+    if (command === 'simulate_button') {
+      const names = ['unknown', 'singleClick', 'doubleClick', 'longPress'];
+      log('DEVICE BUTTON', names[params.action] ?? `action${params.action}`);
+    }
   } catch (error) {
     log('SIMULATION ERROR', normalizeBridgeError(error));
   }
+}
+
+function startDeviceButtonPress(event) {
+  if (!deviceRunning || deviceButtonPointerId !== null || event.button !== 0) return;
+  if (!deviceButtonInput.press()) return;
+  deviceButtonPointerId = event.pointerId;
+  deviceActionButton.classList.add('active');
+  startDeviceButtonFeedback();
+  deviceActionButton.setPointerCapture?.(event.pointerId);
+}
+
+function finishDeviceButtonPress(event) {
+  if (event.pointerId !== deviceButtonPointerId) return;
+  event.preventDefault();
+  const pointerId = deviceButtonPointerId;
+  deviceButtonPointerId = null;
+  deviceButtonInput.release();
+  if (deviceActionButton.hasPointerCapture?.(pointerId)) {
+    deviceActionButton.releasePointerCapture(pointerId);
+  }
+  finishDeviceButtonFeedback();
+}
+
+function cancelDeviceButtonPress(event) {
+  if (deviceButtonPointerId === null) return;
+  if (event?.pointerId !== undefined && event.pointerId !== deviceButtonPointerId) return;
+  const pointerId = deviceButtonPointerId;
+  deviceButtonPointerId = null;
+  deviceButtonInput.cancelPress();
+  if (deviceActionButton.hasPointerCapture?.(pointerId)) {
+    deviceActionButton.releasePointerCapture(pointerId);
+  }
+  resetDeviceButtonFeedback();
+}
+
+function startDeviceButtonKeyPress(event) {
+  if (!['Enter', ' '].includes(event.key) || event.repeat || !deviceRunning) return;
+  event.preventDefault();
+  if (!deviceButtonInput.press()) return;
+  deviceButtonKeyboardActive = true;
+  deviceActionButton.classList.add('active');
+  startDeviceButtonFeedback();
+}
+
+function finishDeviceButtonKeyPress(event) {
+  if (!['Enter', ' '].includes(event.key) || !deviceButtonKeyboardActive) return;
+  event.preventDefault();
+  deviceButtonKeyboardActive = false;
+  deviceButtonInput.release();
+  finishDeviceButtonFeedback();
+}
+
+function clearDeviceButtonInputUi() {
+  const pointerId = deviceButtonPointerId;
+  deviceButtonPointerId = null;
+  deviceButtonKeyboardActive = false;
+  deviceButtonInput.reset();
+  if (pointerId !== null && deviceActionButton.hasPointerCapture?.(pointerId)) {
+    deviceActionButton.releasePointerCapture(pointerId);
+  }
+  resetDeviceButtonFeedback();
+}
+
+function startDeviceButtonFeedback() {
+  if (deviceButtonFeedbackResetTimer !== null) clearTimeout(deviceButtonFeedbackResetTimer);
+  if (deviceButtonFeedbackTimer !== null) clearInterval(deviceButtonFeedbackTimer);
+  deviceButtonFeedbackResetTimer = null;
+  deviceButtonLongPressSent = false;
+  deviceButtonFeedbackDeadline = performance.now() + DEVICE_BUTTON_LONG_PRESS_MS;
+  updateDeviceButtonFeedback();
+  deviceButtonFeedbackTimer = setInterval(updateDeviceButtonFeedback, 100);
+}
+
+function updateDeviceButtonFeedback() {
+  const remainingMs = Math.max(0, deviceButtonFeedbackDeadline - performance.now());
+  if (remainingMs === 0) return;
+  deviceActionButton.textContent = `Hold ${Math.ceil(remainingMs / 1000)}s`;
+  deviceButtonHint.textContent = 'Keep holding';
+}
+
+function showLongPressFeedback() {
+  deviceButtonLongPressSent = true;
+  if (deviceButtonFeedbackTimer !== null) clearInterval(deviceButtonFeedbackTimer);
+  deviceButtonFeedbackTimer = null;
+  deviceActionButton.textContent = 'Long press sent';
+  deviceButtonHint.textContent = 'Release to continue';
+}
+
+function finishDeviceButtonFeedback() {
+  deviceActionButton.classList.remove('active');
+  if (!deviceButtonLongPressSent) {
+    resetDeviceButtonFeedback();
+    return;
+  }
+  if (deviceButtonFeedbackResetTimer !== null) clearTimeout(deviceButtonFeedbackResetTimer);
+  deviceButtonFeedbackResetTimer = setTimeout(resetDeviceButtonFeedback, 600);
+}
+
+function resetDeviceButtonFeedback() {
+  if (deviceButtonFeedbackTimer !== null) clearInterval(deviceButtonFeedbackTimer);
+  if (deviceButtonFeedbackResetTimer !== null) clearTimeout(deviceButtonFeedbackResetTimer);
+  deviceButtonFeedbackTimer = null;
+  deviceButtonFeedbackResetTimer = null;
+  deviceButtonFeedbackDeadline = 0;
+  deviceButtonLongPressSent = false;
+  deviceActionButton.classList.remove('active');
+  deviceActionButton.textContent = 'Press';
+  deviceButtonHint.textContent = 'Once · twice · hold 1s';
 }
 
 function queueDirectionVector(x, y, active) {
@@ -1034,7 +1175,8 @@ function updatePairStatus() {
 }
 
 function updateDeviceControls() {
-  for (const button of deviceEventButtons) button.disabled = !deviceRunning;
+  deviceActionButton.disabled = !deviceRunning;
+  if (!deviceRunning) clearDeviceButtonInputUi();
   directionJoystick.classList.toggle('disabled', !deviceRunning);
   directionJoystick.setAttribute('aria-disabled', String(!deviceRunning));
   directionJoystick.tabIndex = deviceRunning ? 0 : -1;
