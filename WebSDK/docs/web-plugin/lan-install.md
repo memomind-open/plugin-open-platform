@@ -7,17 +7,23 @@ authentication.
 
 ## QR code payload
 
-The QR code contains compact JSON:
+The preferred QR payload is a compact URI. The package name is percent-encoded
+as one path segment:
+
+```text
+mmpkg+tcp://192.168.1.8:18765/counter-0.1.0.mmpkg
+```
+
+The App also accepts the original JSON descriptor for compatibility with
+existing development tools:
 
 ```json
 {"v":1,"scheme":"mmpkg+tcp","host":"192.168.1.8","port":18765,"name":"counter-0.1.0.mmpkg"}
 ```
 
-- `v`: protocol version, currently `1`.
-- `scheme`: always `mmpkg+tcp`; do not treat it as the firmware plugin scheme
-  `gmp+tcp`.
-- `host` and `port`: Studio's LAN TCP address.
-- `name`: suggested download filename.
+The scheme is always `mmpkg+tcp`; do not treat it as the firmware plugin
+scheme `gmp+tcp`. The authority contains Studio's LAN host and port, and the
+single path segment is the suggested download filename.
 
 Studio prefers TCP port `18765`. If that port is busy, it selects a random
 available port and writes the actual value into the QR code.

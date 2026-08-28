@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { layoutOverlayText, wrapOverlayText } from './text-overlay.js';
+import { layoutOverlayText, wrapOverlayText } from '../src/text-overlay.js';
 
 const context = {
   measureText(text) {

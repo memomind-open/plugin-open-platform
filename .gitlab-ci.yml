@@ -51,6 +51,6 @@ previewer_verify:
     - apt-get update
     - apt-get install -y --no-install-recommends build-essential cmake ripgrep
   script:
-    - Studio/previewer/build.sh
-    - ctest --test-dir Studio/previewer/build --output-on-failure
+    - Studio/scripts/build-previewer.sh
+    - ctest --test-dir Studio/.build/previewer/linux-release --output-on-failure
     - Studio/previewer/tests/smoke.sh

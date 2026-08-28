@@ -2,11 +2,12 @@
 set -euo pipefail
 
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+studio_root="$(cd "$project_dir/.." && pwd)"
 sdk_build="${GMPLUGIN_SDK_BUILD:-$project_dir/../../GlassSDK/build-host}"
-cli="$project_dir/build/gmplugin-preview-cli"
+cli="$studio_root/.build/previewer/linux-release/gmplugin-preview-cli"
 
 if [[ ! -x "$cli" ]]; then
-  "$project_dir/build.sh"
+  "$studio_root/scripts/build-previewer.sh"
 fi
 if [[ ! -d "$sdk_build" ]]; then
   echo "SDK example build directory not found: $sdk_build" >&2

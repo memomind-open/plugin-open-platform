@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { displayPath } from './path-display.js';
+import { displayPath } from '../src/path-display.js';
 
 test('converts an extended UNC path into a readable Samba path', () => {
   assert.equal(

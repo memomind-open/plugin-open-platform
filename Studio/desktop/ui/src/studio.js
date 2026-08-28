@@ -46,6 +46,9 @@ const deviceShareAddress = document.querySelector('#device-share-address');
 const deviceShareName = document.querySelector('#device-share-name');
 const qrZoom = document.querySelector('#qr-zoom');
 const qrZoomCanvas = document.querySelector('#qr-zoom-canvas');
+const qrModels = new WeakMap();
+const QR_THEME_BACKGROUND = '#d3e1dc';
+const QR_THEME_FOREGROUND = '#10231d';
 const subscriptions = new Map();
 const outboundWaiters = new Set();
 const storageNamespaces = new Map();
@@ -475,14 +478,19 @@ function clearDevicePackageShare(status) {
 }
 
 function drawQrCode(target, size, modules) {
+  qrModels.set(target, { size, modules });
+  renderQrCode(target, size, modules, QR_THEME_BACKGROUND, QR_THEME_FOREGROUND);
+}
+
+function renderQrCode(target, size, modules, background, foreground) {
   const border = 4;
   const canvasSize = target.width;
   const scale = Math.floor(canvasSize / (size + border * 2));
   const offset = Math.floor((canvasSize - (size + border * 2) * scale) / 2);
   const qrContext = target.getContext('2d', { alpha: false });
-  qrContext.fillStyle = '#fff';
+  qrContext.fillStyle = background;
   qrContext.fillRect(0, 0, canvasSize, canvasSize);
-  qrContext.fillStyle = '#000';
+  qrContext.fillStyle = foreground;
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       if (!modules[y * size + x]) continue;
@@ -493,11 +501,9 @@ function drawQrCode(target, size, modules) {
 
 function openQrZoom(source) {
   if (source.hidden) return;
-  const zoomContext = qrZoomCanvas.getContext('2d', { alpha: false });
-  zoomContext.imageSmoothingEnabled = false;
-  zoomContext.fillStyle = '#fff';
-  zoomContext.fillRect(0, 0, qrZoomCanvas.width, qrZoomCanvas.height);
-  zoomContext.drawImage(source, 0, 0, qrZoomCanvas.width, qrZoomCanvas.height);
+  const model = qrModels.get(source);
+  if (!model) return;
+  renderQrCode(qrZoomCanvas, model.size, model.modules, '#fff', '#000');
   qrZoom.dataset.source = source.id;
   qrZoom.dataset.openedAt = String(performance.now());
   qrZoom.hidden = false;

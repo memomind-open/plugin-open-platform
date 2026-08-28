@@ -253,7 +253,8 @@ a smaller Windows display is preferable.
 The command keeps serving that file until you press `Ctrl+C`. Open **Settings > Device
 information > Debug > Plugin WebView Demo > Scan GMP QR code** in Aphrodite,
 scan the code, and keep the phone and development computer on the same LAN. The
-QR code contains only the stable server endpoint and package name. You can
+QR code contains a compact `gmp+tcp://host:port/package.gmp` URI with only the
+stable server endpoint and package name. You can
 rebuild the same example in another terminal and scan the original QR code
 again to fetch the new GMP; the server calculates its size and SHA-256 for every
 download. This is an unauthenticated Debug LAN channel: the size, SHA-256, and

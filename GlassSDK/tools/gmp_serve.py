@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import hashlib
 import importlib
-import json
 import os
 import pathlib
 import socket
@@ -16,10 +15,10 @@ import sys
 import threading
 import zlib
 from dataclasses import dataclass
+from urllib.parse import quote
 
 
 PROTOCOL = "gmp+tcp"
-PROTOCOL_VERSION = 1
 REQUEST_LINE = b"GMP/1 GET\n"
 MAX_REQUEST_BYTES = 64
 MIN_PACKAGE_BYTES = 28
@@ -34,17 +33,7 @@ class PackageMetadata:
     name: str
 
     def to_qr_payload(self) -> str:
-        return json.dumps(
-            {
-                "v": PROTOCOL_VERSION,
-                "scheme": PROTOCOL,
-                "host": self.host,
-                "port": self.port,
-                "name": self.name,
-            },
-            separators=(",", ":"),
-            ensure_ascii=True,
-        )
+        return f"{PROTOCOL}://{self.host}:{self.port}/{quote(self.name, safe='')}"
 
 
 def read_package(path: pathlib.Path) -> bytes:
@@ -170,7 +159,7 @@ def _load_qr_code():
 
 def _encode_qr(payload: str):
     qr_code = _load_qr_code()
-    return qr_code.encode_text(payload, qr_code.Ecc.MEDIUM)
+    return qr_code.encode_text(payload, qr_code.Ecc.LOW)
 
 
 def _png_chunk(kind: bytes, data: bytes) -> bytes:
