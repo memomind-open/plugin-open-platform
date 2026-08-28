@@ -26,8 +26,8 @@ test('Plugin selectors start at the top without a dedicated header', async () =>
 
 test('Glass controls place head motion directly below the button controls', async () => {
   const [html, script] = await Promise.all([
-    readFile(new URL('index.html', directory), 'utf8'),
-    readFile(new URL('studio.js', directory), 'utf8'),
+    readFile(new URL('../index.html', directory), 'utf8'),
+    readFile(new URL('../src/studio.js', directory), 'utf8'),
   ]);
   const buttonsPosition = html.indexOf('<span>BUTTON</span>');
   const headMotionPosition = html.indexOf('<span>HEAD MOTION</span>');
