@@ -37,7 +37,8 @@ fn emit_file_dependencies(directory: &Path) {
 }
 
 fn main() {
-    let previewer = Path::new("../../previewer/src");
+    let previewer_core = Path::new("../../previewer/core");
+    let previewer_include = Path::new("../../previewer/include");
     let lvgl = Path::new("../../previewer/third_party/lvgl");
     let mut lvgl_sources = Vec::new();
     collect_c_sources(&lvgl.join("src"), &mut lvgl_sources);
@@ -47,12 +48,12 @@ fn main() {
         .cpp(true)
         .std("c++17")
         .static_crt(true)
-        .include(previewer)
+        .include(previewer_include)
         .include(lvgl)
-        .file(previewer.join("lvgl_host.cpp"))
-        .file(previewer.join("previewer.cpp"))
-        .file(previewer.join("previewer_c_api.cpp"))
-        .file(previewer.join("rv32.cpp"))
+        .file(previewer_core.join("lvgl_host.cpp"))
+        .file(previewer_core.join("previewer.cpp"))
+        .file(previewer_core.join("previewer_c_api.cpp"))
+        .file(previewer_core.join("rv32.cpp"))
         .flag_if_supported("/utf-8")
         .flag_if_supported("/EHsc")
         .warnings(true)
@@ -75,17 +76,24 @@ fn main() {
 
     for source in [
         "lvgl_host.cpp",
-        "lvgl_host.hpp",
         "previewer.cpp",
-        "previewer.hpp",
         "previewer_c_api.cpp",
-        "previewer_c_api.h",
         "rv32.cpp",
+    ] {
+        println!(
+            "cargo:rerun-if-changed={}",
+            previewer_core.join(source).display()
+        );
+    }
+    for header in [
+        "lvgl_host.hpp",
+        "previewer.hpp",
+        "previewer_c_api.h",
         "rv32.hpp",
     ] {
         println!(
             "cargo:rerun-if-changed={}",
-            previewer.join(source).display()
+            previewer_include.join(header).display()
         );
     }
     println!(

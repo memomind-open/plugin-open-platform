@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import pathlib
 import socket
 import tempfile
@@ -46,16 +45,25 @@ class GmpServeTest(unittest.TestCase):
             package = pathlib.Path(directory) / "snake.gmp"
             package.write_bytes(b"GMPK" + bytes(28))
             metadata = package_metadata(package, "192.168.1.8", 18765)
-            payload = json.loads(metadata.to_qr_payload())
-            self.assertEqual(payload["v"], 1)
-            self.assertEqual(payload["scheme"], "gmp+tcp")
-            self.assertEqual(payload["name"], "snake.gmp")
-            self.assertNotIn("size", payload)
-            self.assertNotIn("sha256", payload)
+            self.assertEqual(
+                metadata.to_qr_payload(),
+                "gmp+tcp://192.168.1.8:18765/snake.gmp",
+            )
 
             original_payload = metadata.to_qr_payload()
             package.write_bytes(b"GMPK" + bytes(64))
             self.assertEqual(metadata.to_qr_payload(), original_payload)
+
+    def test_qr_uses_low_error_correction_for_screen_scanning(self) -> None:
+        qr_code = mock.Mock()
+        qr_code.Ecc.LOW = mock.sentinel.low
+        with mock.patch.object(gmp_serve, "_load_qr_code", return_value=qr_code):
+            gmp_serve._encode_qr("gmp+tcp://192.168.1.8:18765/snake.gmp")
+
+        qr_code.encode_text.assert_called_once_with(
+            "gmp+tcp://192.168.1.8:18765/snake.gmp",
+            mock.sentinel.low,
+        )
 
     def test_server_sends_exact_package_after_valid_request(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

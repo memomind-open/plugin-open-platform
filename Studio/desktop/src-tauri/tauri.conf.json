@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "GM Plugin Studio",
+  "productName": "MemoMind Plugin Studio",
   "version": "0.1.0",
   "identifier": "com.memomind.gm-plugin-studio",
   "build": {
@@ -11,7 +11,8 @@
     "windows": [
       {
         "label": "main",
-        "title": "GM Plugin Studio",
+        "url": "index.html?v=20260828-toolbar-compact",
+        "title": "MemoMind Plugin Studio",
         "width": 1800,
         "height": 920,
         "minWidth": 1500,
@@ -24,6 +25,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": []
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ]
   }
 }

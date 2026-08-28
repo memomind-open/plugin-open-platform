@@ -24,7 +24,7 @@ Bluetooth behavior on the device.
 The built Windows x64 application is located at:
 
 ```text
-build-windows/GMPluginPreviewer.exe
+Studio/.build/previewer/windows-mingw-x64/GMPluginPreviewer.exe
 ```
 
 After launch, you can:
@@ -50,7 +50,7 @@ in the Previewer; the plugin receives a short three-axis gyro motion sequence.
 You may also pass an `.gmp` on the command line:
 
 ```powershell
-.\build-windows\GMPluginPreviewer.exe C:\plugins\my-plugin.gmp
+.\Studio\.build\previewer\windows-mingw-x64\GMPluginPreviewer.exe C:\plugins\my-plugin.gmp
 ```
 
 ## Build
@@ -59,13 +59,15 @@ The current development environment can cross-compile the Windows executable
 on Linux:
 
 ```bash
-./build-windows.sh
+Studio/scripts/build-previewer-windows.sh
 ```
 
 To use firmware fonts, specify the font directory when configuring CMake:
 
 ```powershell
-cmake -S . -B build-windows -DGM_PREVIEW_FONT_DIR=C:\path\to\fonts
+cmake -S Studio/previewer \
+  -B Studio/.build/previewer/windows-mingw-x64 \
+  -DGM_PREVIEW_FONT_DIR=C:\path\to\fonts
 ```
 
 The directory must contain:
@@ -82,16 +84,18 @@ separate runtime files.
 Build the headless validation tool on Linux with:
 
 ```bash
-./build.sh
+Studio/scripts/build-previewer.sh
 ```
 
 CLI examples:
 
 ```bash
-./build/gmplugin-preview-cli ../../GlassSDK/build-host/lvgl_ui/lvgl_ui.gmp \
+Studio/.build/previewer/linux-release/gmplugin-preview-cli \
+  GlassSDK/build-host/lvgl_ui/lvgl_ui.gmp \
   --frames 30 --pgm /tmp/lvgl-ui.pgm
 
-./build/gmplugin-preview-cli ../../GlassSDK/build-host/bluetooth/bluetooth.gmp \
+Studio/.build/previewer/linux-release/gmplugin-preview-cli \
+  GlassSDK/build-host/bluetooth/bluetooth.gmp \
   --bt 1 "Hello plugin"
 ```
 
@@ -145,7 +149,7 @@ acceptance standard for physical glasses.
 Run:
 
 ```bash
-./tests/smoke.sh
+Studio/previewer/tests/smoke.sh
 ```
 
 The regression script runs every maintained example in `GlassSDK/build-host`
@@ -171,14 +175,17 @@ jet_runner    snake          tetris
 
 ```text
 previewer/
-├── src/rv32.*           RV32IMAFC guest executor and isolated memory
-├── src/previewer.*      GMP loader, Host API, LVGL scene, and rendering core
-├── src/main_win32.cpp   Windows desktop UI
-├── src/main_cli.cpp     Headless test entry point
-├── tests/smoke.sh       SDK example regression suite
-├── build-windows.sh     Windows x64 cross-build
-└── build.sh             Native CLI build
+├── core/                RV32 executor, GMP loader, Host API, and rendering
+├── include/             Public C and C++ previewer interfaces
+├── apps/cli/            Headless validation frontend
+├── apps/win32/          Standalone Windows compatibility frontend
+├── resources/           Native frontend resources
+├── tests/               Core integration and SDK regression tests
+└── third_party/         Pinned LVGL compatibility dependency
 ```
+
+Build scripts and generated files live outside the source tree under
+`Studio/scripts/` and `Studio/.build/`, respectively.
 
 ## Current limitations
 

@@ -1,0 +1,30 @@
+FROM ubuntu:24.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG RUST_TOOLCHAIN=1.88.0
+ARG TAURI_CLI_VERSION=2.11.4
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    curl \
+    file \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    libssl-dev \
+    libwebkit2gtk-4.1-dev \
+    libxdo-dev \
+    patchelf \
+    wget \
+    xdg-utils \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV CARGO_HOME=/opt/cargo
+ENV RUSTUP_HOME=/opt/rustup
+ENV PATH=/opt/cargo/bin:${PATH}
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --profile minimal --default-toolchain ${RUST_TOOLCHAIN} \
+  && cargo install --locked tauri-cli --version ${TAURI_CLI_VERSION}
+
+WORKDIR /workspace

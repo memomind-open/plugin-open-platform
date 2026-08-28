@@ -5,7 +5,7 @@ import test from 'node:test';
 const directory = new URL('.', import.meta.url);
 
 test('Phone and glass columns share one vertical divider', async () => {
-  const css = await readFile(new URL('studio.css', directory), 'utf8');
+  const css = await readFile(new URL('../src/studio.css', directory), 'utf8');
   assert.match(css, /--paired-columns: minmax\(0, 1fr\) minmax\(0, 1fr\);/u);
   assert.match(css, /\.pair-toolbar \{[^}]*grid-template-columns: var\(--paired-columns\);[^}]*column-gap: var\(--paired-column-gap\);/u);
   assert.match(css, /\.workspace \{[^}]*grid-template-columns: var\(--paired-columns\);[^}]*column-gap: var\(--paired-column-gap\);/u);
@@ -14,9 +14,9 @@ test('Phone and glass columns share one vertical divider', async () => {
 
 test('Plugin selectors start at the top without a dedicated header', async () => {
   const [html, css, script] = await Promise.all([
-    readFile(new URL('index.html', directory), 'utf8'),
-    readFile(new URL('studio.css', directory), 'utf8'),
-    readFile(new URL('studio.js', directory), 'utf8'),
+    readFile(new URL('../index.html', directory), 'utf8'),
+    readFile(new URL('../src/studio.css', directory), 'utf8'),
+    readFile(new URL('../src/studio.js', directory), 'utf8'),
   ]);
   assert.doesNotMatch(html, /class="app-header"|id="pair-status"/u);
   assert.doesNotMatch(css, /\.app-header|\.pair-status/u);

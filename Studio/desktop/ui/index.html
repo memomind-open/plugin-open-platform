@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GM Plugin Studio</title>
-    <link rel="stylesheet" href="./studio.css">
+    <title>MemoMind Plugin Studio</title>
+    <link rel="stylesheet" href="./src/studio.css?v=20260828-toolbar-compact">
   </head>
   <body>
     <section class="pair-toolbar">
@@ -24,7 +24,7 @@
         </div>
         <aside class="web-share-card" aria-live="polite">
           <div class="web-share-visual">
-            <canvas id="web-share-qr" class="clickable-qr" width="160" height="160" hidden role="button" tabindex="0" aria-label="Click to enlarge the phone plugin installation QR code"></canvas>
+            <canvas id="web-share-qr" class="clickable-qr" width="148" height="148" hidden role="button" tabindex="0" aria-label="Click to enlarge the phone plugin installation QR code"></canvas>
             <span id="web-share-placeholder">Generated after<br>selection</span>
           </div>
         </aside>
@@ -45,7 +45,7 @@
         </div>
         <aside class="device-share-card" aria-live="polite">
           <div class="device-share-visual">
-            <canvas id="device-share-qr" class="clickable-qr" width="160" height="160" hidden role="button" tabindex="0" aria-label="Click to enlarge the glass plugin installation QR code"></canvas>
+            <canvas id="device-share-qr" class="clickable-qr" width="148" height="148" hidden role="button" tabindex="0" aria-label="Click to enlarge the glass plugin installation QR code"></canvas>
             <span id="device-share-placeholder">Generated after<br>selection</span>
           </div>
         </aside>
@@ -111,6 +111,6 @@
       </div>
     </div>
 
-    <script type="module" src="./studio.js"></script>
+    <script type="module" src="./src/studio.js?v=20260828-toolbar-compact"></script>
   </body>
 </html>

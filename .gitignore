@@ -7,6 +7,8 @@ coverage/
 dist/
 target/
 
-Studio/previewer/build/
-Studio/previewer/build-windows/
 Studio/desktop/src-tauri/gen/schemas/
+Studio/.build/
+Studio/export/*/
+Studio/export/*.json
+Studio/export/*.txt

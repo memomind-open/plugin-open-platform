@@ -8,7 +8,7 @@ import {
   encodeSceneMessage,
   PLUGIN_TRANSPORT,
   SCENE_CHANNELS,
-} from './scene-protocol.js';
+} from '../src/scene-protocol.js';
 
 test('desktop routes glasses plugin messages only on uplink command 0x29', () => {
   assert.deepEqual(PLUGIN_TRANSPORT, {

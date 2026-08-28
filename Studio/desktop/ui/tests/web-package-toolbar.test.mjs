@@ -5,7 +5,7 @@ import test from 'node:test';
 const directory = new URL('.', import.meta.url);
 
 test('Package information keeps the install status aligned beside the QR', async () => {
-  const css = await readFile(new URL('studio.css', directory), 'utf8');
+  const css = await readFile(new URL('../src/studio.css', directory), 'utf8');
   assert.match(css, /grid-template-columns: minmax\(0, 1fr\) auto auto;/u);
   assert.match(css, /\.web-share-copy strong, \.device-share-copy strong \{ grid-column: 3;/u);
   assert.match(css, /#web-share-name, #device-share-name \{ grid-column: 1;/u);
@@ -14,8 +14,8 @@ test('Package information keeps the install status aligned beside the QR', async
 
 test('Phone plugin selection owns the inline package QR and automatic run flow', async () => {
   const [html, script] = await Promise.all([
-    readFile(new URL('index.html', directory), 'utf8'),
-    readFile(new URL('studio.js', directory), 'utf8'),
+    readFile(new URL('../index.html', directory), 'utf8'),
+    readFile(new URL('../src/studio.js', directory), 'utf8'),
   ]);
 
   assert.match(html, /id="web-share-qr"/u);
@@ -33,16 +33,16 @@ test('Phone plugin selection owns the inline package QR and automatic run flow',
   assert.match(script, /queueWebPackageShareWhenIdle\(path\);/u);
   assert.match(script, /requestIdleCallback\(startPackaging, \{ timeout: 1500 \}\)/u);
   assert.match(script, /webShareName\.textContent = `Path: \$\{packagePath\}`;/u);
-  assert.match(html, /id="web-share-qr"[^>]*width="160" height="160"/u);
+  assert.match(html, /id="web-share-qr"[^>]*width="148" height="148"/u);
 });
 
 test('Glass plugin selection owns the inline package QR and automatic run flow', async () => {
   const [html, script] = await Promise.all([
-    readFile(new URL('index.html', directory), 'utf8'),
-    readFile(new URL('studio.js', directory), 'utf8'),
+    readFile(new URL('../index.html', directory), 'utf8'),
+    readFile(new URL('../src/studio.js', directory), 'utf8'),
   ]);
 
-  assert.match(html, /id="device-share-qr"[^>]*width="160" height="160"/u);
+  assert.match(html, /id="device-share-qr"[^>]*width="148" height="148"/u);
   assert.match(html, /class="device-share-copy"[\s\S]*class="picker-actions"/u);
   assert.doesNotMatch(html, /id="run-device"/u);
   assert.doesNotMatch(html, /id="share-device"/u);
@@ -58,9 +58,9 @@ test('Glass plugin selection owns the inline package QR and automatic run flow',
 
 test('Package QR codes open a centered zoom view without multi-click dismissal', async () => {
   const [html, css, script] = await Promise.all([
-    readFile(new URL('index.html', directory), 'utf8'),
-    readFile(new URL('studio.css', directory), 'utf8'),
-    readFile(new URL('studio.js', directory), 'utf8'),
+    readFile(new URL('../index.html', directory), 'utf8'),
+    readFile(new URL('../src/studio.css', directory), 'utf8'),
+    readFile(new URL('../src/studio.js', directory), 'utf8'),
   ]);
 
   assert.match(html, /id="web-share-qr" class="clickable-qr"/u);
@@ -70,4 +70,24 @@ test('Package QR codes open a centered zoom view without multi-click dismissal',
   assert.match(script, /qr\.addEventListener\('click', \(\) => openQrZoom\(qr\)\)/u);
   assert.match(script, /performance\.now\(\) - Number\(qrZoom\.dataset\.openedAt \|\| 0\) < 400/u);
   assert.match(script, /event\.key === 'Escape'/u);
+});
+
+test('Inline QR codes use the Studio palette while the zoom remains black and white', async () => {
+  const [html, css, script, tauriConfig] = await Promise.all([
+    readFile(new URL('../index.html', directory), 'utf8'),
+    readFile(new URL('../src/studio.css', directory), 'utf8'),
+    readFile(new URL('../src/studio.js', directory), 'utf8'),
+    readFile(new URL('../../src-tauri/tauri.conf.json', directory), 'utf8'),
+  ]);
+
+  assert.equal(JSON.parse(tauriConfig).app.windows[0].url, 'index.html?v=20260828-toolbar-compact');
+  assert.match(html, /studio\.css\?v=20260828-toolbar-compact/u);
+  assert.match(html, /studio\.js\?v=20260828-toolbar-compact/u);
+  assert.match(css, /#web-share-qr, #device-share-qr \{[^}]*background: #d3e1dc;[^}]*\}/u);
+  assert.doesNotMatch(css, /#web-share-qr, #device-share-qr \{[^}]*filter:/u);
+  assert.match(script, /QR_THEME_BACKGROUND = '#d3e1dc'/u);
+  assert.match(script, /QR_THEME_FOREGROUND = '#10231d'/u);
+  assert.match(script, /qrModels\.set\(target, \{ size, modules \}\)/u);
+  assert.match(script, /renderQrCode\(qrZoomCanvas, model\.size, model\.modules, '#fff', '#000'\)/u);
+  assert.doesNotMatch(script, /zoomContext\.drawImage\(source/u);
 });

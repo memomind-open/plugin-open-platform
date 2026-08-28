@@ -1,4 +1,4 @@
-# GM Plugin Studio Desktop
+# MemoMind Plugin Studio Desktop
 
 The cross-platform desktop Studio runs a Web plugin and a device `.gmp` in one
 window. The left side uses the system WebView; the right side uses the RV32/Host
@@ -88,7 +88,7 @@ target platform:
 
 ```bash
 cargo install tauri-cli --version 2.11.4 --locked
-npm run desktop:build
+npm run build --prefix Studio
 ```
 
 Automatic Web packaging uses the same `.mmpkg v1` structure and SHA-256 file
@@ -103,7 +103,7 @@ The phone and computer must be on the same LAN, and the App must implement the
 
 Build and sign `.app/.dmg` artifacts on a macOS runner. Build and sign
 `.msi/.exe` artifacts with MSVC on a Windows runner. Both platforms share all
-Rust, frontend, and C++ core source. `Studio/previewer/src/main_win32.cpp`
+Rust, frontend, and C++ core source. `Studio/previewer/apps/win32/main.cpp`
 remains available as a standalone native Windows debugger.
 
 For local Windows testing, Linux can cross-compile the unsigned x64 executable
@@ -123,7 +123,26 @@ PATH=/usr/lib/llvm-19/bin:$PATH cargo tauri build \
 ```
 
 The executable is written to
-`target/x86_64-pc-windows-msvc/release/gm-plugin-studio-desktop.exe`. Run it
+`Studio/.build/cargo/x86_64-pc-windows-msvc/release/gm-plugin-studio-desktop.exe`. Run it
 from within a repository checkout so Studio can discover `WebSDK` and
 `GlassSDK`. Production installers and code signing should still use a Windows
 runner.
+
+## Distribution exports
+
+Native installers remain platform-specific. Use the common export workflow to
+stage one directly usable file under `Studio/export/<platform>/`:
+
+```bash
+npm run export --prefix Studio
+```
+
+The Linux development environment can produce and stage an unsigned Windows
+x64 NSIS installer with:
+
+```bash
+npm run export:windows:x64 --prefix Studio
+```
+
+See [`../export/README.md`](../export/README.md) for native installer guidance
+and CI artifact collection.

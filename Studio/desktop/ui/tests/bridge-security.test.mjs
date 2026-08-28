@@ -5,7 +5,7 @@ import {
   hasBridgePermission,
   isTrustedPluginMessage,
   storageNamespace,
-} from './bridge-security.js';
+} from '../src/bridge-security.js';
 
 test('only accepts messages from the active plugin frame and origin', () => {
   const frame = {};

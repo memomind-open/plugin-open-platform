@@ -7,7 +7,7 @@ import {
   describeWorkspace,
   evaluateCompatibility,
   WEB_BRIDGE_PLUGIN_ID,
-} from './workspace-mode.js';
+} from '../src/workspace-mode.js';
 
 const plugins = [
   { id: 'com.gm.example.bluetooth', path: '/build/bluetooth/bluetooth.gmp' },

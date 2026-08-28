@@ -1,7 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
-use qrcode::{types::Color, QrCode};
+use qrcode::{
+    types::{Color, EcLevel},
+    QrCode,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -36,6 +39,18 @@ const DEVICE_FONT_DEFAULT: &[u8] =
     include_bytes!("../../../previewer/third_party/lvgl/fonts/lv_font_xgimi_17.bin");
 const DEVICE_FONT_LARGE: &[u8] =
     include_bytes!("../../../previewer/third_party/lvgl/fonts/lv_font_xgimi_20.bin");
+
+fn install_qr_code(payload: &str) -> Result<QrCode, String> {
+    // These QR codes are scanned from an undamaged, backlit screen. Low error
+    // correction keeps the wire format compatible while producing fewer,
+    // larger modules than the crate's medium-correction default.
+    QrCode::with_error_correction_level(payload.as_bytes(), EcLevel::L)
+        .map_err(|error| format!("Could not generate QR code: {error}"))
+}
+
+fn install_qr_payload(scheme: &str, host: &str, port: u16, name: &str) -> String {
+    format!("{scheme}://{host}:{port}/{}", urlencoding::encode(name))
+}
 
 #[repr(C)]
 #[derive(Default)]
@@ -1552,16 +1567,8 @@ async fn build_and_share_web_plugin(
         .and_then(|value| value.to_str())
         .ok_or_else(|| "Generated package name is not UTF-8".to_string())?
         .to_string();
-    let qr_payload = serde_json::json!({
-        "v": 1,
-        "scheme": "mmpkg+tcp",
-        "host": host.to_string(),
-        "port": port,
-        "name": name,
-    })
-    .to_string();
-    let qr = QrCode::new(qr_payload.as_bytes())
-        .map_err(|error| format!("Could not generate QR code: {error}"))?;
+    let qr_payload = install_qr_payload("mmpkg+tcp", &host.to_string(), port, &name);
+    let qr = install_qr_code(&qr_payload)?;
     let qr_size = qr.width();
     let qr_modules = qr
         .to_colors()
@@ -1616,16 +1623,8 @@ async fn share_device_plugin(
         .and_then(|value| value.to_str())
         .ok_or_else(|| "Device package name is not UTF-8".to_string())?
         .to_string();
-    let qr_payload = serde_json::json!({
-        "v": 1,
-        "scheme": "gmp+tcp",
-        "host": host.to_string(),
-        "port": port,
-        "name": name,
-    })
-    .to_string();
-    let qr = QrCode::new(qr_payload.as_bytes())
-        .map_err(|error| format!("Could not generate QR code: {error}"))?;
+    let qr_payload = install_qr_payload("gmp+tcp", &host.to_string(), port, &name);
+    let qr = install_qr_code(&qr_payload)?;
     let qr_size = qr.width();
     let qr_modules = qr
         .to_colors()
@@ -2193,7 +2192,7 @@ fn main() {
             tick_frame,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running GM Plugin Studio");
+        .expect("error while running MemoMind Plugin Studio");
 }
 
 #[cfg(test)]
@@ -2224,6 +2223,28 @@ mod tests {
 
     fn write_test_mmpkg(package: &Path) {
         write_test_mmpkg_with_title(package, "sample");
+    }
+
+    #[test]
+    fn install_qr_uses_a_less_dense_screen_scanning_profile() {
+        let payload = r#"{"v":1,"scheme":"mmpkg+tcp","host":"192.168.100.100","port":18765,"name":"talking-pet-0.7.2.mmpkg"}"#;
+        let compact = install_qr_code(payload).expect("install QR code must be generated");
+        let default = QrCode::new(payload.as_bytes()).expect("default QR code must be generated");
+
+        assert!(compact.width() < default.width());
+    }
+
+    #[test]
+    fn install_qr_payload_uses_the_compact_uri_contract() {
+        assert_eq!(
+            install_qr_payload(
+                "mmpkg+tcp",
+                "192.168.100.100",
+                18_765,
+                "talking pet-0.7.2.mmpkg",
+            ),
+            "mmpkg+tcp://192.168.100.100:18765/talking%20pet-0.7.2.mmpkg"
+        );
     }
 
     #[test]

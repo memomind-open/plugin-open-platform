@@ -16,12 +16,12 @@ target_compile_definitions(gm_device_lvgl PUBLIC
     CONFIG_XGIMI_PATCH=1)
 
 add_library(gmplugin_previewer_core
-    src/lvgl_host.cpp
-    src/previewer.cpp
-    src/previewer_c_api.cpp
-    src/rv32.cpp
+    core/lvgl_host.cpp
+    core/previewer.cpp
+    core/previewer_c_api.cpp
+    core/rv32.cpp
 )
-target_include_directories(gmplugin_previewer_core PUBLIC src third_party/lvgl)
+target_include_directories(gmplugin_previewer_core PUBLIC include third_party/lvgl)
 target_link_libraries(gmplugin_previewer_core PUBLIC gm_device_lvgl)
 target_compile_definitions(gmplugin_previewer_core PRIVATE
     GM_PREVIEW_FONT17_PATH="${CMAKE_CURRENT_SOURCE_DIR}/third_party/lvgl/fonts/lv_font_xgimi_17.bin"
@@ -32,7 +32,7 @@ else()
     target_compile_options(gmplugin_previewer_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-add_executable(gmplugin-preview-cli src/main_cli.cpp)
+add_executable(gmplugin-preview-cli apps/cli/main.cpp)
 target_link_libraries(gmplugin-preview-cli PRIVATE gmplugin_previewer_core)
 
 include(CTest)
@@ -79,11 +79,11 @@ if(WIN32)
         "${GM_PREVIEW_FONT_DIR}/lv_font_xgimi_17.bin" ABSOLUTE)
     get_filename_component(GM_PREVIEW_FONT20
         "${GM_PREVIEW_FONT_DIR}/lv_font_xgimi_20.bin" ABSOLUTE)
-    set(GM_PREVIEWER_WIN32_SOURCES src/main_win32.cpp)
+    set(GM_PREVIEWER_WIN32_SOURCES apps/win32/main.cpp)
     if(EXISTS "${GM_PREVIEW_FONT17}" AND EXISTS "${GM_PREVIEW_FONT20}")
         file(TO_CMAKE_PATH "${GM_PREVIEW_FONT17}" GM_PREVIEW_FONT17_RC)
         file(TO_CMAKE_PATH "${GM_PREVIEW_FONT20}" GM_PREVIEW_FONT20_RC)
-        configure_file(src/fonts.rc.in "${CMAKE_CURRENT_BINARY_DIR}/fonts.rc" @ONLY)
+        configure_file(resources/fonts.rc.in "${CMAKE_CURRENT_BINARY_DIR}/fonts.rc" @ONLY)
         list(APPEND GM_PREVIEWER_WIN32_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/fonts.rc")
         set(GM_PREVIEW_HAS_EMBEDDED_FONTS 1)
     else()
