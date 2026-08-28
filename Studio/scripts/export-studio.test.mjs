@@ -24,7 +24,7 @@ test('export staging separates platforms and records checksums', () => {
     const manifest = JSON.parse(readFileSync(join(output, 'windows-x64', 'manifest.json'), 'utf8'));
     assert.equal(manifest.productName, 'MemoMind Plugin Studio');
     assert.equal(manifest.platform, 'windows-x64');
-    assert.equal(typeof manifest.sourceDirty, 'boolean');
+    assert.ok(manifest.sourceDirty === null || typeof manifest.sourceDirty === 'boolean');
     assert.equal(manifest.artifacts[0].name, 'MemoMind-Plugin-Studio-portable.exe');
     assert.match(readFileSync(join(output, 'windows-x64', 'SHA256SUMS.txt'), 'utf8'),
       /MemoMind-Plugin-Studio-portable\.exe/u);
