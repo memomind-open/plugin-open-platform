@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createDeviceButtonInput, DEVICE_BUTTON_ACTION } from './device-button-input.js';
+import { createDeviceButtonInput, DEVICE_BUTTON_ACTION } from '../src/device-button-input.js';
 
 function createClock() {
   let now = 0;

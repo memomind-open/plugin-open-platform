@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { describeDeviceFrameTransition } from './device-runtime.js';
+import { describeDeviceFrameTransition } from '../src/device-runtime.js';
 
 test('draws frames while a glass plugin is running', () => {
   assert.deepEqual(describeDeviceFrameTransition(false, true), {
