@@ -1,44 +1,15 @@
-# GM Plugin Open Platform
+# Plugin Open Platform
 
-This monorepo contains the public development tools for both GM glasses device
-plugins and companion-app Web plugins.
+This repository contains the SDKs and Studio distributions required for plugin development.
 
-## Repository layout
+## Directories
 
-```text
-GlassSDK/    Native RV32 `.gmp` SDK, examples, packaging and install tools
-WebSDK/      Bridge v1 Web SDK, browser simulator, `.mmpkg` tools and docs
-Studio/      Cross-platform dual-ended Studio and the GMP previewer core
-```
+- `GlassSDK/` contains the SDK, tools, examples, and documentation for glasses plugins.
+- `WebSDK/` contains the SDK, tools, examples, and documentation for Web plugins.
+- `Studio/` contains MemoMind Plugin Studio distributions for Linux, macOS, and Windows.
 
-The two package formats serve different runtimes: `.gmp` runs on the glasses,
-while `.mmpkg` runs in the companion application's WebView. GM Plugin Studio
-loads one of each so their standard Scene transport or custom message channels
-can be tested together.
+## Studio platforms
 
-## Quick start
-
-Run the cross-platform desktop Studio:
-
-```sh
-npm run dev
-```
-
-This starts the optimized Release build by default. For Rust debugging, use
-`npm run dev:debug` instead.
-
-Run repository-level JavaScript tests:
-
-```sh
-npm test
-```
-
-Build all native device examples from `GlassSDK/`:
-
-```sh
-cd GlassSDK
-sh ./gm-build all
-```
-
-Each component has its own README with platform prerequisites and focused
-commands.
+- `Studio/linux/` contains Linux packages and executables.
+- `Studio/macos/` contains macOS application packages.
+- `Studio/windows/` contains Windows installers and executables.
