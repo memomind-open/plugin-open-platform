@@ -126,6 +126,21 @@ static bool input_event(void *context, const gm_plugin_event_t *event)
     case GM_PLUGIN_BUTTON_ACTION_LONG:
         message = "LONG PRESS";
         break;
+    case GM_PLUGIN_BUTTON_ACTION_TRIGGER:
+        switch (event->data.button.button) {
+        case GM_PLUGIN_BUTTON_UP: message = "UP"; break;
+        case GM_PLUGIN_BUTTON_DOWN: message = "DOWN"; break;
+        case GM_PLUGIN_BUTTON_LEFT: message = "LEFT"; break;
+        case GM_PLUGIN_BUTTON_RIGHT: message = "RIGHT"; break;
+        case GM_PLUGIN_BUTTON_PAGE_UP: message = "PAGE UP"; break;
+        case GM_PLUGIN_BUTTON_PAGE_DOWN: message = "PAGE DOWN"; break;
+        case GM_PLUGIN_BUTTON_SCROLL_UP: message = "SCROLL UP"; break;
+        case GM_PLUGIN_BUTTON_SCROLL_DOWN: message = "SCROLL DOWN"; break;
+        case GM_PLUGIN_BUTTON_BACK: message = "BACK"; break;
+        case GM_PLUGIN_BUTTON_HOME: message = "HOME"; break;
+        default: return false;
+        }
+        break;
     default:
         return false;
     }
