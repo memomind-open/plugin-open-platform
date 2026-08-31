@@ -1,10 +1,9 @@
 # 2048 game
 
 This example implements the classic 4 x 4 2048 puzzle with the shared Host
-LVGL table. Tilt or turn your head up, down, left, or right to slide the board.
-Raw IMU input treats moving away and returning to a stable neutral pose as one
-complete action. The recorded move is applied only after that return, so the
-board refresh happens while the player's head is centered.
+LVGL table. Use the Bluetooth accessory Up, Down, Left, and Right navigation
+buttons to slide the board. Each `TRIGGER` event applies one move immediately;
+holding a repeatable direction can generate repeated moves.
 Equal adjacent tiles merge once per move, and every effective move creates a
 new 2 or 4 tile. The current score is the sum of all merged tile values.
 

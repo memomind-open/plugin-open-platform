@@ -36,7 +36,7 @@ spacing, or minimum usable layout sizes rather than device width or height.
 | `game/tetris` | grid game with IMU movement and button rotation | button + raw IMU + locale |
 | `game/jet_runner` | scrolling IMU-controlled runner | button + raw IMU + locale |
 | `game/snake` | IMU-controlled snake game | button + raw IMU + locale |
-| `game/2048` | 4 x 4 number-merging puzzle with return-to-neutral input | button + raw IMU |
+| `game/2048` | 4 x 4 number-merging puzzle with accessory navigation | button |
 | `game/fighter_arena` | fixed two-fighter best-of-three match with specials and character AI | button + Bluetooth |
 
 Build the changed module from the SDK root:
