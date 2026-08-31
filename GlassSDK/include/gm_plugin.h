@@ -267,13 +267,41 @@ typedef struct {
     int16_t pitch_degrees;  /**< Current signed pitch angle in whole degrees. */
 } gm_plugin_imu_sample_t;
 
-/* ABI-FROZEN input and gesture IDs. Do not append, renumber or reuse IDs. */
+/* Release-candidate input and gesture IDs. Before the first public release,
+ * intentional additions must update the ABI 1.0 snapshot in the same change.
+ * After release, do not renumber or reuse IDs.
+ *
+ * A button identifies the input control; it does not describe how that control
+ * was activated. Keep the button and action as separate fields so new controls
+ * and new activation semantics can evolve without defining every combination. */
 typedef uint16_t gm_plugin_button_t;
 enum {
     GM_PLUGIN_BUTTON_UNKNOWN = 0,
     GM_PLUGIN_BUTTON_PRIMARY = 1,
+    GM_PLUGIN_BUTTON_UP = 2,
+    GM_PLUGIN_BUTTON_DOWN = 3,
+    GM_PLUGIN_BUTTON_LEFT = 4,
+    GM_PLUGIN_BUTTON_RIGHT = 5,
+    GM_PLUGIN_BUTTON_PAGE_UP = 6,
+    GM_PLUGIN_BUTTON_PAGE_DOWN = 7,
+    GM_PLUGIN_BUTTON_SCROLL_UP = 8,
+    GM_PLUGIN_BUTTON_SCROLL_DOWN = 9,
+    GM_PLUGIN_BUTTON_BACK = 10,
+    GM_PLUGIN_BUTTON_HOME = 11,
 };
 
+/* An action describes what happened to a button. The currently valid pairs are:
+ *
+ *   PRIMARY                         SINGLE, DOUBLE, LONG, VERY_LONG, RELEASE
+ *   UP, DOWN, LEFT, RIGHT           TRIGGER
+ *   PAGE_UP, PAGE_DOWN              TRIGGER
+ *   SCROLL_UP, SCROLL_DOWN          TRIGGER
+ *   BACK, HOME                      TRIGGER
+ *
+ * TRIGGER represents one semantic navigation step, not a physical-button click.
+ * Holding a repeatable HOGP navigation key produces multiple TRIGGER events.
+ * BACK and HOME are discrete commands and therefore produce only one TRIGGER.
+ * Plugins must ignore button/action combinations they do not recognize. */
 typedef uint16_t gm_plugin_button_action_t;
 enum {
     GM_PLUGIN_BUTTON_ACTION_UNKNOWN = 0,
@@ -282,6 +310,7 @@ enum {
     GM_PLUGIN_BUTTON_ACTION_LONG = 3,
     GM_PLUGIN_BUTTON_ACTION_VERY_LONG = 4,
     GM_PLUGIN_BUTTON_ACTION_RELEASE = 5,
+    GM_PLUGIN_BUTTON_ACTION_TRIGGER = 6,
 };
 
 typedef uint16_t gm_plugin_imu_gesture_t;
