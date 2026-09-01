@@ -16,6 +16,7 @@
 #define BRICK_TOP 28
 #define PADDLE_W 80
 #define PADDLE_H 10
+#define ACCESSORY_PADDLE_STEP 32
 #define BALL_SIZE 10
 #define GYRO_THRESHOLD 15
 #define EXIT_PITCH 30
@@ -462,7 +463,7 @@ static gm_plugin_result_t create_ui(breakout_t *self)
     self->ui->style_set(self->control_label, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
                         number(GM_PLUGIN_LVGL_TEXT_ALIGN_RIGHT),
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
-    set_control_text(self, self->strings->look_up_exit);
+    set_control_text(self, self->strings->control_hint);
     style_panel(self, self->message_label);
     self->ui->label_set_long_mode(self->message_label,
                                   GM_PLUGIN_LVGL_LABEL_WRAP);
@@ -503,6 +504,17 @@ static void move_paddle(breakout_t *self, const gm_plugin_imu_sample_t *imu)
         self->paddle_x = maximum;
         self->paddle_vx = 0;
     }
+}
+
+static void move_paddle_with_accessory(breakout_t *self, int32_t direction)
+{
+    int32_t maximum = (self->board_width - PADDLE_W) * Q;
+    self->paddle_x += direction * ACCESSORY_PADDLE_STEP * Q;
+    self->paddle_vx = 0;
+    if (self->paddle_x < 0) self->paddle_x = 0;
+    else if (self->paddle_x > maximum) self->paddle_x = maximum;
+    self->ui->obj_set_pos(self->paddle, (int16_t)(self->paddle_x / Q),
+                          self->paddle_y - 2);
 }
 
 static void brick_collision(breakout_t *self)
@@ -615,7 +627,7 @@ static void frame(breakout_t *self, uint32_t now)
     } else if (self->exiting != 0U) {
         self->exiting = 0;
         self->exit_seconds = 0;
-        set_control_text(self, self->strings->look_up_exit);
+        set_control_text(self, self->strings->control_hint);
     }
     if (self->paused != 0U || self->ended != 0U) return;
     move_paddle(self, &imu);
@@ -719,11 +731,22 @@ static bool on_event(void *opaque, const gm_plugin_event_t *event)
 {
     breakout_t *self = opaque;
     gm_plugin_button_action_t action;
+    gm_plugin_button_t button;
     if (event == 0 || event->type != GM_PLUGIN_EVENT_BUTTON) return false;
     action = event->data.button.action;
+    button = event->data.button.button;
     if (action == GM_PLUGIN_BUTTON_ACTION_LONG ||
         action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
         self->host->app_exit();
+        return true;
+    }
+    if (action == GM_PLUGIN_BUTTON_ACTION_TRIGGER) {
+        if (button != GM_PLUGIN_BUTTON_LEFT &&
+            button != GM_PLUGIN_BUTTON_RIGHT)
+            return false;
+        if (self->paused == 0U && self->ended == 0U && self->exiting == 0U)
+            move_paddle_with_accessory(
+                self, button == GM_PLUGIN_BUTTON_LEFT ? -1 : 1);
         return true;
     }
     if (action != GM_PLUGIN_BUTTON_ACTION_SINGLE) return false;

@@ -11,6 +11,8 @@ serves it to the phone application.
 Controls:
 
 - turn the head left/right: move the paddle;
+- press the accessory left/right buttons: move the paddle one step (holding a
+  repeatable button continues moving it);
 - single-click: pause/resume, or restart after win/game over;
 - keep the head raised for three seconds: exit the plugin application;
 - long-press: exit immediately.
