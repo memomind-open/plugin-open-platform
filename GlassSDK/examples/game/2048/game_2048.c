@@ -7,13 +7,6 @@
 #define FOOTER_HEIGHT 30
 #define CELL_GAP 4
 #define MIN_CELL_SIZE 42
-#define VERTICAL_TRIGGER_THRESHOLD 55
-#define VERTICAL_RETURN_THRESHOLD 20
-#define HORIZONTAL_TRIGGER_THRESHOLD 40
-#define HORIZONTAL_RETURN_THRESHOLD 18
-#define GYRO_QUIET_THRESHOLD 20
-#define REARM_QUIET_MS 100U
-
 typedef enum {
     MOVE_UP,
     MOVE_RIGHT,
@@ -39,11 +32,6 @@ typedef struct {
     int16_t screen_height;
     int16_t board_pixels;
     int16_t cell_size;
-    uint16_t rearm_quiet_ms;
-    move_direction_t gesture_direction;
-    bool imu_armed;
-    bool return_seen;
-    bool action_pending;
     bool game_over;
 } game_2048_t;
 
@@ -269,10 +257,6 @@ static void reset_game(game_2048_t *self)
     }
     self->score = 0U;
     self->game_over = false;
-    self->imu_armed = false;
-    self->return_seen = true;
-    self->rearm_quiet_ms = 0U;
-    self->action_pending = false;
     self->random_state ^= self->host->monotonic_ms() | 1U;
     self->ui->obj_add_flag(self->message_label, GM_PLUGIN_LVGL_FLAG_HIDDEN);
     (void)add_random_tile(self);
@@ -299,90 +283,6 @@ static void apply_move(game_2048_t *self, move_direction_t direction)
                                  "GAME OVER\nClick to restart");
         self->ui->obj_clear_flag(self->message_label,
                                  GM_PLUGIN_LVGL_FLAG_HIDDEN);
-    }
-}
-
-static bool classify_motion(int32_t gyro_x, int32_t gyro_y, int32_t gyro_z,
-                            move_direction_t *direction)
-{
-    int32_t horizontal = gyro_x - gyro_y;
-    int32_t abs_horizontal = horizontal < 0 ? -horizontal : horizontal;
-    int32_t abs_z = gyro_z < 0 ? -gyro_z : gyro_z;
-    if (abs_z >= VERTICAL_TRIGGER_THRESHOLD && abs_z > abs_horizontal) {
-        *direction = gyro_z > 0 ? MOVE_UP : MOVE_DOWN;
-        return true;
-    }
-    if (abs_horizontal < HORIZONTAL_TRIGGER_THRESHOLD ||
-        abs_horizontal <= abs_z)
-        return false;
-    *direction = horizontal < 0 ? MOVE_LEFT : MOVE_RIGHT;
-    return true;
-}
-
-static void read_controls(game_2048_t *self, uint32_t elapsed_ms)
-{
-    gm_plugin_imu_sample_t imu;
-    int32_t gyro_x;
-    int32_t gyro_y;
-    int32_t gyro_z;
-    int32_t abs_x;
-    int32_t abs_y;
-    int32_t abs_z;
-    int32_t horizontal;
-    move_direction_t detected = MOVE_UP;
-    if (self->host->imu_read(&imu) != GM_PLUGIN_OK) return;
-    gyro_x = imu.gyro_raw[0];
-    gyro_y = imu.gyro_raw[1];
-    gyro_z = imu.gyro_raw[2];
-    abs_x = gyro_x < 0 ? -gyro_x : gyro_x;
-    abs_y = gyro_y < 0 ? -gyro_y : gyro_y;
-    abs_z = gyro_z < 0 ? -gyro_z : gyro_z;
-    horizontal = gyro_x - gyro_y;
-
-    if (self->imu_armed) {
-        if (!self->game_over &&
-            classify_motion(gyro_x, gyro_y, gyro_z, &detected)) {
-            self->gesture_direction = detected;
-            self->imu_armed = false;
-            self->return_seen = false;
-            self->rearm_quiet_ms = 0U;
-            self->action_pending = true;
-        }
-        return;
-    }
-
-    /* The opposite angular-velocity peak belongs to returning the head to its
-     * neutral pose. Consume it only as an unlock signal; never as a move. */
-    if (!self->return_seen) {
-        if ((self->gesture_direction == MOVE_UP &&
-             gyro_z < -VERTICAL_RETURN_THRESHOLD) ||
-            (self->gesture_direction == MOVE_DOWN &&
-             gyro_z > VERTICAL_RETURN_THRESHOLD) ||
-            (self->gesture_direction == MOVE_LEFT &&
-             horizontal > HORIZONTAL_RETURN_THRESHOLD) ||
-            (self->gesture_direction == MOVE_RIGHT &&
-             horizontal < -HORIZONTAL_RETURN_THRESHOLD)) {
-            self->return_seen = true;
-            self->rearm_quiet_ms = 0U;
-        }
-        return;
-    }
-
-    if (abs_x < GYRO_QUIET_THRESHOLD && abs_y < GYRO_QUIET_THRESHOLD &&
-        abs_z < GYRO_QUIET_THRESHOLD) {
-        uint32_t quiet = (uint32_t)self->rearm_quiet_ms + elapsed_ms;
-        self->rearm_quiet_ms = quiet >= REARM_QUIET_MS ?
-                               REARM_QUIET_MS : (uint16_t)quiet;
-        if (self->rearm_quiet_ms >= REARM_QUIET_MS) {
-            if (self->action_pending && !self->game_over)
-                apply_move(self, self->gesture_direction);
-            self->action_pending = false;
-            self->imu_armed = true;
-            self->return_seen = false;
-            self->rearm_quiet_ms = 0U;
-        }
-    } else {
-        self->rearm_quiet_ms = 0U;
     }
 }
 
@@ -434,7 +334,7 @@ static gm_plugin_result_t create_ui(game_2048_t *self)
     set_style(self, self->score_label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR,
               color(0xFF));
     self->ui->label_set_text(self->help_label,
-                             "Head: up / down / left / right");
+                             "Accessory: up / down / left / right");
     self->ui->obj_align(self->help_label, GM_PLUGIN_LVGL_ALIGN_TOP_RIGHT,
                         -SCREEN_MARGIN, 10);
     set_style(self, self->help_label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR,
@@ -475,23 +375,17 @@ static gm_plugin_result_t create_ui(game_2048_t *self)
 static gm_plugin_result_t plugin_start(void *opaque)
 {
     game_2048_t *self = opaque;
-    gm_plugin_result_t result =
-        self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW);
-    if (result != GM_PLUGIN_OK) return result;
-    result = create_ui(self);
+    gm_plugin_result_t result = create_ui(self);
     if (result == GM_PLUGIN_OK) reset_game(self);
-    else {
-        (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
+    else
         self->ui->obj_clean(self->ui->root_get());
-    }
     return result;
 }
 
 static void plugin_loop(void *opaque, uint32_t elapsed_ms)
 {
-    game_2048_t *self = opaque;
-    if (elapsed_ms > 150U) elapsed_ms = 150U;
-    read_controls(self, elapsed_ms);
+    (void)opaque;
+    (void)elapsed_ms;
 }
 
 static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
@@ -500,6 +394,7 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
     if (event == 0) return false;
     if (event->type == GM_PLUGIN_EVENT_BUTTON) {
         gm_plugin_button_action_t action = event->data.button.action;
+        gm_plugin_button_t button = event->data.button.button;
         if (action == GM_PLUGIN_BUTTON_ACTION_LONG ||
             action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
             self->host->app_exit();
@@ -509,45 +404,53 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
             reset_game(self);
             return true;
         }
+        if (action != GM_PLUGIN_BUTTON_ACTION_TRIGGER) return false;
+        switch (button) {
+        case GM_PLUGIN_BUTTON_UP:
+            apply_move(self, MOVE_UP);
+            return true;
+        case GM_PLUGIN_BUTTON_DOWN:
+            apply_move(self, MOVE_DOWN);
+            return true;
+        case GM_PLUGIN_BUTTON_LEFT:
+            apply_move(self, MOVE_LEFT);
+            return true;
+        case GM_PLUGIN_BUTTON_RIGHT:
+            apply_move(self, MOVE_RIGHT);
+            return true;
+        default:
+            return false;
+        }
     }
     return false;
 }
 
 static void plugin_suspend(void *opaque)
 {
-    game_2048_t *self = opaque;
-    (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
+    (void)opaque;
 }
 
 static void plugin_resume(void *opaque)
 {
-    game_2048_t *self = opaque;
-    (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW);
-    self->imu_armed = false;
-    self->return_seen = true;
-    self->rearm_quiet_ms = 0U;
-    self->action_pending = false;
+    (void)opaque;
 }
 
 static void plugin_stop(void *opaque)
 {
     game_2048_t *self = opaque;
-    (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
     self->ui->obj_clean(self->ui->root_get());
 }
 
 gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
                                    gm_plugin_descriptor_t *plugin)
 {
-    const gm_plugin_capabilities_t required = GM_PLUGIN_CAP_IMU_RAW |
-                                              GM_PLUGIN_CAP_BUTTON;
+    const gm_plugin_capabilities_t required = GM_PLUGIN_CAP_BUTTON;
     if (host == 0 || plugin == 0 ||
         host->struct_size < GM_PLUGIN_HOST_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(host->abi_version,
                                       GM_PLUGIN_ABI_MIN_VERSION) ||
         host->graphics.lvgl == 0 || host->display_get_info == 0 ||
-        host->monotonic_ms == 0 || host->imu_enable == 0 ||
-        host->imu_read == 0 ||
+        host->monotonic_ms == 0 ||
         host->app_exit == 0 ||
         (host->capabilities & required) != required ||
         plugin->struct_size < GM_PLUGIN_DESCRIPTOR_MIN_SIZE)
