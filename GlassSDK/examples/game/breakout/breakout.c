@@ -302,6 +302,8 @@ static gm_plugin_result_t create_ui(breakout_t *self)
     uint8_t col;
     uint8_t index;
     int16_t header_side_width;
+    int16_t control_width;
+    int16_t control_x;
     int16_t position;
     if (host_root == 0) return GM_PLUGIN_ESTATE;
     self->ui->obj_clean(host_root);
@@ -446,7 +448,8 @@ static gm_plugin_result_t create_ui(breakout_t *self)
                         number(GM_PLUGIN_LVGL_OPA_COVER),
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->obj_set_size(self->timer_label, HEADER_TIMER_W, HEADER_H);
-    self->ui->obj_align(self->timer_label, GM_PLUGIN_LVGL_ALIGN_TOP_MID, 0, 8);
+    self->ui->obj_align(self->timer_label, GM_PLUGIN_LVGL_ALIGN_TOP_RIGHT,
+                        -12, 8);
     self->ui->label_set_long_mode(self->timer_label, GM_PLUGIN_LVGL_LABEL_CLIP);
     self->ui->style_set(self->timer_label, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
                         number(GM_PLUGIN_LVGL_TEXT_ALIGN_CENTER),
@@ -461,9 +464,11 @@ static gm_plugin_result_t create_ui(breakout_t *self)
     self->ui->style_set(self->control_label, GM_PLUGIN_LVGL_STYLE_TEXT_OPA,
                         number(GM_PLUGIN_LVGL_OPA_COVER),
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
-    self->ui->obj_set_size(self->control_label, header_side_width, HEADER_H);
-    self->ui->obj_align(self->control_label, GM_PLUGIN_LVGL_ALIGN_TOP_RIGHT,
-                        -12, 8);
+    control_x = BOARD_X + 4 + header_side_width + 12;
+    control_width = self->screen_width - control_x - HEADER_TIMER_W - 20;
+    if (control_width < 0) control_width = 0;
+    self->ui->obj_set_pos(self->control_label, control_x, 8);
+    self->ui->obj_set_size(self->control_label, control_width, HEADER_H);
     self->ui->label_set_long_mode(self->control_label,
                                   GM_PLUGIN_LVGL_LABEL_CLIP);
     self->ui->style_set(self->control_label, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
