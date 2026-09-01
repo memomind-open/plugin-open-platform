@@ -15,4 +15,4 @@ Controls:
   repeatable button continues moving it);
 - single-click: pause/resume, or restart after win/game over;
 - keep the head raised for three seconds: exit the plugin application;
-- long-press: exit immediately.
+- long-press: show a two-second exit countdown; release to cancel.

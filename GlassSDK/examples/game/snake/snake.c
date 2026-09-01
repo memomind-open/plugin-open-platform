@@ -17,6 +17,7 @@
 #define TOP_MARGIN 38
 #define BOTTOM_MARGIN 10
 #define MIN_CELL_SIZE 5
+#define EXIT_HOLD_MS 2000U
 
 typedef enum {
     DIR_UP,
@@ -38,6 +39,7 @@ typedef struct {
     gm_plugin_lvgl_obj_t *score_label;
     gm_plugin_lvgl_obj_t *help_label;
     gm_plugin_lvgl_obj_t *message_label;
+    gm_plugin_lvgl_obj_t *exit_arc;
     gm_plugin_lvgl_obj_t *cells[ROWS][COLS];
     point_t snake[MAX_SNAKE];
     uint8_t shown[ROWS][COLS];
@@ -47,6 +49,7 @@ typedef struct {
     uint32_t random_state;
     uint32_t frame_accumulator;
     uint32_t step_accumulator;
+    uint32_t exit_hold_ms;
     uint16_t step_ms;
     uint16_t rearm_quiet_ms;
     int16_t cell_size;
@@ -59,6 +62,7 @@ typedef struct {
     bool turn_queued;
     direction_t gesture_direction;
     bool game_over;
+    bool holding_exit;
 } snake_game_t;
 
 static snake_game_t game;
@@ -206,8 +210,11 @@ static void reset_game(snake_game_t *self)
     self->return_seen = true;
     self->turn_queued = false;
     self->game_over = false;
+    self->exit_hold_ms = 0;
+    self->holding_exit = false;
     self->random_state ^= self->host->monotonic_ms() | 1U;
     self->ui->obj_add_flag(self->message_label, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
     place_food(self);
     show_score(self);
     render(self);
@@ -438,6 +445,23 @@ static gm_plugin_result_t create_ui(snake_game_t *self)
             style_box(self, cell, 0x08, 0, 1);
         }
     }
+    self->exit_arc = self->ui->arc_create(self->root);
+    if (self->exit_arc == 0) return GM_PLUGIN_ENOMEM;
+    self->ui->obj_set_size(self->exit_arc, 48, 48);
+    self->ui->obj_align(self->exit_arc, GM_PLUGIN_LVGL_ALIGN_CENTER, 0, 0);
+    self->ui->arc_set_range(self->exit_arc, 0, EXIT_HOLD_MS);
+    self->ui->arc_set_value(self->exit_arc, 0);
+    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_WIDTH,
+                        number(4), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_COLOR,
+                        color(0x20), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_WIDTH,
+                        number(4), GM_PLUGIN_LVGL_SELECTOR_INDICATOR);
+    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_COLOR,
+                        color(0xF0), GM_PLUGIN_LVGL_SELECTOR_INDICATOR);
+    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_OPA,
+                        number(0), GM_PLUGIN_LVGL_SELECTOR_KNOB);
+    self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
     return GM_PLUGIN_OK;
 }
 
@@ -459,6 +483,15 @@ static void plugin_loop(void *opaque, uint32_t elapsed_ms)
 {
     snake_game_t *self = opaque;
     if (elapsed_ms > 150U) elapsed_ms = 150U;
+    if (self->holding_exit) {
+        self->exit_hold_ms += elapsed_ms;
+        if (self->exit_hold_ms >= EXIT_HOLD_MS) {
+            self->host->app_exit();
+            return;
+        }
+        self->ui->arc_set_value(self->exit_arc,
+                                (int16_t)self->exit_hold_ms);
+    }
     read_controls(self, elapsed_ms);
     if (self->game_over) return;
     self->frame_accumulator += elapsed_ms;
@@ -479,9 +512,22 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
     if (event == 0 || event->type != GM_PLUGIN_EVENT_BUTTON) return false;
     action = event->data.button.action;
     button = event->data.button.button;
-    if (action == GM_PLUGIN_BUTTON_ACTION_LONG ||
-        action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
+    if (action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
         self->host->app_exit();
+        return true;
+    }
+    if (action == GM_PLUGIN_BUTTON_ACTION_LONG) {
+        self->holding_exit = true;
+        self->exit_hold_ms = 0;
+        self->ui->arc_set_value(self->exit_arc, 0);
+        self->ui->obj_clear_flag(self->exit_arc,
+                                 GM_PLUGIN_LVGL_FLAG_HIDDEN);
+        return true;
+    }
+    if (action == GM_PLUGIN_BUTTON_ACTION_RELEASE) {
+        self->holding_exit = false;
+        self->exit_hold_ms = 0;
+        self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
         return true;
     }
     if (action == GM_PLUGIN_BUTTON_ACTION_SINGLE) {
@@ -515,6 +561,9 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
 static void plugin_suspend(void *opaque)
 {
     snake_game_t *self = opaque;
+    self->holding_exit = false;
+    self->exit_hold_ms = 0;
+    self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
 }
 

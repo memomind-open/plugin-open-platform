@@ -65,7 +65,7 @@ stride before redrawing current objects.
 - `S` + back direction: crouch-block during an incoming attack
 - `Enter`: confirm menus and skip interstitial screens
 - `Esc` in GMPluginWindows: pause or resume
-- Hold the glasses button: exit
+- Hold the glasses button: show a two-second exit countdown; release to cancel
 
 Open **Extensions > Fighter Arena...** in GMPluginWindows. The dedicated
 extension window sends a four-byte v2 snapshot on channel `0x4647`:
