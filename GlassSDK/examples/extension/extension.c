@@ -2,6 +2,7 @@
 #include "gm_plugin_extensions.h"
 
 static const gm_plugin_host_api_t *s_host;
+static const gm_plugin_random_extension_api_t *s_random_extension;
 static const gm_plugin_lz4_extension_api_t *s_extension;
 
 static gm_plugin_result_t extension_load(void *context)
@@ -11,7 +12,8 @@ static gm_plugin_result_t extension_load(void *context)
     (void)context;
     bound = s_extension->compress_bound(64);
     if (bound <= 0) return GM_PLUGIN_EIO;
-    s_host->log("extension discovery: LZ4 bound for 64 bytes is %d", bound);
+    s_host->log("extension discovery: random=%u, LZ4 bound=%d",
+                s_random_extension->get_u32(), bound);
     return GM_PLUGIN_OK;
 }
 
@@ -29,8 +31,11 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         plugin->struct_size < GM_PLUGIN_DESCRIPTOR_MIN_SIZE)
         return GM_PLUGIN_EVERSION;
 
-    result = host->extension_get(GM_PLUGIN_EXTENSION_RESERVED_1, &api);
-    if (result != GM_PLUGIN_ENOTSUP || api != 0) return GM_PLUGIN_EVERSION;
+    result = host->extension_get(GM_PLUGIN_EXTENSION_RANDOM, &api);
+    if (result != GM_PLUGIN_OK) return result;
+    s_random_extension = (const gm_plugin_random_extension_api_t *)api;
+    if (s_random_extension == 0 || s_random_extension->get_u32 == 0)
+        return GM_PLUGIN_EVERSION;
 
     result = host->extension_get(GM_PLUGIN_EXTENSION_LZ4, &api);
     if (result != GM_PLUGIN_OK) return result;

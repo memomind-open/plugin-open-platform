@@ -10,8 +10,20 @@
  * the meaning of an existing ID. An incompatible table needs a new ID while
  * firmware continues serving the old table for already-built plugins.
  */
-#define GM_PLUGIN_EXTENSION_RESERVED_1 UINT32_C(1)
+#define GM_PLUGIN_EXTENSION_RANDOM UINT32_C(1)
 #define GM_PLUGIN_EXTENSION_LZ4 UINT32_C(2)
+
+/**
+ * Pseudo-random number services.
+ *
+ * The generated values are suitable for non-security uses such as randomized
+ * UI behavior. They are not a cryptographically secure random source and must
+ * not be used to generate keys, nonces or other security-sensitive values.
+ */
+typedef struct gm_plugin_random_extension_api {
+    /** Return the next pseudo-random value in the inclusive range 0..UINT32_MAX. */
+    uint32_t (*get_u32)(void);
+} gm_plugin_random_extension_api_t;
 
 /**
  * Raw LZ4 block compression services.
