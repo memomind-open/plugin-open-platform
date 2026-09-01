@@ -25,6 +25,7 @@
 #define PITCH_DEAD_ZONE 2
 #define PITCH_LIMIT 38
 #define PITCH_TO_PIXEL 3
+#define ACCESSORY_PLAYER_STEP 18
 #define BASE_SPEED_Q (125 * Q)
 #define SPEED_STEP_Q (4 * Q)
 #define MAX_SPEED_Q (220 * Q)
@@ -57,6 +58,7 @@ typedef struct {
     int16_t board_w;
     int16_t board_h;
     int16_t neutral_pitch;
+    int16_t accessory_offset_y;
     uint16_t score;
     uint32_t random_state;
     uint32_t frame_accumulator;
@@ -184,6 +186,18 @@ static void show_score(jet_t *self)
     self->ui->label_set_text(self->score_label, text);
 }
 
+static void position_player(jet_t *self)
+{
+    int16_t player_y = (int16_t)(self->player_y_q / Q);
+    self->ui->obj_set_pos(self->player, PLAYER_X, player_y);
+    self->ui->obj_set_pos(self->flame,
+                          PLAYER_X + (self->flame_long ? -9 : -4),
+                          player_y + 12);
+    self->ui->obj_set_pos(self->flame_core,
+                          PLAYER_X + (self->flame_long ? -6 : -1),
+                          player_y + 13);
+}
+
 static void layout_obstacle(jet_t *self, obstacle_t *obstacle)
 {
     int16_t bottom_y = obstacle->gap_top + GAP_H;
@@ -211,19 +225,16 @@ static void reset_game(jet_t *self)
     self->score = 0;
     self->game_over = false;
     self->calibrated = false;
+    self->accessory_offset_y = 0;
     self->frame_accumulator = 0;
     self->hold_ms = 0;
     self->holding_exit = false;
     self->random_state ^= self->host->monotonic_ms() | 1U;
     self->ui->obj_add_flag(self->end_label, GM_PLUGIN_LVGL_FLAG_HIDDEN);
     self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
-    self->ui->obj_set_pos(self->player, PLAYER_X,
-                          (int16_t)(self->player_y_q / Q));
+    self->flame_long = false;
     self->ui->obj_set_size(self->flame, 8, 4);
-    self->ui->obj_set_pos(self->flame, PLAYER_X - 4,
-                          (int16_t)(self->player_y_q / Q) + 12);
-    self->ui->obj_set_pos(self->flame_core, PLAYER_X - 1,
-                          (int16_t)(self->player_y_q / Q) + 13);
+    position_player(self);
     for (index = 0; index < OBSTACLE_COUNT; ++index) {
         obstacle_t *obstacle = &self->obstacles[index];
         obstacle->x_q = (self->board_w + 70 +
@@ -277,24 +288,35 @@ static void update_player(jet_t *self, const gm_plugin_imu_sample_t *imu)
     if (delta > -PITCH_DEAD_ZONE && delta < PITCH_DEAD_ZONE) delta = 0;
     if (delta > PITCH_LIMIT) delta = PITCH_LIMIT;
     if (delta < -PITCH_LIMIT) delta = -PITCH_LIMIT;
-    target = ((self->board_h - PLAYER_H) / 2 - delta * PITCH_TO_PIXEL) * Q;
+    target = ((self->board_h - PLAYER_H) / 2 - delta * PITCH_TO_PIXEL +
+              self->accessory_offset_y) * Q;
     if (target < 0) target = 0;
     if (target > maximum) target = maximum;
     self->player_y_q += (target - self->player_y_q) * 28 / 100;
-    self->ui->obj_set_pos(self->player, PLAYER_X,
-                          (int16_t)(self->player_y_q / Q));
+    position_player(self);
+}
+
+static void move_player_with_accessory(jet_t *self, int16_t direction)
+{
+    int16_t center = (self->board_h - PLAYER_H) / 2;
+    int16_t maximum_y = self->board_h - PLAYER_H;
+    int32_t maximum_q = maximum_y * Q;
+    self->accessory_offset_y += direction * ACCESSORY_PLAYER_STEP;
+    if (self->accessory_offset_y < -center)
+        self->accessory_offset_y = -center;
+    else if (self->accessory_offset_y > maximum_y - center)
+        self->accessory_offset_y = maximum_y - center;
+    self->player_y_q += direction * ACCESSORY_PLAYER_STEP * Q;
+    if (self->player_y_q < 0) self->player_y_q = 0;
+    else if (self->player_y_q > maximum_q) self->player_y_q = maximum_q;
+    position_player(self);
 }
 
 static void update_flame(jet_t *self)
 {
     self->flame_long = !self->flame_long;
     self->ui->obj_set_size(self->flame, self->flame_long ? 12 : 7, 4);
-    self->ui->obj_set_pos(self->flame,
-                          PLAYER_X + (self->flame_long ? -9 : -4),
-                          (int16_t)(self->player_y_q / Q) + 12);
-    self->ui->obj_set_pos(self->flame_core,
-                          PLAYER_X + (self->flame_long ? -6 : -1),
-                          (int16_t)(self->player_y_q / Q) + 13);
+    position_player(self);
 }
 
 static void update_obstacles(jet_t *self, uint32_t elapsed_ms)
@@ -510,24 +532,33 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
 {
     jet_t *self = opaque;
     gm_plugin_button_action_t action;
+    gm_plugin_button_t button;
     if (event == 0 || event->type != GM_PLUGIN_EVENT_BUTTON) return false;
     action = event->data.button.action;
-    if (action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
-        self->host->app_exit();
-        return true;
-    }
-    if (action == GM_PLUGIN_BUTTON_ACTION_LONG) {
-        self->holding_exit = true;
-        self->hold_ms = 0;
-        self->ui->arc_set_value(self->exit_arc, 0);
-        self->ui->obj_clear_flag(self->exit_arc,
-                                 GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    button = event->data.button.button;
+    if (action == GM_PLUGIN_BUTTON_ACTION_LONG ||
+        action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
+        if (!self->holding_exit) {
+            self->holding_exit = true;
+            self->hold_ms = 0;
+            self->ui->arc_set_value(self->exit_arc, 0);
+            self->ui->obj_clear_flag(self->exit_arc,
+                                     GM_PLUGIN_LVGL_FLAG_HIDDEN);
+        }
         return true;
     }
     if (action == GM_PLUGIN_BUTTON_ACTION_RELEASE) {
         self->holding_exit = false;
         self->hold_ms = 0;
         self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+        return true;
+    }
+    if (action == GM_PLUGIN_BUTTON_ACTION_TRIGGER &&
+        (button == GM_PLUGIN_BUTTON_UP ||
+         button == GM_PLUGIN_BUTTON_DOWN)) {
+        if (!self->game_over && !self->holding_exit)
+            move_player_with_accessory(
+                self, button == GM_PLUGIN_BUTTON_UP ? -1 : 1);
         return true;
     }
     if (self->game_over &&

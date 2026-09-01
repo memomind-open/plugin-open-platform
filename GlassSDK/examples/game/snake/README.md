@@ -9,7 +9,8 @@ An IMU-controlled Snake game built with the core LVGL plugin API.
   heading. Direct reversals and additional turns before the next step are
   ignored, matching the head-motion controls.
 - Eat the bright food square to grow, score points and gradually speed up.
-- A single click restarts after game over; a long press exits at any time.
+- A single click restarts after game over. A long press shows a two-second exit
+  countdown; release the button to cancel it.
 - Reversing directly into the snake body is filtered out.
 
 After changing this example, run `./gm-build` from the SDK root. The output is

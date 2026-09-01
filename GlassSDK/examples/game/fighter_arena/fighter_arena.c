@@ -62,6 +62,7 @@
 #define LANDING_RECOVERY_MS 150U
 #define TURN_DELAY_MS 100U
 #define WALK_FRAME_MS 100U
+#define EXIT_HOLD_MS 2000U
 
 #define SCREEN_TITLE 0U
 #define SCREEN_DIFFICULTY 1U
@@ -219,6 +220,7 @@ typedef struct {
     uint16_t previous_input;
     uint32_t input_last_ms;
     uint32_t frame_accumulator;
+    uint32_t exit_hold_ms;
     uint32_t round_left_ms;
     uint32_t random_state;
     uint16_t screen_ms;
@@ -247,6 +249,7 @@ typedef struct {
     uint8_t impact_kind;
     uint8_t rush_owner;
     bool input_active;
+    bool holding_exit;
     bool impact_strong;
     bool cpu_defense_decided;
 } game_t;
@@ -527,6 +530,44 @@ static void centered_text_panel(gm_plugin_framebuffer_surface_t *surface,
               (int16_t)(text_width + 6 * scale),
               (int16_t)(9 * scale), 0U);
     text(surface, x, y, value, scale, gray);
+}
+
+static void draw_exit_countdown(game_t *self,
+                                gm_plugin_framebuffer_surface_t *surface)
+{
+    static const int8_t ring_x[] = {
+        0, 5, 9, 10, 9, 5, 0, -5, -9, -10, -9, -5, 0
+    };
+    static const int8_t ring_y[] = {
+        -10, -9, -5, 0, 5, 9, 10, 9, 5, 0, -5, -9, -10
+    };
+    int16_t center_x = (int16_t)(self->width / 2U);
+    int16_t center_y = (int16_t)(self->height / 2U);
+    int16_t radius = (int16_t)(20U + self->scale * 4U);
+    uint8_t thickness = (uint8_t)(self->scale * 2U);
+    uint8_t completed = (uint8_t)(self->exit_hold_ms * 12U /
+                                  EXIT_HOLD_MS);
+    uint8_t index;
+    uint32_t remaining = (EXIT_HOLD_MS - self->exit_hold_ms + 999U) / 1000U;
+    char seconds[2] = {(char)('0' + remaining), '\0'};
+    circle(surface, center_x, center_y, radius, 4U);
+    circle(surface, center_x, center_y,
+           (int16_t)(radius - thickness), 0U);
+    if (completed > 12U) completed = 12U;
+    for (index = 0; index < completed; ++index) {
+        line(surface,
+             (int16_t)(center_x + ring_x[index] * radius / 10),
+             (int16_t)(center_y + ring_y[index] * radius / 10),
+             (int16_t)(center_x + ring_x[index + 1U] * radius / 10),
+             (int16_t)(center_y + ring_y[index + 1U] * radius / 10),
+             thickness, 15U);
+    }
+    centered_text(surface, self->width,
+                  (int16_t)(center_y - 8 * self->scale),
+                  seconds, self->scale, 15U);
+    centered_text(surface, self->width,
+                  (int16_t)(center_y + 2 * self->scale),
+                  "EXIT", self->scale, 10U);
 }
 
 static void number_text(char *output, uint32_t value)
@@ -1094,6 +1135,7 @@ static void draw_slice(game_t *self, gm_plugin_framebuffer_surface_t *surface)
     } else {
         draw_interstitial(self, surface);
     }
+    if (self->holding_exit) draw_exit_countdown(self, surface);
 }
 
 static gm_plugin_result_t render(game_t *self)
@@ -2020,7 +2062,9 @@ static gm_plugin_result_t plugin_start(void *opaque)
     self->previous_input = 0U;
     self->pause_reason = PAUSE_NONE;
     self->frame_accumulator = 0U;
+    self->exit_hold_ms = 0U;
     self->input_active = false;
+    self->holding_exit = false;
     if (self->host->log != 0)
         self->host->log("fighter_arena: start %ux%u scale=%u\n",
                         (unsigned int)self->width,
@@ -2041,13 +2085,21 @@ static void plugin_loop(void *opaque, uint32_t elapsed_ms)
     game_t *self = opaque;
     uint32_t now = self->host->monotonic_ms();
     bool render_needed = false;
+    if (elapsed_ms > MAX_CATCHUP_MS) elapsed_ms = MAX_CATCHUP_MS;
+    if (self->holding_exit) {
+        self->exit_hold_ms += elapsed_ms;
+        if (self->exit_hold_ms >= EXIT_HOLD_MS) {
+            self->host->app_exit();
+            return;
+        }
+        render_needed = true;
+    }
     if (self->input_active && now - self->input_last_ms > INPUT_TIMEOUT_MS) {
         self->input = KEY_PAUSE;
         self->previous_input = KEY_PAUSE;
         self->pause_reason = PAUSE_INPUT_LOST;
         self->input_active = false;
     }
-    if (elapsed_ms > MAX_CATCHUP_MS) elapsed_ms = MAX_CATCHUP_MS;
     self->frame_accumulator += elapsed_ms;
     while (self->frame_accumulator >= FRAME_MS) {
         self->frame_accumulator -= FRAME_MS;
@@ -2099,7 +2151,17 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
     if (event->type != GM_PLUGIN_EVENT_BUTTON) return false;
     if (event->data.button.action == GM_PLUGIN_BUTTON_ACTION_LONG ||
         event->data.button.action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
-        self->host->app_exit();
+        if (!self->holding_exit) {
+            self->holding_exit = true;
+            self->exit_hold_ms = 0U;
+            (void)render(self);
+        }
+        return true;
+    }
+    if (event->data.button.action == GM_PLUGIN_BUTTON_ACTION_RELEASE) {
+        self->holding_exit = false;
+        self->exit_hold_ms = 0U;
+        (void)render(self);
         return true;
     }
     if (event->data.button.action == GM_PLUGIN_BUTTON_ACTION_SINGLE &&
@@ -2116,6 +2178,8 @@ static void plugin_stop(void *opaque)
     self->input = 0U;
     self->pause_reason = PAUSE_NONE;
     self->input_active = false;
+    self->holding_exit = false;
+    self->exit_hold_ms = 0U;
     self->event_head = 0U;
     self->event_count = 0U;
 }

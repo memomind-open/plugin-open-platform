@@ -21,6 +21,7 @@
 #define GYRO_THRESHOLD 15
 #define EXIT_PITCH 30
 #define EXIT_MS 3000U
+#define BUTTON_EXIT_MS 2000U
 #define HEADER_SIDE_W 190
 #define HEADER_TIMER_W 100
 #define HEADER_H 24
@@ -44,6 +45,7 @@ typedef struct {
     gm_plugin_lvgl_obj_t *timer_label;
     gm_plugin_lvgl_obj_t *control_label;
     gm_plugin_lvgl_obj_t *message_label;
+    gm_plugin_lvgl_obj_t *exit_arc;
     int32_t ball_x;
     int32_t ball_y;
     int32_t ball_vx;
@@ -57,6 +59,7 @@ typedef struct {
     uint32_t pause_ms;
     uint32_t paused_total_ms;
     uint32_t exit_start_ms;
+    uint32_t button_hold_ms;
     uint32_t last_second;
     int16_t screen_width;
     int16_t screen_height;
@@ -72,6 +75,7 @@ typedef struct {
     uint8_t ended;
     uint8_t exiting;
     uint8_t exit_seconds;
+    uint8_t button_holding_exit;
 } breakout_t;
 
 static breakout_t game;
@@ -287,6 +291,8 @@ static void initialize_state(breakout_t *self)
     self->ended = 0;
     self->exiting = 0;
     self->exit_seconds = 0;
+    self->button_hold_ms = 0;
+    self->button_holding_exit = 0;
 }
 
 static gm_plugin_result_t create_ui(breakout_t *self)
@@ -296,6 +302,8 @@ static gm_plugin_result_t create_ui(breakout_t *self)
     uint8_t col;
     uint8_t index;
     int16_t header_side_width;
+    int16_t control_width;
+    int16_t control_x;
     int16_t position;
     if (host_root == 0) return GM_PLUGIN_ESTATE;
     self->ui->obj_clean(host_root);
@@ -440,7 +448,8 @@ static gm_plugin_result_t create_ui(breakout_t *self)
                         number(GM_PLUGIN_LVGL_OPA_COVER),
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->obj_set_size(self->timer_label, HEADER_TIMER_W, HEADER_H);
-    self->ui->obj_align(self->timer_label, GM_PLUGIN_LVGL_ALIGN_TOP_MID, 0, 8);
+    self->ui->obj_align(self->timer_label, GM_PLUGIN_LVGL_ALIGN_TOP_RIGHT,
+                        -12, 8);
     self->ui->label_set_long_mode(self->timer_label, GM_PLUGIN_LVGL_LABEL_CLIP);
     self->ui->style_set(self->timer_label, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
                         number(GM_PLUGIN_LVGL_TEXT_ALIGN_CENTER),
@@ -455,9 +464,11 @@ static gm_plugin_result_t create_ui(breakout_t *self)
     self->ui->style_set(self->control_label, GM_PLUGIN_LVGL_STYLE_TEXT_OPA,
                         number(GM_PLUGIN_LVGL_OPA_COVER),
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
-    self->ui->obj_set_size(self->control_label, header_side_width, HEADER_H);
-    self->ui->obj_align(self->control_label, GM_PLUGIN_LVGL_ALIGN_TOP_RIGHT,
-                        -12, 8);
+    control_x = BOARD_X + 4 + header_side_width + 12;
+    control_width = self->screen_width - control_x - HEADER_TIMER_W - 20;
+    if (control_width < 0) control_width = 0;
+    self->ui->obj_set_pos(self->control_label, control_x, 8);
+    self->ui->obj_set_size(self->control_label, control_width, HEADER_H);
     self->ui->label_set_long_mode(self->control_label,
                                   GM_PLUGIN_LVGL_LABEL_CLIP);
     self->ui->style_set(self->control_label, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
@@ -468,6 +479,23 @@ static gm_plugin_result_t create_ui(breakout_t *self)
     self->ui->label_set_long_mode(self->message_label,
                                   GM_PLUGIN_LVGL_LABEL_WRAP);
     set_message(self, "", 0, 0, 0);
+    self->exit_arc = self->ui->arc_create(self->root);
+    if (self->exit_arc == 0) return GM_PLUGIN_ENOMEM;
+    self->ui->obj_set_size(self->exit_arc, 48, 48);
+    self->ui->obj_align(self->exit_arc, GM_PLUGIN_LVGL_ALIGN_CENTER, 0, 0);
+    self->ui->arc_set_range(self->exit_arc, 0, BUTTON_EXIT_MS);
+    self->ui->arc_set_value(self->exit_arc, 0);
+    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_WIDTH,
+                        number(4), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_COLOR,
+                        color(0x20), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_WIDTH,
+                        number(4), GM_PLUGIN_LVGL_SELECTOR_INDICATOR);
+    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_COLOR,
+                        color(0xF0), GM_PLUGIN_LVGL_SELECTOR_INDICATOR);
+    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_OPA,
+                        number(0), GM_PLUGIN_LVGL_SELECTOR_KNOB);
+    self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
     set_score(self);
     set_timer(self, 0);
     return GM_PLUGIN_OK;
@@ -714,6 +742,15 @@ static void on_loop(void *opaque, uint32_t elapsed_ms)
     breakout_t *self = opaque;
     uint32_t now = self->host->monotonic_ms();
     uint32_t seconds = active_elapsed_ms(self, now) / 1000U;
+    if (self->button_holding_exit != 0U) {
+        self->button_hold_ms += elapsed_ms;
+        if (self->button_hold_ms >= BUTTON_EXIT_MS) {
+            self->host->app_exit();
+            return;
+        }
+        self->ui->arc_set_value(self->exit_arc,
+                                (int16_t)self->button_hold_ms);
+    }
     self->frame_accumulator += elapsed_ms;
     if (self->frame_accumulator > 150U) self->frame_accumulator = 150U;
     while (self->frame_accumulator >= FRAME_MS && self->exiting != 2U) {
@@ -737,7 +774,19 @@ static bool on_event(void *opaque, const gm_plugin_event_t *event)
     button = event->data.button.button;
     if (action == GM_PLUGIN_BUTTON_ACTION_LONG ||
         action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
-        self->host->app_exit();
+        if (self->button_holding_exit == 0U) {
+            self->button_holding_exit = 1;
+            self->button_hold_ms = 0;
+            self->ui->arc_set_value(self->exit_arc, 0);
+            self->ui->obj_clear_flag(self->exit_arc,
+                                     GM_PLUGIN_LVGL_FLAG_HIDDEN);
+        }
+        return true;
+    }
+    if (action == GM_PLUGIN_BUTTON_ACTION_RELEASE) {
+        self->button_holding_exit = 0;
+        self->button_hold_ms = 0;
+        self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
         return true;
     }
     if (action == GM_PLUGIN_BUTTON_ACTION_TRIGGER) {
@@ -768,6 +817,9 @@ static bool on_event(void *opaque, const gm_plugin_event_t *event)
 static void on_suspend(void *opaque)
 {
     breakout_t *self = opaque;
+    self->button_holding_exit = 0;
+    self->button_hold_ms = 0;
+    self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
 }
 
