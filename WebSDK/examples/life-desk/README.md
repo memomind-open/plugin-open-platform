@@ -43,12 +43,15 @@ npm run pack:plugin -- examples/life-desk dist/life-desk.mmpkg
 
 ## Implementation
 
-The device image is drawn on an offscreen Canvas and quantized to GRAY_4. It is
-transmitted as six 200×175 raw LZ4 tiles. Each tile is compared with its
-previous content, and only changed tiles are submitted. A Host with atomic-frame
-support creates one `frameId` for the update, waits for every device status
-acknowledgement, and presents the full image only after the final tile, avoiding
-tile-by-tile appearance. Consecutive operations within 60 ms are coalesced.
+The device image is drawn on an offscreen Canvas and quantized to GRAY_4. Dirty
+detection retains six fine-grained 200×175 blocks, but changed blocks in the
+same display row are merged into one LZ4 transfer tile. A full-screen update is
+therefore sent as two 600×175 tiles instead of six independent requests. A
+single dirty row uses the immediate LZ4 channel without a redundant frame-begin
+round trip. When both rows change, a Host with atomic-frame support creates one
+`frameId`, waits for every device status acknowledgement, and presents the full
+image only after the final tile, avoiding row-by-row appearance. Consecutive
+operations within 60 ms are coalesced.
 After an atomic frame begins, its current image is sent completely and later
 state is deferred to the next frame. Older Hosts continue to use the compatible
 Channel 7/6 path.

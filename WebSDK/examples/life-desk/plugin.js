@@ -5,6 +5,8 @@ const canvas = $('#deviceCanvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const W = 600;
 const H = 350;
+const DIRTY_TILE_WIDTH = 200;
+const DIRTY_TILE_HEIGHT = 175;
 const APPS = ['weather', 'typhoon', 'calculator', 'focus', 'clock', 'memo'];
 const APP_LABELS = { home: 'Home', weather: 'Weather', typhoon: 'Cyclones', calculator: 'Calculator', focus: 'Focus', clock: 'World Clock', memo: 'Memo' };
 const WEATHER = {
@@ -498,8 +500,59 @@ function extractGray4Region(frame, sourceWidth, x, y, width, height) {
   return tile;
 }
 
+function bytesEqual(left, right) {
+  if (!left || left.length !== right.length) return false;
+  for (let index = 0; index < right.length; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
+function buildFrameUpdates(frame) {
+  const updates = [];
+  for (let y = 0; y < H; y += DIRTY_TILE_HEIGHT) {
+    const height = Math.min(DIRTY_TILE_HEIGHT, H - y);
+    const cacheEntries = [];
+    let firstDirtyX = W;
+    let dirtyEndX = 0;
+    for (let x = 0; x < W; x += DIRTY_TILE_WIDTH) {
+      const width = Math.min(DIRTY_TILE_WIDTH, W - x);
+      const key = `${x}:${y}`;
+      const tile = extractGray4Region(frame, W, x, y, width, height);
+      if (bytesEqual(presentedTiles.get(key), tile)) continue;
+      cacheEntries.push({ key, tile });
+      firstDirtyX = Math.min(firstDirtyX, x);
+      dirtyEndX = Math.max(dirtyEndX, x + width);
+    }
+    if (cacheEntries.length === 0) continue;
+
+    // Keep 200x175 blocks for dirty detection, but transmit at most one
+    // bounding tile per display row. Bluetooth round-trip latency dominates
+    // the small amount of unchanged data between two dirty blocks.
+    const width = dirtyEndX - firstDirtyX;
+    const tile = cacheEntries.length === 1
+      ? cacheEntries[0].tile
+      : extractGray4Region(frame, W, firstDirtyX, y, width, height);
+    updates.push({
+      cacheEntries,
+      tile,
+      compressed: lz4CompressBlock(tile),
+      geometry: { x: firstDirtyX, y, width, height }
+    });
+  }
+  return updates;
+}
+
+function rememberPresentedUpdates(updates) {
+  for (const update of updates) {
+    for (const entry of update.cacheEntries) {
+      presentedTiles.set(entry.key, entry.tile);
+    }
+  }
+}
+
 async function presentRawFallback(region, geometry) {
-  const maxWidth = 200;
+  const maxWidth = 600;
   const maxHeight = 175;
   for (let relativeY = 0; relativeY < geometry.height; relativeY += maxHeight) {
     for (let relativeX = 0; relativeX < geometry.width; relativeX += maxWidth) {
@@ -518,10 +571,9 @@ async function presentRawFallback(region, geometry) {
   }
 }
 
-async function presentTile(tile, geometry) {
+async function presentTile(tile, geometry, compressed = lz4CompressBlock(tile)) {
   const stride = geometry.width / 2;
   if (lz4Available) {
-    const compressed = lz4CompressBlock(tile);
     try {
       await gm.display.updateImageLz4({
         ...geometry,
@@ -585,41 +637,30 @@ async function presentDevice() {
       presentedTiles = new Map();
     }
     const frame = toGray4Bytes();
-    const tileWidth = 200;
-    const tileHeight = 175;
-    const updates = [];
-    for (let y = 0; y < H; y += tileHeight) {
-      for (let x = 0; x < W; x += tileWidth) {
-        const key = `${x}:${y}`;
-        const tile = extractGray4Region(frame, W, x, y, tileWidth, tileHeight);
-        const previous = presentedTiles.get(key);
-        let unchanged = Boolean(previous && previous.length === tile.length);
-        if (unchanged) {
-          for (let index = 0; index < tile.length; index += 1) {
-            if (tile[index] !== previous[index]) { unchanged = false; break; }
-          }
-        }
-        if (unchanged) continue;
-        updates.push({
-          key,
-          tile,
-          compressed: lz4CompressBlock(tile),
-          geometry: { x, y, width: tileWidth, height: tileHeight }
-        });
-      }
-    }
+    const updates = buildFrameUpdates(frame);
     if (updates.length === 0 || revision !== renderRevision) return;
 
+    // A single update is already atomic and Channel 7 completes in one
+    // request. Avoid the extra frame-begin/status round trip.
+    if (updates.length === 1) {
+      await presentTile(
+        updates[0].tile,
+        updates[0].geometry,
+        updates[0].compressed
+      );
+      rememberPresentedUpdates(updates);
+      return;
+    }
     if (atomicFrameAvailable && lz4Available) {
       const presented = await presentAtomicFrame(updates);
       if (presented) {
-        for (const update of updates) presentedTiles.set(update.key, update.tile);
+        rememberPresentedUpdates(updates);
         return;
       }
     }
     for (const update of updates) {
-      await presentTile(update.tile, update.geometry);
-      presentedTiles.set(update.key, update.tile);
+      await presentTile(update.tile, update.geometry, update.compressed);
+      rememberPresentedUpdates([update]);
     }
   } catch (error) {
     if (error.code === 'DEVICE_DISCONNECTED') deviceConnected = false;
