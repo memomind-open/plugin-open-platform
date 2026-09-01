@@ -71,6 +71,9 @@ core layout or consume capability bits.
 Runtime support is determined by Host ABI validation, capabilities, and
 `extension_get` results.
 
+`GM_PLUGIN_EXTENSION_RANDOM` exposes a non-cryptographic 32-bit pseudo-random
+number service for UI, games, and similar non-security uses.
+
 `GM_PLUGIN_EXTENSION_LZ4` exposes fixed one-shot raw LZ4 block operations.
 It does not implement the LZ4 frame format or carry the original size in the
 compressed payload. Plugins must keep both block sizes in their own protocol.
