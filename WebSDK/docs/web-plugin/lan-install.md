@@ -1,6 +1,6 @@
 # Install an `.mmpkg` over a LAN
 
-Desktop Studio can package the selected Web plugin as an `.mmpkg` and display
+The prebuilt Desktop Studio can package the selected Web plugin as an `.mmpkg` and display
 a QR code for the phone App's debugging entry point. This channel is intended
 for development-time LAN sideloading and does not provide server
 authentication.

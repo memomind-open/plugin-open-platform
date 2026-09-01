@@ -17,10 +17,12 @@ display its own phone UI and use the GM Web Plugin SDK to:
 - store private plugin data; and
 - respond to plugin lifecycle changes.
 
-The preview SDK is distributed as `gm-web-plugin-devkit-0.1.0.zip`. It contains
-the browser SDK, Studio simulator, plugin packager, examples, and documentation.
-The final distribution will use npm packages without changing the Bridge API,
-manifest, or `.mmpkg` format.
+The SDK is distributed in Plugin Open Platform and as
+`gm-web-plugin-devkit-0.1.0.zip`. The ZIP contains the browser SDK, WebSDK
+Browser Studio, plugin packager, examples, and documentation. Plugin Open
+Platform also provides prebuilt Desktop Studio applications for full Web and
+glasses plugin debugging. The private Desktop Studio source repository is not
+a public SDK dependency.
 
 ## 2. DevKit contents
 
@@ -43,12 +45,12 @@ gm-web-plugin-devkit-0.1.0/
 ```
 
 - `sdk/`: browser ES module SDK and TypeScript declarations.
-- `studio/`: local simulation of the App, glasses display, device events, and
-  lifecycle.
+- `studio/`: WebSDK Browser Studio for local App Bridge, display, event, and
+  lifecycle simulation. It does not execute glasses `.gmp` files.
 - `tools/`: `.mmpkg` packager for final H5 output.
 - `examples/`: runnable projects configured to use the local SDK.
-- `internal/`: Studio implementation details that plugins must not import or
-  modify directly.
+- `internal/`: Browser Studio implementation details that plugins must not
+  import or modify directly.
 
 ## 3. Run the included example
 
@@ -66,7 +68,7 @@ Open:
 http://127.0.0.1:4173
 ```
 
-In Studio:
+In WebSDK Browser Studio:
 
 1. Select **Draw to glasses** on the plugin page.
 2. Confirm that green text appears on the virtual glasses display.
@@ -200,7 +202,7 @@ In the current Debug App, `network` is informational and does not mean that the
 App enforces domain isolation. Networked plugins must still use a strict CSP and
 connect only to required domains.
 
-See [Final `.mmpkg` package](web-plugin/package-format.md) for
+See [Final `.mmpkg` package](package-format.md) for
 `deviceRequirements` and the complete manifest contract.
 
 ## 6. Runtime and storage
@@ -514,8 +516,8 @@ non-empty `Uint8Array` no larger than 81,901 bytes. Messaging does not install
 or switch a GMP. A successful send only confirms the underlying GM command
 acknowledgement, not completion of glasses plugin business logic.
 
-See [Bidirectional Plugin Messaging](../../docs/plugin-message-uplink-requirements.md)
-for paired Web and glasses examples.
+The full Plugin Open Platform repository includes the Fighter Controller Web
+plugin and Fighter Arena glasses plugin as a paired implementation.
 
 ## 9. Lifecycle, sessions, and errors
 
@@ -576,7 +578,17 @@ Use bounded retry for disconnection, busy, or rate-limit errors. Never retry in
 an infinite loop. Stop old work after `STALE_RUNTIME`, fix parameter errors
 instead of retrying them, and show a clear H5 message for user-visible failures.
 
-## 10. Debug with Studio
+## 10. Debug with Desktop Studio or Browser Studio
+
+Use the prebuilt Desktop Studio under
+`plugin-open-platform/Studio/<platform>/` for normal development. It can load a
+Web workspace or `.mmpkg`, execute a compatible glasses `.gmp`, route custom
+plugin messages, and show separate Web and glasses simulator logs. Keep the
+`Studio`, `WebSDK`, and `GlassSDK` directories together so it can discover the
+public examples automatically.
+
+Use WebSDK Browser Studio for lightweight Web-only checks that do not require a
+running `.gmp`.
 
 For a static H5 directory containing `index.html`:
 
@@ -594,10 +606,10 @@ node /path/to/devkit/studio/gm-plugin-studio.mjs \
   --plugin /absolute/path/to/my-plugin/dist
 ```
 
-After changing source, rebuild and select **Reload** in Studio. The browser-only
+After changing source, rebuild and select **Reload** in Browser Studio. Browser
 Studio loads static files and does not start Vite or provide HMR.
 
-Studio simulates:
+Browser Studio simulates:
 
 - the 600×350 green monochrome display;
 - single-click, double-click, and long-press actions;
@@ -609,9 +621,9 @@ Studio simulates:
 - raw LZ4 decoded-size validation; and
 - the channel, payload size, and LZ4 decoded size of the most recent drawing.
 
-An oversized request fails with `PAYLOAD_TOO_LARGE` and is not rendered. Studio
-suggests a maximum tile height. Validate tiling in Studio before testing on
-physical glasses.
+An oversized request fails with `PAYLOAD_TOO_LARGE` and is not rendered.
+Browser Studio suggests a maximum tile height. Validate tiling in a simulator
+before testing on physical glasses.
 
 Studio targets Bridge and device-canvas compatibility, not complete optical
 simulation. Validate firmware fonts, visible brightness and contrast, lens
@@ -677,8 +689,8 @@ review, server signing, trusted App key verification, marketplace delivery,
 updates and revocation, a permission UI, and request-level WebView network
 isolation. Do not distribute unsigned local packages to normal Release users.
 
-See [Final `.mmpkg` package](web-plugin/package-format.md) and
-[LAN installation](web-plugin/lan-install.md) for complete details.
+See [Final `.mmpkg` package](package-format.md) and
+[LAN installation](lan-install.md) for complete details.
 
 ## 12. CSP and resource security
 
@@ -709,36 +721,17 @@ Use a strict Content Security Policy, for example:
 - Escape user input and remote content.
 - Do not attempt to access capabilities the App did not authorize.
 
-## 13. Migrate from ZIP to npm
+## 13. SDK and Studio distribution
 
-The planned npm workflow is:
+The DevKit ZIP remains the offline distribution for the standalone browser SDK,
+Browser Studio, packager, examples, and documentation. If WebSDK libraries are
+also published to npm in the future, a plugin may replace its vendored SDK file
+with the matching public package without changing Bridge v1 methods, events,
+the manifest, or the `.mmpkg` format.
 
-```sh
-npm install @memomind/gm-plugin-web-sdk
-npm install --save-dev @memomind/gm-plugin-studio
-```
-
-Replace the local import:
-
-```js
-import { createGMPlugin } from './vendor/gm-plugin-web-sdk.esm.js';
-```
-
-with:
-
-```js
-import { createGMPlugin } from '@memomind/gm-plugin-web-sdk';
-```
-
-Start Studio with:
-
-```sh
-npx gm-plugin-studio --plugin ./dist
-```
-
-Migration does not change `createGMPlugin()` usage, Bridge v1 methods or
-events, the manifest, the `.mmpkg` format, or App installation and permission
-validation.
+Desktop Studio remains a prebuilt application distributed through Plugin Open
+Platform. Do not add the private Desktop Studio source repository or a Studio
+npm package as a plugin project dependency.
 
 ## 14. Troubleshooting
 
@@ -816,8 +809,8 @@ generated `.mmpkg` manually; rebuild it after every source change.
 
 ## Related documentation
 
-- [Web plugin documentation index](web-plugin/README.md)
-- [Bridge v1 API overview](web-plugin/api-reference.md)
-- [Debugging with Studio](web-plugin/studio.md)
-- [Final `.mmpkg` package](web-plugin/package-format.md)
-- [Compatibility and on-device limits](web-plugin/compatibility.md)
+- [Web plugin documentation index](README.md)
+- [Bridge v1 API overview](api-reference.md)
+- [Debugging with Desktop Studio and Browser Studio](studio.md)
+- [Final `.mmpkg` package](package-format.md)
+- [Compatibility and on-device limits](compatibility.md)

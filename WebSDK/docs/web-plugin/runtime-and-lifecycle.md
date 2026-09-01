@@ -3,7 +3,8 @@
 The same Web plugin code can run in two hosts:
 
 - App WebView: the H5 SDK uses the `MemoPluginBridge` JavaScript channel.
-- Studio: the H5 SDK uses the parent-frame `postMessage` transport.
+- Desktop Studio and WebSDK Browser Studio: the H5 SDK uses the parent-frame
+  `postMessage` transport.
 
 The Host uses a session token and runtime generation to isolate old pages.
 After a page reload, requests and events from the previous generation must not

@@ -1,6 +1,6 @@
 # Web and device plugin compatibility
 
-GM Plugin Studio matches a Web plugin to a device plugin through declared
+MemoMind Desktop Studio matches a Web plugin to a device plugin through declared
 protocols. This avoids coupling ordinary Web plugins to one device package
 when multiple packages implement the same transport contract.
 
@@ -41,16 +41,16 @@ Current public protocol IDs are:
 ## Matching behavior
 
 Web manifests declare requirements using the `.mmpkg` `deviceRequirements`
-field. Studio prefers `preferredPluginId` when it is compatible. A
+field. Desktop Studio prefers `preferredPluginId` when it is compatible. A
 `requiredPluginId` is a strict package identity constraint; use it only when a
 protocol-compatible replacement is not acceptable. `minPluginVersion` applies
 to the required plugin.
 
-Studio labels discovered device plugins as recommended, compatible or
+Desktop Studio labels discovered device plugins as recommended, compatible or
 incompatible. An explicit developer selection is preserved for diagnostics,
 but an incompatible pairing is not reported as ready.
 
-GMP v1 does not embed manifest text. Studio reads protocol metadata from the
+GMP v1 does not embed manifest text. Desktop Studio reads protocol metadata from the
 source manifest associated with an SDK `build-host` output, or from a
 `manifest.json` beside an imported package. A standalone `.gmp` without either
 source layout is reported as having unknown compatibility rather than being

@@ -5,41 +5,52 @@ Plugin manifest version: `30`
 
 ## Requirements
 
-- GM glasses with the GM Plugin Host ABI 1.0
-- Windows 10 or 11
-- A paired outgoing Bluetooth SPP COM port
-- The bundled `GMPluginWindows.exe`
+- A complete `plugin-open-platform` release checkout
+- MemoMind Plugin Studio for Windows x64, Linux x64, or macOS Universal 2
+- `fighter-controller.mmpkg`
+- `fighter_arena.gmp`
 
-Use the EXE from this same Beta 22 package. Older Windows tools do not contain
-the current multi-channel audio event handling.
+Desktop Studio is distributed as a prebuilt application under
+`Studio/<platform>/`. Its source repository is not part of the public SDK.
 
-## Install and play
+## Preview in Desktop Studio
 
-1. Pair the glasses in Windows and note the outgoing Bluetooth SPP COM port.
-2. Start `GMPluginWindows.exe`, choose that port, and connect over SPP.
-3. Select `fighter_arena.gmp`, then install and start it.
-4. Open **Extensions > Fighter Arena...** to show the dedicated game-control
-   window.
-5. Press `J` to leave the title screen. Select difficulty with `A`/`D` and
-   confirm with `J` or `Enter`.
-6. Use `A`/`D` to move, `W` to jump, `S` to crouch, `J` for light punch, `K`
-   for heavy punch, `U` for light kick, and `I` for heavy kick.
-7. Press `L` for a large 50-energy wave or `O` for a 35-energy six-hit
-   tracking rush. It chases toward the opponent with speed trails, then chains
-   punches, a knee, and a heavy kick into a launching double-palm finisher.
-   The opening strike must connect; a very distant whiff cannot deal later hits.
-   Normal target combos are `J, J, K` and `J, U, I`. Hold away to retreat;
-   when an attack reaches its active range, the
-   same input becomes stand-block. Combine it with `S` to crouch-block. Press
-   `Esc` to pause or resume.
+1. Start MemoMind Plugin Studio from `Studio/<platform>/`.
+2. Select or import `fighter-controller.mmpkg` as the Web plugin.
+3. Select or import `fighter_arena.gmp` as the glasses plugin.
+4. Start the pair and keep the Web plugin panel focused while using keyboard
+   controls.
+5. Use the controller UI or mapped keyboard controls to move, jump, crouch,
+   punch, kick, trigger skills, pause, and resume.
 
-Blocking no longer has a separate `GD` meter or guard break. A successful block
-still causes chip damage and brief block stun. Direct attack damage is roughly
-half of Beta 20, so rounds last substantially longer.
+Desktop Studio runs both packages in one process and routes their custom
+`plugin.sendMessage` channels without a Bluetooth connection.
 
-The PC mixes four original looping tracks plus the CC0 `MIDI battle theme` with
-23 original game effects,
-including attack swings, distinct hits, blocks, special charge/launch, jump,
-menu, round start, KO, draw, victory, and defeat cues. Keep GMPluginWindows
-connected and focused while playing. Losing focus or the SPP connection pauses
-the match and its music.
+## Run on physical glasses
+
+1. Serve `fighter_arena.gmp` with the GlassSDK QR installation workflow and
+   scan it from the official App's device-plugin debug page.
+2. Import or launch `fighter-controller.mmpkg` in an official App version that
+   supports Web plugins.
+3. Connect the App to the glasses and start both plugins.
+4. Keep the Fighter Controller Web plugin active while playing.
+
+See [`../../../../INSTALLATION.md`](../../../../INSTALLATION.md) for the current GMP
+installation workflow and
+[`../../../../../WebSDK/docs/web-plugin/quick-start.md`](../../../../../WebSDK/docs/web-plugin/quick-start.md)
+for Web plugin packaging and App delivery.
+
+## Controls
+
+- Move left or right, jump, and crouch with the matching direction controls.
+- Use light/heavy punch and light/heavy kick for normal attacks.
+- Use the energy-wave and tracking-rush controls for special attacks.
+- Use pause to suspend or resume the match.
+
+Blocking has no separate `GD` meter or guard break. Holding away retreats until
+an incoming attack enters its active range, when the same input becomes a
+stand block. Combine away with down for a crouch block.
+
+Audio is mixed by the Fighter Controller Web plugin on the phone or computer,
+not by the glasses. Losing the Web plugin connection pauses the match and its
+music.

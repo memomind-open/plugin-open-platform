@@ -131,18 +131,14 @@ See [ABI.md](ABI.md) for the complete ABI and lifecycle contract and
 
 ## Install on glasses
 
-After building, install the generated `.gmp` with one of the official companion
-tools:
+After building, use the prebuilt Desktop Studio under `../Studio/<platform>/`
+for local simulation. To install on physical glasses, run the SDK QR server and
+scan its `gmp+tcp` code from the official App's GMP debug installation entry.
 
-- [**GMPluginWindows**](https://github.com/memomind-open/GMPluginWindows) —
-  Windows desktop installer and development transport tool.
-- [**GMPluginPhoneApp**](https://github.com/memomind-open/GMPluginPhoneApp) —
-  Android/OpenHarmony mobile installer and plugin manager, with iOS iAP2
-  integration in progress.
-
-Check each companion repository's Releases page for prebuilt applications. See
-[INSTALLATION.md](INSTALLATION.md) for the build-to-glasses workflow and
-[PROTOCOL.md](PROTOCOL.md) for the underlying transport protocol.
+The public workflow does not require a separate installer source repository.
+See [INSTALLATION.md](INSTALLATION.md) for the complete preview and
+build-to-glasses workflow and [PROTOCOL.md](PROTOCOL.md) for the underlying
+transport contract.
 
 ## Examples
 
@@ -192,10 +188,9 @@ The glasses load the compact `.gmp` package, not the complete ELF file.
 
 ### Why is the plugin gone after reboot?
 
-Plugins currently run from RAM and are not persisted in Flash. Reinstall the
-`.gmp` with [GMPluginWindows](https://github.com/memomind-open/GMPluginWindows)
-or [GMPluginPhoneApp](https://github.com/memomind-open/GMPluginPhoneApp) after
-the glasses reboot.
+Plugins currently run from RAM and are not persisted in Flash. Start the SDK or
+Desktop Studio QR server again and reinstall the `.gmp` through the official
+App's GMP debug installation entry after the glasses reboot.
 
 ### Which graphics API should I use?
 

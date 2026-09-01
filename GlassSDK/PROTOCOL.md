@@ -1,9 +1,8 @@
 # Phone and glasses protocols
 
-This document describes the wire protocols exercised by GM Plugin Studio: the
-GM command channel used for plugin management and system commands, plus the
-separate recording byte stream. Values and packet layouts below match the
-reference implementation in `GMPluginPhoneApp`.
+This document is the public wire contract for the GM command channel used for
+plugin management and system commands, plus the separate recording byte stream
+used by official Studio and App builds.
 
 ## Transports
 

@@ -23,19 +23,20 @@ gm-web-plugin-devkit-0.1.0/
 The directories relevant to plugin developers are:
 
 - `sdk/`: copy these files into the H5 project and import them by relative path.
-- `studio/`: locally simulates the App, device display, action buttons, and
-  lifecycle.
+- `studio/`: contains the public WebSDK Browser Studio launcher. It locally
+  simulates the App Bridge, device display, primary button, and lifecycle, but
+  does not execute glasses `.gmp` files.
 - `tools/`: packages the final H5 build directory as an `.mmpkg`.
 - `examples/`: runnable examples that already reference the local SDK.
 - `docs/web-plugin/`: the current draft developer documentation.
-- `internal/`: Studio runtime dependencies that developers do not need to
-  modify or import directly.
+- `internal/`: Browser Studio runtime dependencies that developers do not need
+  to modify or import directly.
 
 ## Requirements
 
 - Node.js 18 or later.
 - A modern browser such as Chrome, Edge, or Safari.
-- Studio and the packager have no third-party runtime dependencies.
+- Browser Studio and the packager have no third-party runtime dependencies.
 
 ## Five-minute walkthrough
 
@@ -52,12 +53,12 @@ Run the included example:
 node studio/gm-plugin-studio.mjs --plugin examples/basic-counter
 ```
 
-Open `http://127.0.0.1:4173`, then:
+Open `http://127.0.0.1:4173` in WebSDK Browser Studio, then:
 
 1. Select **Draw to glasses** and confirm that a green device image appears on
    the right.
-2. Use Studio's single-click, double-click, and head-gesture buttons and confirm
-   that the plugin receives the events.
+2. Use Browser Studio's single-click, double-click, and head-gesture buttons
+   and confirm that the plugin receives the events.
 3. Change the device connection and lifecycle state and confirm that the plugin
    handles the changes.
 4. Inspect requests, responses, and events in the Bridge Inspector.
@@ -100,12 +101,13 @@ node /path/to/devkit/tools/build-mmpkg.mjs \
 
 ## Current preview limitations
 
-- Studio loads a static directory; it does not start Vite and does not provide
-  HMR.
+- Browser Studio loads a static directory; it does not start Vite, provide HMR,
+  or execute `.gmp` files. Use the prebuilt Desktop Studio from Plugin Open
+  Platform for paired Web and glasses plugin debugging.
 - The browser SDK is a single-file ES module, with separate type declarations
   in `sdk/`.
 - The current App supports unsigned `.mmpkg` sideloading only in Debug builds.
-- Studio fonts, brightness, and optical effects require final validation on
-  physical glasses.
-- The ZIP will not be maintained indefinitely alongside future npm packages.
-  After npm publication, package versions become authoritative.
+- Browser Studio fonts, brightness, and optical effects require final
+  validation on physical glasses.
+- The DevKit ZIP remains an official offline distribution for the browser SDK,
+  Browser Studio, packager, examples, and documentation.

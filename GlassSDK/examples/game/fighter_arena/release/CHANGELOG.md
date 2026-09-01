@@ -270,7 +270,7 @@
   transparent action canvas, eliminating pose-dependent size pulsing.
 - Added torso anchoring so extended punches and kicks do not drag the fighter's
   body toward the center of each frame.
-- Changed the Fighter Arena control help in GMPluginWindows to Chinese.
+- Changed the legacy desktop companion control help to Chinese.
 
 ## 0.1.0-beta.1
 
