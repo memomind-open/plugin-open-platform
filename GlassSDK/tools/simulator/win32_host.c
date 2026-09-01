@@ -1575,6 +1575,9 @@ static int run_lifecycle_test(HINSTANCE instance)
     combat_check(!simulator.exit_requested, "long_press_countdown_started",
                  "exit_requested=%u", simulator.exit_requested ? 1U : 0U);
     combat_frames(20U, 0U);
+    send_button(GM_PLUGIN_BUTTON_ACTION_VERY_LONG);
+    combat_check(!simulator.exit_requested, "very_long_keeps_countdown",
+                 "exit_requested=%u", simulator.exit_requested ? 1U : 0U);
     (void)save_lifecycle_screenshot(simulator.window,
                                     "12-exit-countdown.bmp");
     send_button(GM_PLUGIN_BUTTON_ACTION_RELEASE);
@@ -1582,8 +1585,10 @@ static int run_lifecycle_test(HINSTANCE instance)
     combat_check(!simulator.exit_requested, "long_press_release_cancels",
                  "exit_requested=%u", simulator.exit_requested ? 1U : 0U);
     send_button(GM_PLUGIN_BUTTON_ACTION_LONG);
-    combat_frames(39U, 0U);
-    combat_check(!simulator.exit_requested, "long_press_countdown_pending",
+    combat_frames(20U, 0U);
+    send_button(GM_PLUGIN_BUTTON_ACTION_VERY_LONG);
+    combat_frames(19U, 0U);
+    combat_check(!simulator.exit_requested, "very_long_countdown_pending",
                  "exit_requested=%u", simulator.exit_requested ? 1U : 0U);
     combat_frames(1U, 0U);
     combat_check(simulator.exit_requested, "long_press_countdown_exit",

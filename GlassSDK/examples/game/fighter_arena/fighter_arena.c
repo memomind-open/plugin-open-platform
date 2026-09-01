@@ -2149,14 +2149,13 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
         return true;
     }
     if (event->type != GM_PLUGIN_EVENT_BUTTON) return false;
-    if (event->data.button.action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
-        self->host->app_exit();
-        return true;
-    }
-    if (event->data.button.action == GM_PLUGIN_BUTTON_ACTION_LONG) {
-        self->holding_exit = true;
-        self->exit_hold_ms = 0U;
-        (void)render(self);
+    if (event->data.button.action == GM_PLUGIN_BUTTON_ACTION_LONG ||
+        event->data.button.action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
+        if (!self->holding_exit) {
+            self->holding_exit = true;
+            self->exit_hold_ms = 0U;
+            (void)render(self);
+        }
         return true;
     }
     if (event->data.button.action == GM_PLUGIN_BUTTON_ACTION_RELEASE) {
