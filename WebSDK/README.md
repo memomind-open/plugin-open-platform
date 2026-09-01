@@ -1,7 +1,7 @@
 # GM Web Plugin SDK
 
-GM Web Plugin SDK is the development kit for Web plugins that run in a
-companion application and render content on GM glasses through Bridge v1.
+GM Web Plugin SDK is the public development kit for Web plugins that run in a
+companion App WebView and communicate with GM glasses through Bridge v1.
 
 This workspace contains:
 
@@ -9,23 +9,37 @@ This workspace contains:
 - the shared Bridge contract;
 - a simulated application runtime;
 - a GRAY_4 device renderer;
-- the browser-only compatibility Studio;
-- deterministic `.mmpkg` and DevKit packaging tools.
+- the public, Node.js-based WebSDK Browser Studio;
+- deterministic `.mmpkg` and DevKit ZIP packaging tools; and
+- runnable examples and public documentation.
 
-The default dual-ended desktop application lives in the sibling `Studio/`
-workspace. This directory remains independently testable and
-can produce a standalone Web developer kit.
+The recommended full debugger is the prebuilt MemoMind Desktop Studio under
+[`../Studio/`](../Studio/). Desktop Studio can run a Web plugin together with a
+real glasses `.gmp` in the software previewer. Its source repository is not
+part of the public SDK distribution.
+
+WebSDK Browser Studio remains available for lightweight Web-only development.
+It simulates the App Bridge and virtual display in a normal browser, but it does
+not load or execute `.gmp` files.
 
 ## Quick start
+
+Install the WebSDK development dependencies and run its validation:
 
 ```sh
 npm ci
 npm test
+```
+
+Start Browser Studio with the Counter example:
+
+```sh
 npm run dev
 ```
 
-The last command serves `examples/basic-counter` in the browser-only Studio at
-`http://127.0.0.1:4173`.
+Open `http://127.0.0.1:4173`. For paired Web and glasses plugin development,
+start the prebuilt Desktop Studio for your platform and select the Web workspace
+and glasses plugin there.
 
 Build a distributable Web plugin package:
 
@@ -33,7 +47,7 @@ Build a distributable Web plugin package:
 npm run pack:plugin -- examples/basic-counter dist/basic-counter.mmpkg
 ```
 
-Build the standalone developer kit ZIP:
+Build the standalone DevKit ZIP, which includes Browser Studio:
 
 ```sh
 npm run build:devkit
@@ -42,23 +56,22 @@ npm run build:devkit
 ## Layout
 
 ```text
-packages/bridge-contract  Public methods, events, errors and device profile
+packages/bridge-contract  Public methods, events, errors, and device profile
 packages/web-sdk          H5 SDK and App/Studio transports
 packages/device-renderer  GRAY_4 framebuffer and Canvas presentation
-packages/studio-runtime   Simulated App host
-examples/                 All runnable Web plugin examples and workspaces
-tools/browser-studio      Browser-only compatibility Studio UI
-tools/                    Development servers, packagers and repository checks
-docs/web-plugin/          Web plugin developer documentation
-dist/                     Generated packages and DevKit archives (ignored)
-node_modules/             Installed dependencies (ignored)
+packages/studio-runtime   Browser Studio Host simulation
+examples/                 Runnable Web plugin examples and workspaces
+tools/browser-studio      Public Web-only compatibility Studio UI
+tools/                    Development servers, packagers, and checks
+docs/web-plugin/          Public Web plugin documentation
+dist/                     Published or locally generated packages and DevKit ZIPs
 ```
 
-The `examples/` directory is the single home for Counter, Momo Talking Pet,
-Fighter Arena Controller, GM Life Desk, Tic-Tac-Toe, and Weather. Static
-examples run directly in the desktop Studio; TypeScript/Vite examples must be
-built before their generated `dist/` output appears in the Studio selector.
-Generated outputs and dependency directories are not stored in the repository.
+Static examples can run directly in Desktop Studio or Browser Studio.
+TypeScript/Vite examples must be built before their generated `dist/` output is
+selected. Official Plugin Open Platform releases may include generated
+`.mmpkg` and DevKit artifacts under `WebSDK/dist`; local builds may overwrite
+or add files there.
 
 ## Directory boundaries
 
@@ -66,8 +79,8 @@ Generated outputs and dependency directories are not stored in the repository.
   beside that package.
 - Put every runnable plugin, whether static or toolchain-based, in
   `examples/<plugin-name>/`.
-- Put repository automation and compatibility Studio implementation in
-  `tools/`.
+- Keep Browser Studio implementation under `tools/browser-studio` and its
+  reusable Host implementation under `packages/studio-runtime`.
 - Put public Web plugin documentation in `docs/web-plugin/`.
-- Never place generated packages, dependencies, or local build output under a
-  source directory unless the tool requires an ignored `dist/` directory.
+- Do not depend on the private Desktop Studio source repository from WebSDK
+  packages, examples, or public documentation.

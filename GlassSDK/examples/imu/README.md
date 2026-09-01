@@ -20,10 +20,11 @@ The source portrait sheet is under `assets/head-motion-sprites.png`. Run
 after replacing it to regenerate the embedded `head_sprites.h` data and inspect
 the exact 16-level grayscale result used by the device.
 
-In Studio, select this device plugin and drag the head-motion control. Vertical
-movement changes pitch and reports raising/lowering; horizontal movement
-reports left/right turning. The Nod, Left, Right, and Shake controls exercise
-the independent firmware gesture event path.
+In Desktop Studio, select this glasses plugin and drag the head-motion control.
+Vertical movement changes pitch and reports raising/lowering; horizontal
+movement reports left/right turning. The proportional joystick exercises the
+raw IMU path. Recognized firmware gesture events remain a separate Host event
+path and require compatible simulator or physical-device input.
 
 After changing this example, run `./gm-build build --example imu` from the SDK
 root.

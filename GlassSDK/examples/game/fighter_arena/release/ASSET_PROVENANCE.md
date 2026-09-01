@@ -43,7 +43,7 @@ commercial game asset is included.
 ## Audio
 
 The 23 effects and four non-fight music loops are synthesized locally at
-44.1 kHz by `GMPluginWindows/tools/build_fighter_sfx.py`. Layered chirps,
+44.1 kHz by `WebSDK/tools/generate-fighter-audio.mjs`. Layered chirps,
 harmonics, square-wave transients, filtered seeded noise, envelopes, and short
 original note sequences produce the attack, impact, movement, menu and
 match-flow cues. They contain no recorded samples and do not reproduce audio
@@ -54,5 +54,6 @@ OpenGameArt source page marks it CC0 and describes it as an original, unused,
 loopable BeepBox composition:
 https://opengameart.org/content/midi-battle-theme
 
-The downloaded original is retained as `bgm_fight_cc0.mp3`; its URL, license
-and SHA-256 are also recorded in `GMPluginWindows/assets/sfx/BGM_LICENSES.md`.
+The downloaded original is retained as `bgm_fight_cc0.mp3`; its source and
+license information are recorded in
+`WebSDK/examples/fighter-controller/assets/sfx/README.md`.

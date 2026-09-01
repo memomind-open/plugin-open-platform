@@ -1,7 +1,7 @@
 # Fighter Arena Controller
 
 This Web plugin is a multi-touch controller for the Fighter Arena GMP game.
-It sends the same version 2 state snapshots as GMPluginWindows every 50 ms.
+It sends Fighter Arena version 2 state snapshots every 50 ms.
 The controller is landscape-only. Because the production App currently keeps
 its WebView in portrait, the plugin rotates its complete canvas by 90 degrees
 on portrait touch devices and swaps the viewport dimensions. The user can hold
@@ -30,7 +30,7 @@ Events `1..11` are hit, block, guard-break, special-launch, round-end, attack,
 jump, round-start, menu, KO, and music. Generated audio assets are documented
 under `assets/sfx/README.md`.
 
-Run it in Studio:
+Run it in WebSDK Browser Studio for Web-only protocol checks:
 
 ```sh
 node tools/run-browser-studio.mjs --plugin examples/fighter-controller
@@ -42,7 +42,8 @@ Build the package:
 npm run pack:plugin -- examples/fighter-controller dist/fighter-controller.mmpkg
 ```
 
-Studio validates and records the outgoing messages. Real glasses control also
+Browser Studio validates and records the outgoing messages. Use Desktop Studio
+to run this Web plugin together with `fighter_arena.gmp`. Real glasses control also
 requires the App WebView host to implement `plugin.sendMessage` by forwarding
 the channel and decoded payload through GM service `0x0F`, command `0x28`.
 The App must route unsolicited command `0x29` messages to the WebView event

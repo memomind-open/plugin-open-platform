@@ -49,42 +49,39 @@ stride before redrawing current objects.
 
 ## Controls
 
-- `A` / `D`: move
-- `W`: jump
-- `S`: crouch
-- `J`: light punch / continue after a round
-- `K`: heavy punch
-- `U`: light kick
-- `I`: heavy kick
-- `L`: large energy-wave projectile at 50 energy
-- `O`: six-hit tracking rush at 35 energy: high-speed approach, punch and kick
-  flurry, then a launching double-palm finisher
-- `J`, `J`, `K`: jab, jab, heavy-punch target combo
-- `J`, `U`, `I`: jab, advancing light kick, heavy-kick knockdown combo
-- Back direction: retreat; automatically stand-block during an incoming attack
-- `S` + back direction: crouch-block during an incoming attack
-- `Enter`: confirm menus and skip interstitial screens
-- `Esc` in GMPluginWindows: pause or resume
-- Hold the glasses button: show a two-second exit countdown; release to cancel
+Run `WebSDK/examples/fighter-controller` together with this `.gmp` in Desktop
+Studio. The controller provides:
 
-Open **Extensions > Fighter Arena...** in GMPluginWindows. The dedicated
-extension window sends a four-byte v2 snapshot on channel `0x4647`:
+- movement joystick: move, jump, crouch, and retreat/block;
+- `J` / **LIGHT**: light punch and continue after a round;
+- `K` / **HEAVY**: heavy punch;
+- `U` / **KICK**: light kick;
+- `I` / **BLOCK**: heavy kick or explicit block modifier;
+- **SKILL 1**: large energy-wave projectile at 50 energy;
+- **SKILL 2**: six-hit tracking rush at 35 energy;
+- **START**: confirm menus and skip interstitial screens; and
+- **PAUSE**: pause or resume.
+
+Normal target combos are `J, J, K` and `J, U, I`. Hold the glasses primary
+button to show a two-second exit countdown; release it to cancel.
+
+The Fighter Controller Web plugin sends a four-byte v2 snapshot on channel `0x4647`:
 `version, sequence, buttons_hi, buttons_lo`. Bit 9 is an explicit pause state.
 Legacy v1 snapshots are rejected. A disconnect or 300 ms without a valid
 snapshot pauses the match instead of leaving the CPU active.
 
-Best-effort sound events are sent to GMPluginWindows on channel `0x4648` as
+Best-effort sound events are sent back to the paired Web plugin on channel `0x4648` as
 `version, sequence, event, value`. Version 1 defines hit, block, guard-break,
 special-launch, round-end, attack, jump, round-start, menu, KO, and music-state
-events. The Windows app maps current events to 23 original layered effects,
-four original loops and one CC0 retro battle track. A 16-channel mixer keeps
+events. Fighter Controller maps current events to original layered effects and
+music loops. Its browser mixer keeps
 music and overlapping combat effects audible together. The legacy guard-break
 event remains reserved but is not emitted by the current game. Audio plays on
-the PC because the plugin ABI does not expose glasses-side audio.
+the phone or computer because the plugin ABI does not expose glasses-side audio.
 
 Events enter a small non-blocking queue. Temporary Bluetooth-busy results are
 retried for a bounded number of game loops, preventing ordinary attack and hit
-sounds from being lost while Windows is also sending 50 ms input snapshots.
+sounds from being lost while the Web controller is also sending 50 ms input snapshots.
 
 The encoded sheets are stored in `zen_combat_sprites.h` and
 `rival_combat_sprites.h`; their generated, alpha and normalized source sheets
@@ -120,5 +117,5 @@ Build with:
 gm-build build --example game/fighter_arena
 ```
 
-See [`release/QUICKSTART.md`](release/QUICKSTART.md) for the beta installation
-and verification path.
+See [`release/QUICKSTART.md`](release/QUICKSTART.md) for the paired Desktop
+Studio and physical-device verification paths.

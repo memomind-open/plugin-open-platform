@@ -10,10 +10,13 @@ documentation. The current contract version is Bridge v1.
 3. [DevKit ZIP guide](devkit-zip.md)
 4. [Runtime model and lifecycle](runtime-and-lifecycle.md)
 5. [API overview](api-reference.md)
-6. [Debugging with Studio](studio.md)
+6. [Debugging with Desktop Studio and Browser Studio](studio.md)
 7. [Final `.mmpkg` package](package-format.md)
 8. [Install an `.mmpkg` over a LAN](lan-install.md)
 9. [Compatibility and on-device limits](compatibility.md)
 
-A Web plugin's HTML page runs in the phone App or Studio. Only content
-submitted through `gm.display.*` is rendered on the glasses display.
+A Web plugin's HTML page runs in the phone App, prebuilt Desktop Studio, or
+WebSDK Browser Studio. Only content submitted through `gm.display.*` is
+rendered on the glasses display. Desktop Studio is the recommended debugger for
+paired Web and `.gmp` development; Browser Studio is the lightweight Web-only
+tool included in the DevKit ZIP.

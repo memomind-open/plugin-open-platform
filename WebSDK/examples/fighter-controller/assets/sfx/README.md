@@ -13,4 +13,4 @@ node tools/generate-fighter-audio.mjs
 ```
 
 The older input-confirmation WAV files are also original synthesized assets
-copied from the former GMPluginWindows companion implementation.
+carried forward from the legacy Windows companion implementation.

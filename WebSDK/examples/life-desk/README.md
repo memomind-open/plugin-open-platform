@@ -27,7 +27,7 @@ glasses.
 - Long press: refresh data, clear the calculator, or reset the timer.
 - Nod: confirm. Shake: return to the desktop when supported by the device.
 
-## Run in Studio
+## Run in WebSDK Browser Studio
 
 ```sh
 # Run from the WebSDK workspace root.

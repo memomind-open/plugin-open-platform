@@ -50,11 +50,18 @@ await writeFile(resolve(staging, 'DEVKIT-MANIFEST.json'), `${JSON.stringify({
   name: 'GM Web Plugin DevKit',
   version,
   bridgeVersion: '1.0',
-  distribution: 'internal-zip-preview',
+  distribution: 'public-devkit-zip',
   node: '>=18.0.0',
+  browserStudio: {
+    bundled: true,
+    scope: 'web-only',
+  },
+  desktopStudio: {
+    distribution: 'prebuilt-plugin-open-platform',
+    sourcePublic: false,
+  },
   npmMigration: {
     sdk: '@memomind/gm-plugin-web-sdk',
-    studio: '@memomind/gm-plugin-studio',
   },
 }, null, 2)}\n`);
 

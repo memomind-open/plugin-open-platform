@@ -69,7 +69,8 @@ acknowledgements.
 ## Device plugin requirements
 
 A Web plugin may use `deviceRequirements` to declare required device protocols.
-Studio uses these declarations to pair compatible plugins before launch:
+Desktop Studio uses these declarations to pair compatible Web and glasses
+plugins before launch:
 
 ```json
 {
@@ -93,9 +94,9 @@ Studio uses these declarations to pair compatible plugins before launch:
 
 Protocol IDs use lowercase letters, digits, periods, and hyphens. Versions
 contain one to four numeric components. A device `.gmp` manifest declares its
-protocols through `provides.protocols`. See
-[`../../../GlassSDK/PROTOCOL_COMPATIBILITY.md`](../../../GlassSDK/PROTOCOL_COMPATIBILITY.md)
-for public protocols and the device-side format.
+protocols through `provides.protocols`. In a complete Plugin Open Platform
+release, see `GlassSDK/PROTOCOL_COMPATIBILITY.md` for public protocols and the
+device-side format.
 
 ## Packaging commands
 

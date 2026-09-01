@@ -1,141 +1,124 @@
-# Install a GM Plugin on Glasses
+# Preview and Install a GM Plugin
 
-GM Plugin SDK builds `.gmp` packages but does not contain the transport UI. Use
-one of the official companion tools to install and manage a package on the
-glasses.
+GM Plugin SDK builds `.gmp` packages. Plugin Open Platform provides two public
+development paths:
 
-## Companion tools
+- use the prebuilt Desktop Studio to run the `.gmp` in a software previewer;
+- serve the `.gmp` over the SDK's debug LAN channel and install it on physical
+  glasses through the official App.
 
-- [**GMPluginWindows**](https://github.com/memomind-open/GMPluginWindows) is the
-  Windows desktop installer and development transport tool. Check its
-  [Releases page](https://github.com/memomind-open/GMPluginWindows/releases) for
-  packaged builds.
-- [**GMPluginPhoneApp**](https://github.com/memomind-open/GMPluginPhoneApp) is
-  the Android/OpenHarmony installer and plugin manager. Check its
-  [Releases page](https://github.com/memomind-open/GMPluginPhoneApp/releases)
-  for packaged builds.
-
-The tools are maintained in separate public GitHub repositories so their
-installers, platform requirements, and release cycles remain independent from
-the SDK.
-
-## Before connecting a companion tool
-
-The companion tools use Bluetooth SPP to transfer plugins and communicate with
-the glasses. Disconnect any existing SPP connection before continuing. Use one
-of these methods:
-
-- In the MemoMind phone app, open **Settings > Device connection > Unpair
-  device**.
-- Reset the glasses to factory settings by pressing the button four times and
-  then holding it (short, short, short, short, long).
-
-<img src="images/installation/phone-unpair-glasses.png"
-     alt="Unpair the glasses in the MemoMind phone app" width="420">
-
-> [!NOTE]
-> A factory reset is normally only needed when the glasses cannot connect. It
-> removes the existing pairing, so pair the glasses with the new host again.
+No separate installer source repository is required.
 
 ## Build a plugin
 
-1. Build a plugin from the SDK root. On macOS or Linux:
+From the `GlassSDK` root, build one example on macOS or Linux:
 
-   ```sh
-   ./gm-build build --example game/2048
-   ```
+```sh
+./gm-build build --example game/2048
+```
 
-   On Windows, press `Win+X`, open **Terminal (PowerShell)** or **Windows
-   PowerShell**, then run:
+On Windows, open Terminal or Windows PowerShell and run:
 
-   ```powershell
-   .\gm-build build --example game/2048
-   ```
+```powershell
+.\gm-build build --example game/2048
+```
 
-   Command Prompt is not supported. The bundled native launcher does not need
-   a PowerShell execution-policy change. Missing CMake, Ninja, RISC-V toolchain,
-   and QR dependencies are installed automatically.
+Command Prompt is not supported. The build tool installs missing CMake, Ninja,
+RISC-V compiler, and QR dependencies automatically. The generated package is:
 
-2. Locate the generated package at `build-host/game/2048/2048.gmp`.
+```text
+build-host/game/2048/2048.gmp
+```
 
-Run `./gm-build` on macOS/Linux or `.\gm-build` in Windows PowerShell to build
-incrementally and serve a QR code for the valid example package with the newest
-modification time. The same rule applies when nothing changes or a shared input
-rebuilds multiple packages.
+## Preview in Desktop Studio
 
-You can now transfer and run this `.gmp` with either of the following methods.
+Keep the public repository layout intact and start the prebuilt application for
+your platform under `../Studio/`:
 
-## Method 1: Windows
+```text
+plugin-open-platform/
+|-- GlassSDK/
+|-- WebSDK/
+`-- Studio/<platform>/
+```
 
-### Pair the glasses
+Desktop Studio automatically discovers packages under `GlassSDK/build-host`.
+Select the built plugin from the glasses plugin selector, or import an external
+`.gmp` file. The software previewer runs the RV32 package, public Host API,
+LVGL compatibility layer, virtual 600 x 350 display, buttons, accessory input,
+head motion, locale, and plugin logs.
 
-1. Open **Windows Settings > Bluetooth & devices > Add device**.
-2. Select the glasses whose device name starts with **MemoMind One**.
-3. Keep the default pairing options selected. When Windows asks whether to
-   allow the device to pair, select **Allow**. This permission is required.
+Desktop Studio is a development simulator. It does not reproduce physical
+optics, sensor noise, firmware scheduling, Bluetooth timing, or target memory
+pressure exactly. Complete final validation on physical glasses.
 
-<img src="images/installation/windows-select-memomind-one.png"
-     alt="Select MemoMind One in the Windows Bluetooth device list" width="720">
+## Install on physical glasses
 
-<img src="images/installation/windows-pairing-notification.png"
-     alt="Windows notification for the MemoMind One pairing request" width="470">
+### 1. Prepare the connection
 
-<img src="images/installation/windows-allow-pairing.png"
-     alt="Allow the MemoMind One pairing request in Windows" width="720">
+The phone and development computer must be on the same trusted LAN. The
+official App must already be paired with the glasses. If another host owns the
+glasses Bluetooth SPP connection, disconnect it before continuing.
 
-After pairing succeeds, open **Device Manager** and expand **Ports (COM &
-LPT)**. Windows should show several new **Standard Serial over Bluetooth link**
-ports. The COM numbers vary by computer.
+In the official App, use **Settings > Device connection > Unpair device** when
+the glasses must be paired again. A factory reset is normally necessary only
+when the connection cannot be recovered; it removes the existing pairing.
 
-<img src="images/installation/windows-bluetooth-com-ports.png"
-     alt="Bluetooth serial COM ports in Windows Device Manager" width="720">
+### 2. Start the GMP QR server
 
-### Transfer and run the plugin
+To rebuild changed examples and serve the most recently updated valid package,
+run this from `GlassSDK`:
 
-1. Download and extract GMPluginWindows, then run
-   `GMPluginWindows\dist\GMPluginWindows.exe`.
-2. In **Port**, select the COM port that corresponds to the glasses' Bluetooth
-   SPP service. Use **Refresh Ports** if the port is not listed.
-3. Select **Connect to Glasses via SPP**. The connection status should change
-   to **Bluetooth SPP - Connected**, and the activity log should contain
-   `SPP connected: COMxx`.
+macOS or Linux:
 
-   <img src="images/installation/windows-connect-spp.png"
-        alt="Select the SPP COM port and connect to the glasses" width="720">
+```sh
+./gm-build
+```
 
-4. Select **Choose .gmp Plugin** and open the `.gmp` built in
-   [Build a plugin](#build-a-plugin).
-5. Select **Transfer and Start Plugin**. When the transfer finishes, the plugin
-   starts on the glasses.
+Windows PowerShell:
 
-   <img src="images/installation/windows-transfer-and-start.png"
-        alt="Choose, transfer, and start a GMP plugin" width="720">
+```powershell
+.\gm-build
+```
 
-If you do not know which of the new COM ports is the SPP port, try the new
-ports shown in Device Manager until the activity log reports a successful SPP
-connection.
+To serve an existing package without rebuilding it:
 
-## Method 2: Android
+```sh
+./gm-build serve --gmp build-host/game/2048/2048.gmp
+```
 
-The [GMPluginPhoneApp](https://github.com/memomind-open/GMPluginPhoneApp)
-repository contains the Android demo app source. Build and install the app on
-an Android phone, then open **GM Plugin Studio**.
+Use `.\gm-build` on Windows. The command prints a QR code and writes a
+`*.qr.png` image beside the `.gmp`. It serves the file until `Ctrl+C` is
+pressed.
 
-1. Select **Refresh**, then choose the glasses from **Paired device**.
-2. Select **Connect** to open the Classic Bluetooth SPP connection.
-3. Select a bundled plugin, or select **Choose file** and open the `.gmp` built
-   in [Build a plugin](#build-a-plugin).
-4. Select **Install & run**. The app transfers the plugin to the glasses and
-   starts it.
+Desktop Studio can also expose its selected `.gmp` through the same development
+QR workflow. Use either server, not both on the same TCP port.
 
-<img src="images/installation/android-install-and-run.png"
-     alt="Connect, choose, and install a plugin with GM Plugin Studio on Android"
-     width="420">
+### 3. Scan and run
 
-If the glasses do not appear or cannot connect, disconnect their existing SPP
-connection. If necessary, perform the four-short-presses-and-hold factory reset
-described in [Before connecting a companion tool](#before-connecting-a-companion-tool),
-pair the glasses with the phone again, and retry.
+In the official App, open:
+
+**Settings > Device information > Debug > Plugin WebView Demo > Scan GMP QR
+code**
+
+Scan the terminal or PNG QR code. The App downloads the package, validates its
+size, SHA-256, GMP header, CRC, ABI, and memory bounds, then installs and starts
+it on the glasses.
+
+The QR uses this compact URI form:
+
+```text
+gmp+tcp://192.168.1.8:18765/2048.gmp
+```
+
+Port `18765` is used by default. Use `--port 0` for a random free port or
+`--host <address>` when automatic LAN address selection chooses an interface
+that the phone cannot reach.
+
+This debug channel has no TLS, authentication, or signature. Use it only on a
+trusted LAN with packages from a trusted source. Size, SHA-256, and GMP CRC
+detect truncation and inconsistent content but do not prevent an active
+attacker from replacing both the package and checksum.
 
 ## Lifecycle operations
 
@@ -147,22 +130,27 @@ pair the glasses with the phone again, and retry.
 | Remove | Unload the plugin and release its runtime memory |
 
 Only one plugin is currently supported. Plugins run from temporary RAM and are
-not persisted in Flash. After the glasses reboot, install the package again.
+not persisted in Flash. After the glasses reboot, serve and install the package
+again.
 
 ## Troubleshooting
 
-- **Package rejected:** confirm the SDK ABI is compatible with the glasses
-  firmware and rebuild the `.gmp` with the current SDK.
+- **Studio cannot find SDK examples:** keep `Studio`, `GlassSDK`, and `WebSDK`
+  together in the Plugin Open Platform layout, or import the `.gmp` directly.
+- **Phone cannot open the QR address:** confirm that phone and computer are on
+  the same LAN, allow the server through the computer firewall, and pass a
+  reachable address through `--host`.
+- **Package rejected:** rebuild with the current SDK and confirm that the
+  firmware supports the package ABI and required extensions.
 - **Package too large:** the packer enforces the advertised package and runtime
-  memory limit during the build.
-- **Transfer rejected or interrupted:** reconnect the glasses and retry the
-  install. The installer must abort or resume according to acknowledged
-  offsets; do not concatenate or resend chunks manually.
+  memory limits during the build.
+- **Transfer interrupted:** restart the QR server if necessary and scan again;
+  do not concatenate or resend protocol chunks manually.
 - **Plugin disappeared after reboot:** this is expected because plugins are not
   persisted in Flash.
-- **Do not install untrusted packages:** GMP contains native code and is not
-  currently isolated by an MPU. See [SECURITY.md](SECURITY.md).
+- **Untrusted package:** do not install it. A GMP contains native code and is
+  not currently isolated by an MPU. See [SECURITY.md](SECURITY.md).
 
 The transport command and acknowledgement contract is specified in
-[PROTOCOL.md](PROTOCOL.md). Most plugin developers should use a companion tool
-rather than implement that protocol directly.
+[PROTOCOL.md](PROTOCOL.md). Most plugin developers should use the SDK QR server
+and official App instead of implementing the transport directly.

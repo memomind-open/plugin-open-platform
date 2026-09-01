@@ -5,12 +5,17 @@ npm packages are published. It contains:
 
 - `sdk/`: the browser ES module SDK and TypeScript declarations used by the App
   and Web plugins.
-- `studio/`: the local GM Plugin Studio launcher.
+- `studio/`: the WebSDK Browser Studio launcher for Web-only simulation.
 - `tools/`: the final `.mmpkg` packager.
 - `examples/`: the Counter example configured to use the local SDK.
 - `docs/web-plugin/`: draft public developer documentation.
 
 Requirement: Node.js 18 or later.
+
+Browser Studio simulates the App Bridge and virtual display in a normal
+browser. It does not load or execute glasses `.gmp` files. Use the prebuilt
+Desktop Studio from Plugin Open Platform when testing paired Web and glasses
+plugins.
 
 ## Run immediately
 
@@ -44,14 +49,9 @@ Start with [docs/web-plugin/README.md](docs/web-plugin/README.md) for the full
 workflow. See [docs/web-plugin/devkit-zip.md](docs/web-plugin/devkit-zip.md) for
 ZIP-specific details.
 
-## Future npm migration
+## Distribution model
 
-After official publication, the planned workflow is:
-
-```sh
-npm install @memomind/gm-plugin-web-sdk
-npm install --save-dev @memomind/gm-plugin-studio
-npx gm-plugin-studio --plugin ./dist
-```
-
-Migrating to npm does not change the Bridge API, manifest, or `.mmpkg` format.
+This DevKit ZIP remains the offline distribution for the standalone browser
+SDK, Browser Studio, packager, examples, and documentation. Desktop Studio is
+distributed separately as a prebuilt application inside Plugin Open Platform;
+its source and an npm Studio package are not required.
