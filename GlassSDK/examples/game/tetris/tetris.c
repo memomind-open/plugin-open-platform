@@ -501,9 +501,40 @@ static void plugin_loop(void *opaque, uint32_t elapsed_ms)
 static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
 {
     tetris_t *self = opaque;
+    gm_plugin_button_t button;
     gm_plugin_button_action_t action;
     if (event == 0 || event->type != GM_PLUGIN_EVENT_BUTTON) return false;
+    button = event->data.button.button;
     action = event->data.button.action;
+
+    if (action == GM_PLUGIN_BUTTON_ACTION_TRIGGER &&
+        (button == GM_PLUGIN_BUTTON_UP ||
+         button == GM_PLUGIN_BUTTON_DOWN ||
+         button == GM_PLUGIN_BUTTON_LEFT ||
+         button == GM_PLUGIN_BUTTON_RIGHT)) {
+        if (self->game_over) return true;
+
+        switch (button) {
+        case GM_PLUGIN_BUTTON_UP:
+            rotate(self);
+            break;
+        case GM_PLUGIN_BUTTON_DOWN:
+            step_down(self);
+            self->drop_accumulator = 0;
+            break;
+        case GM_PLUGIN_BUTTON_LEFT:
+            move_horizontal(self, -1);
+            break;
+        case GM_PLUGIN_BUTTON_RIGHT:
+            move_horizontal(self, 1);
+            break;
+        default:
+            break;
+        }
+        render(self);
+        return true;
+    }
+
     if (action == GM_PLUGIN_BUTTON_ACTION_RELEASE) {
         self->fast_drop = false;
         return true;

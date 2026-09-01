@@ -229,6 +229,15 @@ static bool classify_motion(int32_t gyro_x, int32_t gyro_y, int32_t gyro_z,
     return true;
 }
 
+static void queue_direction(snake_game_t *self, direction_t direction)
+{
+    if (self->game_over || self->turn_queued || direction == self->direction ||
+        (((uint8_t)direction + 2U) & 3U) == (uint8_t)self->direction)
+        return;
+    self->pending_direction = direction;
+    self->turn_queued = true;
+}
+
 static void read_controls(snake_game_t *self, uint32_t elapsed_ms)
 {
     gm_plugin_imu_sample_t imu;
@@ -268,12 +277,7 @@ static void read_controls(snake_game_t *self, uint32_t elapsed_ms)
             self->gesture_direction = detected;
             self->return_seen = false;
             self->rearm_quiet_ms = 0;
-            if (detected != self->direction &&
-                (((uint8_t)detected + 2U) & 3U) !=
-                    (uint8_t)self->direction) {
-                self->pending_direction = detected;
-                self->turn_queued = true;
-            }
+            queue_direction(self, detected);
             return;
         }
         if (!self->return_seen) {
@@ -312,11 +316,7 @@ static void read_controls(snake_game_t *self, uint32_t elapsed_ms)
     self->imu_armed = false;
     self->return_seen = false;
     self->rearm_quiet_ms = 0;
-    if (detected != self->direction &&
-        (((uint8_t)detected + 2U) & 3U) != (uint8_t)self->direction) {
-        self->pending_direction = detected;
-        self->turn_queued = true;
-    }
+    queue_direction(self, detected);
 }
 
 static void step(snake_game_t *self)
@@ -410,7 +410,7 @@ static gm_plugin_result_t create_ui(snake_game_t *self)
     set_style(self, self->score_label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR,
               color(0xFF));
     self->ui->label_set_text(self->help_label,
-                             "Head: up/down/left/right  Hold: exit");
+                             "Head/accessory: U/D/L/R  Hold: exit");
     self->ui->obj_align(self->help_label, GM_PLUGIN_LVGL_ALIGN_TOP_RIGHT,
                         -SIDE_MARGIN, 8);
     set_style(self, self->help_label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR,
@@ -475,8 +475,10 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
 {
     snake_game_t *self = opaque;
     gm_plugin_button_action_t action;
+    gm_plugin_button_t button;
     if (event == 0 || event->type != GM_PLUGIN_EVENT_BUTTON) return false;
     action = event->data.button.action;
+    button = event->data.button.button;
     if (action == GM_PLUGIN_BUTTON_ACTION_LONG ||
         action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
         self->host->app_exit();
@@ -488,6 +490,24 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
             return true;
         }
         return false;
+    }
+    if (action == GM_PLUGIN_BUTTON_ACTION_TRIGGER) {
+        switch (button) {
+        case GM_PLUGIN_BUTTON_UP:
+            queue_direction(self, DIR_UP);
+            return true;
+        case GM_PLUGIN_BUTTON_DOWN:
+            queue_direction(self, DIR_DOWN);
+            return true;
+        case GM_PLUGIN_BUTTON_LEFT:
+            queue_direction(self, DIR_LEFT);
+            return true;
+        case GM_PLUGIN_BUTTON_RIGHT:
+            queue_direction(self, DIR_RIGHT);
+            return true;
+        default:
+            return false;
+        }
     }
     return false;
 }
