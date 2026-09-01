@@ -223,12 +223,12 @@ typedef enum {
 
 typedef struct gm_plugin_display_control_api {
     /** @return true when the display is powered on, otherwise false. */
-    bool (*power_get)(void);
+    bool (*screen_is_on)(void);
     /**
      * @param on true to power the display on; false to power it off.
      * @return GM_PLUGIN_OK when the request is accepted.
      */
-    gm_plugin_result_t (*power_set)(bool on);
+    gm_plugin_result_t (*screen_turn_on)(bool on);
     /** @return The current fixed brightness level. */
     gm_plugin_display_brightness_t (*brightness_get)(void);
     /**
