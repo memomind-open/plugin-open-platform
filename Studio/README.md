@@ -41,7 +41,9 @@ Use the single **Import workspace** button in the top toolbar to select the
 two, or three plugin levels below each SDK's first-level collection directories
 (for example, `WebSDK/examples/<plugin>/manifest.json`). SDK infrastructure
 such as tools, dependencies, documentation, and build output is excluded. The two
-plugin cards only need their refresh and individual package-import actions.
+plugin cards retain only their refresh actions. Use the separate **Import
+package** button beside **Import workspace** for `.mmpkg`, `.gmp`, and complete
+developer-app `.zip` files; unrelated file types are hidden.
 Studio can also locate the SDKs automatically when the repository layout
 remains intact.
 
@@ -53,14 +55,15 @@ loads the generated package from the matching
 
 `WebSDK/examples` and `GlassSDK/examples` remain the recommended locations, but
 they are not required. A plugin can live one to three levels below any
-non-infrastructure first-level collection directory. Deeper source workspaces are not scanned;
-import their built `.mmpkg` or `.gmp` package directly.
+non-infrastructure first-level collection directory. Deeper source workspaces
+are not scanned; import their built package through the top toolbar instead.
+Importing a ZIP applies its complete A/B composition, so a component absent
+from the ZIP is disabled in Studio just as it is during App local import.
 
 For glasses plugins, manifest metadata is used only for display and optional
 pairing hints. Unknown fields are ignored, and unavailable metadata does not
-block execution. Studio does not pre-validate a GMP package header before
-sharing it; the software runtime or physical glasses validates the package
-when loading it.
+block execution. Studio validates an imported GMP package before running or
+sharing it; the physical glasses validates it again when loading it.
 
 On Windows, run:
 
@@ -74,15 +77,17 @@ application package included in the matching platform directory.
 
 ## What Desktop Studio provides
 
-- Unified platform-workspace discovery and individual `.mmpkg` loading.
+- Unified platform-workspace discovery and top-level `.mmpkg`, `.gmp`, or
+  developer-app ZIP import.
 - Glasses `.gmp` loading through the software RV32 and Host API previewer.
 - Web-to-glasses plugin message routing.
 - Virtual display, primary button, accessory navigation buttons, and raw head
   motion input.
 - Runtime logs for both the Web plugin and glasses simulator.
 - Interface language selection and plugin locale propagation.
-- Development QR packaging and LAN serving for supported debug installation
-  flows.
+- One developer-app ZIP and QR for the selected phone/glasses combination.
+  New installs fetch the complete selection; updates transfer only changed
+  components. See [`APP_BUNDLE.md`](../APP_BUNDLE.md).
 
 Simulation is not a substitute for final testing on physical glasses. Optical
 brightness, timing, Bluetooth behavior, sensors, memory pressure, and firmware

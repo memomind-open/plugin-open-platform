@@ -349,6 +349,7 @@ def main() -> int:
     parser.add_argument("--qr-output", type=pathlib.Path, help="QR PNG path for serve (default: next to the GMP)")
     parser.add_argument("--gmp", type=pathlib.Path, help="serve an existing GMP without rebuilding")
     args = parser.parse_args()
+    serve_after_build = args.command in ("build", "serve")
     build_root = args.build_dir.expanduser().resolve()
     if args.command == "clean":
         shutil.rmtree(cmake_build_path(), ignore_errors=True)
@@ -379,7 +380,7 @@ def main() -> int:
             example = "game/breakout"
             build_cmake(cmake, build_root, cmake_target(example))
             gmp = package_path(build_root, example)
-    if args.command == "serve":
+    if serve_after_build:
         advertised_host = args.host or choose_lan_address()
         qr_output = (args.qr_output or gmp.with_suffix(".qr.png")).expanduser().resolve()
         server, metadata = start_server(gmp, advertised_host, args.port, qr_output)
