@@ -91,8 +91,8 @@ refresh action to display the new plugin automatically.
 | Command | Description |
 | --- | --- |
 | `python3 build.py` | Rebuild affected plugins, then serve the most recently updated GMP |
-| `python3 build.py build --example bluetooth` | Build one example |
-| `python3 build.py build --example game/2048` | Build a nested game example |
+| `python3 build.py build --example bluetooth` | Build one example, then serve its installation QR code |
+| `python3 build.py build --example game/2048` | Build one nested example, then serve its installation QR code |
 | `python3 build.py all` | Build all maintained examples |
 | `python3 build.py inspect --example extension` | Build and inspect the RISC-V ELF |
 | `python3 build.py clean` | Remove temporary build files while keeping prebuilt GMP packages |
@@ -103,11 +103,15 @@ stored under `build-host/.build/<example>/`.
 
 ## QR package selection
 
-After the incremental build completes, the driver serves the valid example
-`.gmp` with the newest modification time. This also applies to the first full
-build, a no-change run, and a shared-input change that rebuilds several
-packages. If modification times are identical, the example path provides a
-stable tie-breaker.
+After a single-example build completes, the driver wraps that example's valid
+`.gmp` in a single-component developer-app ZIP and serves one App-compatible
+QR code. With no command, it instead serves the valid example `.gmp` with the
+newest modification time after the incremental build. This also applies to the
+first full build, a no-change run, and a shared-input change that rebuilds
+several packages. If modification times are identical, the example path
+provides a stable tie-breaker.
+
+See [Developer App ZIP](../APP_BUNDLE.md) for the shared ZIP and LAN protocol.
 
 Examples do not need their own `CMakeLists.txt`. The build driver discovers
 every example directory containing `manifest.json` and compiles all of its
@@ -136,7 +140,8 @@ See [ABI.md](docs/ABI.md) for the complete ABI and lifecycle contract and
 
 After building, use the prebuilt Desktop Studio under `../Studio/<platform>/`
 for local simulation. To install on physical glasses, run the SDK QR server and
-scan its `gmp+tcp` code from the official App's GMP debug installation entry.
+scan its `mmapp+tcp` developer-app ZIP code from the official App's Developer
+Workbench entry.
 
 The public workflow does not require a separate installer source repository.
 See [INSTALLATION.md](docs/INSTALLATION.md) for the complete preview and

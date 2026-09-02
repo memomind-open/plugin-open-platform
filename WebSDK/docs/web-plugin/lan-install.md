@@ -1,29 +1,25 @@
-# Install an `.mmpkg` over a LAN
+# Install a developer app over a LAN
 
-The prebuilt Desktop Studio can package the selected Web plugin as an `.mmpkg` and display
-a QR code for the phone App's debugging entry point. This channel is intended
-for development-time LAN sideloading and does not provide server
-authentication.
+The prebuilt Desktop Studio packages its selected phone and glasses plugins as
+one developer-app ZIP and displays one QR code for the phone App's debugging
+entry point. This channel is intended for development-time LAN sideloading and
+does not provide server authentication.
 
 ## QR code payload
 
-The preferred QR payload is a compact URI. The package name is percent-encoded
-as one path segment:
+The QR payload contains only the direct Studio server address:
 
 ```text
-mmpkg+tcp://192.168.1.8:18765/counter-0.1.0.mmpkg
+mmapp+tcp://192.168.1.8:18765
 ```
 
-The App also accepts the original JSON descriptor for compatibility with
-existing development tools:
+The QR does not contain JSON or package metadata. See the repository-level
+[Developer App ZIP](../../../APP_BUNDLE.md) contract for composition and
+incremental-update rules.
 
-```json
-{"v":1,"scheme":"mmpkg+tcp","host":"192.168.1.8","port":18765,"name":"counter-0.1.0.mmpkg"}
-```
-
-The scheme is always `mmpkg+tcp`; do not treat it as the firmware plugin
-scheme `gmp+tcp`. The authority contains Studio's LAN host and port, and the
-single path segment is the suggested download filename.
+The scheme is always `mmapp+tcp`. The authority contains Studio's LAN host and
+port. The server returns the percent-encoded application ZIP name in its
+response metadata, keeping the QR short while preserving application identity.
 
 Studio prefers TCP port `18765`. If that port is busy, it selects a random
 available port and writes the actual value into the QR code.
@@ -33,32 +29,33 @@ available port and writes the actual value into the QR code.
 After connecting to the TCP address in the QR code, the App sends:
 
 ```text
-MMPKG/1 GET\n
+MMAPP/1 GET - -\n
 ```
 
 A successful response is one ASCII metadata line followed immediately by the
 package body:
 
 ```text
-MMPKG/1 OK <size> <sha256>\n<mmpkg bytes>
+MMAPP/1 OK <size> <sha256> <A|B|AB> <percent-encoded-name>\n<zip bytes>
 ```
 
 `size` is a decimal byte count and `sha256` is a 64-character lowercase
-hexadecimal digest. The App must enforce the 10 MB package limit, read exactly
-`size` bytes, verify SHA-256, and then run the normal `.mmpkg` manifest, file
-hash, and installation validation.
+hexadecimal digest. The final token is the percent-encoded `.zip` application
+name used by the App for the per-application disclaimer and local identity. The
+App enforces the combined package limit, reads exactly `size` bytes, verifies
+SHA-256, and then applies each component's normal validation rules.
 
 An invalid request returns:
 
 ```text
-MMPKG/1 ERROR invalid-request\n
+MMAPP/1 ERROR invalid-request\n
 ```
 
 If the package was deleted, corrupted, or exceeds the limit before download,
 the server returns:
 
 ```text
-MMPKG/1 ERROR invalid-package\n
+MMAPP/1 ERROR invalid-package\n
 ```
 
 ## Security boundary

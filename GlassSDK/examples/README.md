@@ -52,7 +52,8 @@ Build every maintained example:
 python3 build.py all
 ```
 
-Build only one example by passing its path from this table:
+Build only one example and start its QR installation server by passing its path
+from this table:
 
 ```sh
 python3 build.py build --example game/2048

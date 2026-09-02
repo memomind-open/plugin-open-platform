@@ -49,7 +49,7 @@ Desktop Studio provides:
 - Web-to-glasses and glasses-to-Web plugin messages;
 - separate Web and glasses simulator logs;
 - interface language selection and glasses plugin locale propagation;
-- `.mmpkg` and `.gmp` development QR generation; and
+- one developer-app ZIP QR for the selected `.mmpkg`/`.gmp` combination; and
 - GRAY_4 framebuffer and text-overlay preview.
 
 The Desktop Studio application is distributed as a prebuilt tool. Its private

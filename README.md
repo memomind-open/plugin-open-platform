@@ -16,6 +16,8 @@ Studio source to build, preview, package, or test plugins.
   DevKit ZIP tools, and `.mmpkg` packager for Web plugins.
 - [`Studio/`](Studio/) contains prebuilt Desktop Studio applications and their
   platform runtime files.
+- [`APP_BUNDLE.md`](APP_BUNDLE.md) defines the single ZIP used for App import,
+  sharing, and QR installation of phone/glasses plugin combinations.
 
 ## Desktop Studio platforms
 

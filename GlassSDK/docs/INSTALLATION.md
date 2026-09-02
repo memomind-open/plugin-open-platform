@@ -30,6 +30,10 @@ RISC-V compiler, and QR dependencies automatically. The generated package is:
 build-host/.build/game/2048/2048.gmp
 ```
 
+After building, this command prints the installation QR code, writes
+`2048.qr.png` beside the package, and keeps its transfer server running until
+`Ctrl+C` is pressed.
+
 ## Preview in Desktop Studio
 
 Keep the public repository layout intact and start the prebuilt application for
@@ -69,8 +73,9 @@ when the connection cannot be recovered; it removes the existing pairing.
 
 ### 2. Start the GMP QR server
 
-To rebuild changed examples and serve the most recently updated valid package,
-run this from `GlassSDK`:
+The single-example build command in step 1 has already started this server. To
+build incrementally without selecting an example and serve the most recently
+updated valid package, run this from `GlassSDK`:
 
 macOS or Linux:
 
@@ -91,18 +96,20 @@ python3 build.py serve --gmp build-host/.build/game/2048/2048.gmp
 ```
 
 Use `py build.py` on Windows. The command prints a QR code and writes a
-`*.qr.png` image beside the `.gmp`. It serves the file until `Ctrl+C` is
-pressed.
+`*.qr.png` image beside the `.gmp`. The server wraps the GMP in a
+single-component developer-app ZIP in memory and serves it until `Ctrl+C` is
+pressed; it does not write an extra ZIP beside the build output.
 
-Desktop Studio can also expose its selected `.gmp` through the same development
-QR workflow. Use either server, not both on the same TCP port.
+Desktop Studio exposes its complete selected phone/glasses combination through
+the same development QR workflow. Use either server, not both on the same TCP
+port.
 
 ### 3. Scan and run
 
 In the official App, open:
 
-**Settings > Device information > Debug > Plugin WebView Demo > Scan GMP QR
-code**
+**Settings > Device information > Debug > Developer Workbench > Scan to
+import**
 
 Scan the terminal or PNG QR code. The App downloads the package, validates its
 size, SHA-256, GMP header, CRC, ABI, and memory bounds, then installs and starts
@@ -111,7 +118,7 @@ it on the glasses.
 The QR uses this compact URI form:
 
 ```text
-gmp+tcp://192.168.1.8:18765/2048.gmp
+mmapp+tcp://192.168.1.8:18765
 ```
 
 Port `18765` is used by default. Use `--port 0` for a random free port or
@@ -122,6 +129,9 @@ This debug channel has no TLS, authentication, or signature. Use it only on a
 trusted LAN with packages from a trusted source. Size, SHA-256, and GMP CRC
 detect truncation and inconsistent content but do not prevent an active
 attacker from replacing both the package and checksum.
+
+The complete ZIP and incremental update contract is documented in
+[Developer App ZIP](../../APP_BUNDLE.md).
 
 ## Lifecycle operations
 
