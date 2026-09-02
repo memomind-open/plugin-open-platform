@@ -6,7 +6,7 @@ bounded text windows to the paired `novel_reader.gmp`. The glasses plugin owns
 font measurement, wrapping, automatic scrolling, page continuity, and device
 input. It never persists novel data.
 
-Version 0.1.9 temporarily bundles `晚明_柯山梦.txt` for device testing.
+Version 0.1.11 temporarily bundles `晚明_柯山梦.txt` for device testing.
 On first launch the Web plugin copies that UTF-8 text into its phone-side
 IndexedDB bookshelf and opens it automatically, so the Android file chooser is
 not required for this test build. Bridge callbacks are registered before the
@@ -19,6 +19,9 @@ reading progress at bottom right.
 
 The phone controls and status messages use English. Imported novel text and
 detected chapter titles remain in their original language.
+The reader heading uses a dedicated title row followed by a separate
+three-button action row so long names cannot collapse the mobile layout. The
+current chapter appears below the preview, immediately above reading progress.
 
 The phone page intentionally shows only a compact excerpt near the current
 reading offset. The full text remains available to the glasses-side streaming

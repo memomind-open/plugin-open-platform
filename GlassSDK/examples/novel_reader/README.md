@@ -12,7 +12,8 @@ directory title at bottom left and reading progress at bottom right.
 Automatic scrolling batches display movement to 10 frames per second and only
 updates the progress label when its percentage changes, reducing long-running
 CPU load and repeated label allocations without changing reading speed.
-The centered reading viewport displays five scrolling text lines at a time.
+The bottom-aligned reading viewport displays five scrolling text lines at a
+time, directly above the chapter and progress status line.
 The implementation uses the Host libc extension for memory operations and
 formatting, avoiding private libc replacements and redundant window clearing.
 
@@ -30,6 +31,9 @@ Controls:
 
 Head gestures are intentionally not used, so normal head movement cannot
 start or complete the exit countdown.
+
+Pause, resume, and successful bookmark actions show a brief English status
+message at the top center of the glasses display.
 
 Automatic scrolling uses 8, 16, or 24 pixels per second for the slow,
 standard, and fast presets respectively.

@@ -41,6 +41,7 @@
 #define WINDOW_GUARD_BYTES 512U
 #define CHAPTER_TITLE_BYTES 320U
 #define EXIT_HOLD_MS 3000U
+#define NOTICE_DURATION_MS 1400U
 #define PROGRESS_INTERVAL_MS 1000U
 #define SCROLL_FRAME_MS 100U
 
@@ -58,6 +59,7 @@ typedef struct {
     gm_plugin_lvgl_obj_t *chapter_label;
     gm_plugin_lvgl_obj_t *footer;
     gm_plugin_lvgl_obj_t *page[2];
+    gm_plugin_lvgl_obj_t *notice_label;
     gm_plugin_lvgl_obj_t *exit_label;
     gm_plugin_lvgl_obj_t *exit_arc;
     char window[WINDOW_BYTES + 1U];
@@ -76,6 +78,7 @@ typedef struct {
     uint32_t scroll_fraction;
     uint32_t scroll_elapsed;
     uint32_t progress_elapsed;
+    uint32_t notice_elapsed;
     uint32_t exit_elapsed;
     int16_t viewport_width;
     int16_t viewport_height;
@@ -195,16 +198,26 @@ static void send_progress(novel_reader_t *self)
     (void)self->host->bt_send(READER_EVENT_CHANNEL, data, sizeof(data));
 }
 
-static void send_action(novel_reader_t *self, uint8_t action)
+static bool send_action(novel_reader_t *self, uint8_t action)
 {
     uint8_t data[11];
-    if (self->connected == 0U || self->session == 0U) return;
+    if (self->connected == 0U || self->session == 0U) return false;
     data[0] = PROTOCOL_VERSION;
     data[1] = EVENT_ACTION;
     write_u32(data + 2, self->session);
     data[6] = action;
     write_u32(data + 7, visible_offset(self));
-    (void)self->host->bt_send(READER_EVENT_CHANNEL, data, sizeof(data));
+    return self->host->bt_send(READER_EVENT_CHANNEL, data, sizeof(data)) ==
+        GM_PLUGIN_OK;
+}
+
+static void show_notice(novel_reader_t *self, const char *text)
+{
+    if (self->notice_label == 0) return;
+    self->ui->label_set_text(self->notice_label, text);
+    self->ui->obj_clear_flag(self->notice_label,
+                             GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    self->notice_elapsed = NOTICE_DURATION_MS;
 }
 
 static void position_pages(novel_reader_t *self)
@@ -241,8 +254,8 @@ static void calculate_layout(novel_reader_t *self)
     if (lines < 2) lines = 2;
     if (lines > (int16_t)MAX_PAGE_LINES) lines = MAX_PAGE_LINES;
     self->page_height = (int16_t)(lines * self->line_height);
-    viewport_y = (int16_t)(TOP_MARGIN +
-        (self->viewport_height - self->page_height) / 2);
+    viewport_y = (int16_t)(TOP_MARGIN + self->viewport_height -
+        self->page_height);
     self->ui->obj_set_pos(self->viewport, SIDE_MARGIN, viewport_y);
     self->ui->obj_set_size(self->viewport, self->viewport_width,
                            self->page_height);
@@ -400,11 +413,15 @@ static void reset_private_data(novel_reader_t *self)
     self->scroll_fraction = 0U;
     self->scroll_elapsed = 0U;
     self->progress_elapsed = 0U;
+    self->notice_elapsed = 0U;
     self->shown_percent = 0xffU;
     if (self->page[0] != 0) self->ui->label_set_text(self->page[0], "");
     if (self->page[1] != 0) self->ui->label_set_text(self->page[1], "");
     if (self->chapter_label != 0)
         self->ui->label_set_text(self->chapter_label, "");
+    if (self->notice_label != 0)
+        self->ui->obj_add_flag(self->notice_label,
+                               GM_PLUGIN_LVGL_FLAG_HIDDEN);
 }
 
 static void show_exit(novel_reader_t *self)
@@ -512,8 +529,14 @@ static bool handle_control(novel_reader_t *self, const uint8_t *data,
     command = data[6];
     value = read_u16(data + 7);
     switch (command) {
-    case CONTROL_PLAY: self->playing = 1U; break;
-    case CONTROL_PAUSE: self->playing = 0U; break;
+    case CONTROL_PLAY:
+        self->playing = 1U;
+        show_notice(self, "Playing");
+        break;
+    case CONTROL_PAUSE:
+        self->playing = 0U;
+        show_notice(self, "Paused");
+        break;
     case CONTROL_LINE_UP: advance_pixels(self, (int16_t)-self->line_height); break;
     case CONTROL_LINE_DOWN: advance_pixels(self, self->line_height); break;
     case CONTROL_PAGE_UP: previous_page(self); break;
@@ -586,10 +609,12 @@ static gm_plugin_result_t create_ui(novel_reader_t *self)
     self->viewport = self->ui->obj_create(self->root);
     self->page[0] = self->ui->label_create(self->viewport);
     self->page[1] = self->ui->label_create(self->viewport);
+    self->notice_label = self->ui->label_create(self->root);
     self->exit_label = self->ui->label_create(self->root);
     self->exit_arc = self->ui->arc_create(self->root);
     if (self->chapter_label == 0 || self->footer == 0 || self->viewport == 0 ||
         self->page[0] == 0 || self->page[1] == 0 ||
+        self->notice_label == 0 ||
         self->exit_label == 0 || self->exit_arc == 0)
         return GM_PLUGIN_ENOMEM;
     self->ui->obj_set_pos(self->viewport, SIDE_MARGIN, TOP_MARGIN);
@@ -644,6 +669,17 @@ static gm_plugin_result_t create_ui(novel_reader_t *self)
                         color(0xFFU), GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->obj_add_flag(self->page[0], GM_PLUGIN_LVGL_FLAG_HIDDEN);
     self->ui->obj_add_flag(self->page[1], GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    self->ui->obj_set_size(self->notice_label, 240, 28);
+    self->ui->obj_align(self->notice_label, GM_PLUGIN_LVGL_ALIGN_TOP_MID,
+                        0, 14);
+    self->ui->style_set(self->notice_label,
+                        GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
+                        number(GM_PLUGIN_LVGL_TEXT_ALIGN_CENTER),
+                        GM_PLUGIN_LVGL_SELECTOR_MAIN);
+    self->ui->style_set(self->notice_label,
+                        GM_PLUGIN_LVGL_STYLE_TEXT_COLOR, color(0xFFU),
+                        GM_PLUGIN_LVGL_SELECTOR_MAIN);
+    self->ui->obj_add_flag(self->notice_label, GM_PLUGIN_LVGL_FLAG_HIDDEN);
     self->ui->obj_set_size(self->exit_label, 180, 30);
     self->ui->obj_align(self->exit_label, GM_PLUGIN_LVGL_ALIGN_CENTER, 0, 34);
     self->ui->style_set(self->exit_label, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
@@ -687,6 +723,15 @@ static gm_plugin_result_t on_start(void *opaque)
 static void on_loop(void *opaque, uint32_t elapsed_ms)
 {
     novel_reader_t *self = opaque;
+    if (self->notice_elapsed != 0U) {
+        if (elapsed_ms >= self->notice_elapsed) {
+            self->notice_elapsed = 0U;
+            self->ui->obj_add_flag(self->notice_label,
+                                   GM_PLUGIN_LVGL_FLAG_HIDDEN);
+        } else {
+            self->notice_elapsed -= elapsed_ms;
+        }
+    }
     if (self->exit_sources != 0U) {
         self->exit_elapsed += elapsed_ms;
         if (self->exit_elapsed >= EXIT_HOLD_MS) {
@@ -728,10 +773,12 @@ static bool handle_button(novel_reader_t *self,
     if (button == GM_PLUGIN_BUTTON_PRIMARY) {
         if (action == GM_PLUGIN_BUTTON_ACTION_SINGLE) {
             self->playing = self->playing == 0U ? 1U : 0U;
+            show_notice(self, self->playing != 0U ? "Playing" : "Paused");
             update_footer(self);
             send_progress(self);
         } else if (action == GM_PLUGIN_BUTTON_ACTION_DOUBLE) {
-            send_action(self, ACTION_BOOKMARK);
+            if (send_action(self, ACTION_BOOKMARK))
+                show_notice(self, "Bookmark Added");
         } else if (action == GM_PLUGIN_BUTTON_ACTION_LONG ||
                    action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
             set_exit_source(self, 1U, true);
@@ -816,6 +863,7 @@ static void on_stop(void *opaque)
     self->chapter_label = 0;
     self->footer = 0;
     self->page[0] = self->page[1] = 0;
+    self->notice_label = 0;
     self->exit_label = 0;
     self->exit_arc = 0;
 }
