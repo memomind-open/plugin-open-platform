@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "node tools/run-browser-studio.mjs --plugin examples/basic-counter",
+    "dev": "node tools/run-browser-studio.mjs --plugin examples/app-counter",
     "build:devkit": "node tools/build-devkit.mjs",
     "sync:example-sdk": "node tools/sync-example-sdk.mjs",
     "pack:plugin": "node tools/build-mmpkg.mjs",

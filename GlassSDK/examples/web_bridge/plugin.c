@@ -1,5 +1,6 @@
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_extensions.h"
+#include "gm_plugin_libc.h"
 
 #define WEB_BRIDGE_MAX_ELEMENTS 16U
 #define WEB_BRIDGE_PROTOCOL_VERSION 1U
@@ -78,7 +79,10 @@ typedef struct {
     const gm_plugin_host_api_t *host;
     const gm_plugin_lvgl_api_t *lvgl;
     const gm_plugin_lz4_extension_api_t *lz4;
+    const gm_plugin_libc_extension_api_t *libc;
     gm_plugin_lvgl_obj_t *root;
+    uint8_t *decode_buffer;
+    uint32_t decode_capacity;
     web_bridge_element_t elements[WEB_BRIDGE_MAX_ELEMENTS];
     uint32_t sequence;
     uint32_t frame_id;
@@ -142,8 +146,8 @@ static bool send_event(web_bridge_context_t *self,
 {
     gm_plugin_result_t result = self->host->bt_send(channel, data, length);
     if (result != GM_PLUGIN_OK)
-        self->host->log("web bridge send channel=%u failed=%d", channel,
-                        result);
+        self->host->log("web bridge send channel=%u failed=%d",
+                        (unsigned int)channel, (int)result);
     return result == GM_PLUGIN_OK;
 }
 
@@ -215,20 +219,13 @@ static void reset_element(web_bridge_context_t *self,
                           web_bridge_element_t *element)
 {
     if (element->object != 0) self->lvgl->obj_delete(element->object);
-    element->id = 0;
-    element->type = ELEMENT_NONE;
-    element->object = 0;
+    self->libc->memset(element, 0, sizeof(*element));
 }
 
 static void clear_scene(web_bridge_context_t *self)
 {
-    uint8_t index;
     if (self->root != 0) self->lvgl->obj_clean(self->root);
-    for (index = 0; index < WEB_BRIDGE_MAX_ELEMENTS; ++index) {
-        self->elements[index].id = 0;
-        self->elements[index].type = ELEMENT_NONE;
-        self->elements[index].object = 0;
-    }
+    self->libc->memset(self->elements, 0, sizeof(self->elements));
 }
 
 static web_bridge_element_t *prepare_element(web_bridge_context_t *self,
@@ -277,7 +274,6 @@ static void draw_text(web_bridge_context_t *self, const uint8_t *data,
     web_bridge_element_t *element;
     char *text;
     uint32_t text_length;
-    uint32_t index;
     if (length < 11U) return;
     element = prepare_element(self, data[0], ELEMENT_TEXT);
     if (element == 0) return;
@@ -301,8 +297,7 @@ static void draw_text(web_bridge_context_t *self, const uint8_t *data,
     text_length = length - 11U;
     text = self->host->alloc(text_length + 1U);
     if (text == 0) return;
-    for (index = 0; index < text_length; ++index)
-        text[index] = (char)data[11U + index];
+    self->libc->memcpy(text, data + 11U, text_length);
     text[text_length] = '\0';
     self->lvgl->label_set_text(element->object, text);
     self->host->free(text);
@@ -400,6 +395,7 @@ static gm_plugin_result_t draw_bitmap(web_bridge_context_t *self,
         return GM_PLUGIN_EINVAL;
     if (destination.x < 0 || destination.y < 0 ||
         self->host->display_get_info(&display) != GM_PLUGIN_OK ||
+        display.pixel_format != GM_PLUGIN_PIXEL_GRAY_4 ||
         (uint32_t)destination.x + destination.width > display.width ||
         (uint32_t)destination.y + destination.height > display.height)
         return GM_PLUGIN_EINVAL;
@@ -407,48 +403,62 @@ static gm_plugin_result_t draw_bitmap(web_bridge_context_t *self,
     next_y = (uint16_t)destination.y;
     end_y = (uint16_t)(destination.y + destination.height);
     while (next_y < end_y) {
+        uint32_t surface_end;
         uint16_t part_end;
         uint32_t width;
         uint32_t row;
         gm_plugin_result_t result =
             self->host->graphics.framebuffer.lock(next_y, &surface);
         if (result != GM_PLUGIN_OK) return result;
-        part_end = (uint16_t)(surface.y + surface.height);
-        if (part_end > end_y) part_end = end_y;
-        if (next_y < surface.y || part_end <= next_y ||
+        surface_end = (uint32_t)surface.y + surface.height;
+        part_end = surface_end > end_y ? end_y : (uint16_t)surface_end;
+        if (surface.pixels == 0 || surface.height == 0U ||
+            surface.stride < (surface.width + 1U) / 2U ||
+            surface.y > next_y || surface_end <= next_y ||
+            surface_end > display.height || part_end <= next_y ||
             (uint32_t)destination.x + destination.width > surface.width) {
             (void)self->host->graphics.framebuffer.unlock(0, false);
             return GM_PLUGIN_EINVAL;
         }
 
         width = destination.width;
-        for (row = next_y; row < part_end; ++row) {
+        if ((destination.x & 1) == 0 && (width & 1U) == 0U &&
+            destination.x == 0 && width == surface.width &&
+            stride == surface.stride) {
+            uint32_t rows = (uint32_t)(part_end - next_y);
             const uint8_t *source = data + 10U +
-                (row - (uint16_t)destination.y) * stride;
+                ((uint32_t)next_y - (uint16_t)destination.y) * stride;
             uint8_t *target = surface.pixels +
-                (row - surface.y) * surface.stride +
-                ((uint16_t)destination.x >> 1);
-            if ((destination.x & 1) == 0) {
-                uint32_t bytes = width >> 1;
-                uint32_t index;
-                for (index = 0; index < bytes; ++index)
-                    target[index] = source[index];
-                if ((width & 1U) != 0U)
-                    target[bytes] = (uint8_t)((target[bytes] & 0x0FU) |
-                                               (source[bytes] & 0xF0U));
-            } else {
-                uint32_t pairs = (width - 1U) >> 1;
-                uint32_t index;
-                target[0] =
-                    (uint8_t)((target[0] & 0xF0U) | (source[0] >> 4));
-                for (index = 0; index < pairs; ++index)
-                    target[index + 1U] =
-                        (uint8_t)((source[index] << 4) |
-                                  (source[index + 1U] >> 4));
-                if ((width & 1U) == 0U)
-                    target[pairs + 1U] =
-                        (uint8_t)((target[pairs + 1U] & 0x0FU) |
-                                  ((source[pairs] & 0x0FU) << 4));
+                ((uint32_t)next_y - surface.y) * surface.stride;
+            self->libc->memcpy(target, source, rows * stride);
+        } else {
+            for (row = next_y; row < part_end; ++row) {
+                const uint8_t *source = data + 10U +
+                    (row - (uint16_t)destination.y) * stride;
+                uint8_t *target = surface.pixels +
+                    (row - surface.y) * surface.stride +
+                    ((uint16_t)destination.x >> 1);
+                if ((destination.x & 1) == 0) {
+                    uint32_t bytes = width >> 1;
+                    self->libc->memcpy(target, source, bytes);
+                    if ((width & 1U) != 0U)
+                        target[bytes] =
+                            (uint8_t)((target[bytes] & 0x0FU) |
+                                      (source[bytes] & 0xF0U));
+                } else {
+                    uint32_t pairs = (width - 1U) >> 1;
+                    uint32_t index;
+                    target[0] =
+                        (uint8_t)((target[0] & 0xF0U) | (source[0] >> 4));
+                    for (index = 0; index < pairs; ++index)
+                        target[index + 1U] =
+                            (uint8_t)((source[index] << 4) |
+                                      (source[index + 1U] >> 4));
+                    if ((width & 1U) == 0U)
+                        target[pairs + 1U] =
+                            (uint8_t)((target[pairs + 1U] & 0x0FU) |
+                                      ((source[pairs] & 0x0FU) << 4));
+                }
             }
         }
 
@@ -499,19 +509,25 @@ static uint8_t draw_bitmap_lz4(web_bridge_context_t *self,
         (uint32_t)y + height > display.height)
         return FRAME_STATUS_INVALID_PAYLOAD;
 
-    decoded = self->host->alloc(decoded_size + 10U);
+    if (self->decode_capacity < decoded_size + 10U) {
+        uint8_t *larger = self->host->alloc(decoded_size + 10U);
+        if (larger == 0) return FRAME_STATUS_OUT_OF_MEMORY;
+        if (self->decode_buffer != 0) self->host->free(self->decode_buffer);
+        self->decode_buffer = larger;
+        self->decode_capacity = decoded_size + 10U;
+    }
+    decoded = self->decode_buffer;
     if (decoded == 0) return FRAME_STATUS_OUT_OF_MEMORY;
-    for (uint8_t index = 0; index < 10U; ++index) decoded[index] = data[index];
+    self->libc->memcpy(decoded, data, 10U);
     restored_size = self->lz4->decompress_safe(
         data + 14U, decoded + 10U, (int32_t)compressed_size,
         (int32_t)decoded_size);
     if (restored_size != (int32_t)decoded_size) {
-        self->host->log("web bridge lz4 decode failed=%d", restored_size);
-        self->host->free(decoded);
+        self->host->log("web bridge lz4 decode failed=%d",
+                        (int)restored_size);
         return FRAME_STATUS_DECODE_FAILED;
     }
     draw_result = draw_bitmap(self, decoded, decoded_size + 10U, present);
-    self->host->free(decoded);
     return draw_result == GM_PLUGIN_OK ? FRAME_STATUS_OK :
                                         FRAME_STATUS_FRAMEBUFFER_FAILED;
 }
@@ -751,7 +767,7 @@ static gm_plugin_result_t web_bridge_start(void *opaque)
     }
     result = self->host->imu_enable(imu_modes);
     if (result != GM_PLUGIN_OK && raw_available) {
-        self->host->log("web bridge raw IMU unavailable=%d", result);
+        self->host->log("web bridge raw IMU unavailable=%d", (int)result);
         result = self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_GESTURES);
         raw_available = false;
     }
@@ -793,8 +809,10 @@ static void web_bridge_loop(void *opaque, uint32_t elapsed_ms)
         process_raw_direction(self, &sample, direction_elapsed_ms,
                               timestamp_ms);
     if (self->raw_imu_interval_ms == 0U) return;
-    self->raw_imu_elapsed_ms += elapsed_ms;
-    if (self->raw_imu_elapsed_ms < self->raw_imu_interval_ms) return;
+    if (elapsed_ms < self->raw_imu_interval_ms - self->raw_imu_elapsed_ms) {
+        self->raw_imu_elapsed_ms += elapsed_ms;
+        return;
+    }
     self->raw_imu_elapsed_ms = 0;
     write_event_header(self, payload, WEB_BRIDGE_EVENT_RAW_IMU,
                        timestamp_ms);
@@ -816,6 +834,8 @@ static bool web_bridge_event(void *opaque, const gm_plugin_event_t *event)
     if (event == 0) return false;
     switch (event->type) {
     case GM_PLUGIN_EVENT_BT_MESSAGE:
+        if (event->data.bt.length != 0U && event->data.bt.data == 0)
+            return false;
         if (self->frame_active && event->data.bt.channel >= 1U &&
             event->data.bt.channel <= WEB_BRIDGE_CHANNEL_BITMAP_LZ4)
             return true;
@@ -878,7 +898,10 @@ static void web_bridge_stop(void *opaque)
     web_bridge_context_t *self = opaque;
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
     clear_scene(self);
+    if (self->decode_buffer != 0) self->host->free(self->decode_buffer);
     self->root = 0;
+    self->decode_buffer = 0;
+    self->decode_capacity = 0;
     self->raw_imu_enabled = false;
     self->raw_direction_enabled = false;
     self->direction_active = false;
@@ -895,6 +918,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
     if (host == 0 || plugin == 0 || host->log == 0 ||
         host->monotonic_ms == 0 || host->alloc == 0 ||
         host->free == 0 || host->display_get_info == 0 ||
+        host->extension_get == 0 ||
         host->graphics.lvgl == 0 ||
         host->graphics.framebuffer.lock == 0 ||
         host->graphics.framebuffer.unlock == 0 || host->bt_send == 0 ||
@@ -909,6 +933,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
     context.host = host;
     context.lvgl = host->graphics.lvgl;
     context.lz4 = 0;
+    context.libc = 0;
     if (context.lvgl->struct_size < GM_PLUGIN_LVGL_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(context.lvgl->api_version,
                                       GM_PLUGIN_LVGL_API_MIN_VERSION))
@@ -922,6 +947,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
             (const gm_plugin_lz4_extension_api_t *)lz4_api;
         if (lz4->decompress_safe != 0) context.lz4 = lz4;
     }
+    if (gm_plugin_libc_get(host, &context.libc) != GM_PLUGIN_OK)
+        return GM_PLUGIN_ENOTSUP;
 
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &context;

@@ -13,13 +13,9 @@ neckerchief, cuff rings, fitted shorts and leggings, and two-tone ankle boots.
 The prompts explicitly excluded the reference figures' facial marks and props,
 commercial fighting-game characters, logos, costumes, and stages.
 
-The generated source, alpha-cleaned sheet, normalized preview, and encoded
-header are retained beside the plugin for review and regeneration. Beta 2 uses
-a fixed scale derived from each character's neutral frame, a torso anchor, and
-a wider transparent action canvas so attacks preserve body size. Beta 22
-replaces both character identities and extends the deterministic build tool to
-handle either fighter, preserve real alpha, remove baked preview backgrounds,
-and filter small detached cell leaks.
+The public SDK retains only the release-ready encoded sprite headers. Generated
+source sheets, alpha-cleaned images, normalized previews, and production tools
+are excluded because they are not inputs to plugin compilation.
 
 Beta 3 adds two original 2 x 2 damage sheets derived from the same identity
 references. They contain only light stagger, heavy recoil, knockdown and
@@ -27,11 +23,8 @@ recovery poses; no commercial animation frames were used. Beta 22 regenerates
 these sheets for the new mascot identities.
 
 Beta 19 adds original two-character grapple-entry and kneeling ground-pound
-source sheets. Beta 22 replaces both figures in those retained review sheets
-with poses from the new character sources. The green-screen sources, normalized
-per-character frames, combined 12-frame previews, encoded headers, and
-deterministic rebuild script are retained with the example. No commercial
-fighting-game frames were used.
+poses. Beta 22 replaces both figures with poses from the new character sources.
+No commercial fighting-game frames were used.
 
 ## Stage art
 

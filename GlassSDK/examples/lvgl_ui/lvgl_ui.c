@@ -1,8 +1,11 @@
 #include "gm_plugin_lvgl_api.h"
 
+#define PROGRESS_STEP_MS 50U
+
 static const gm_plugin_lvgl_api_t *s_lvgl;
 static gm_plugin_lvgl_obj_t *s_progress;
 static int32_t s_value;
+static uint32_t s_progress_elapsed_ms;
 
 static gm_plugin_result_t plugin_start(void *context)
 {
@@ -26,14 +29,20 @@ static gm_plugin_result_t plugin_start(void *context)
     s_lvgl->obj_align(s_progress, GM_PLUGIN_LVGL_ALIGN_CENTER, 0, 12);
     s_lvgl->arc_set_range(s_progress, 0, 100);
     s_value = 0;
+    s_progress_elapsed_ms = 0U;
     return GM_PLUGIN_OK;
 }
 
 static void plugin_tick(void *context, uint32_t elapsed_ms)
 {
+    uint32_t steps;
     (void)context;
-    (void)elapsed_ms;
-    s_value = (s_value + 1) % 101;
+    if (elapsed_ms > 1000U) elapsed_ms = 1000U;
+    s_progress_elapsed_ms += elapsed_ms;
+    steps = s_progress_elapsed_ms / PROGRESS_STEP_MS;
+    if (steps == 0U) return;
+    s_progress_elapsed_ms %= PROGRESS_STEP_MS;
+    s_value = (s_value + (int32_t)steps) % 101;
     s_lvgl->arc_set_value(s_progress, (int16_t)s_value);
 }
 

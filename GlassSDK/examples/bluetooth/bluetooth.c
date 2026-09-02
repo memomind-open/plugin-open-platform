@@ -1,4 +1,5 @@
 #include "gm_plugin_lvgl_api.h"
+#include "gm_plugin_libc.h"
 
 #define TEXT_CHANNEL 1U
 #define MAX_TEXT_BYTES 1024U
@@ -6,6 +7,7 @@
 
 static const gm_plugin_host_api_t *s_host;
 static const gm_plugin_lvgl_api_t *s_lvgl;
+static const gm_plugin_libc_extension_api_t *s_libc;
 static gm_plugin_lvgl_obj_t *s_label;
 
 static gm_plugin_result_t bluetooth_start(void *context)
@@ -19,6 +21,7 @@ static gm_plugin_result_t bluetooth_start(void *context)
         return GM_PLUGIN_ENOTSUP;
     root = s_lvgl->root_get();
     if (root == 0) return GM_PLUGIN_ESTATE;
+    s_lvgl->obj_clean(root);
     s_label = s_lvgl->label_create(root);
     if (s_label == 0) return GM_PLUGIN_ENOMEM;
     s_lvgl->obj_set_size(s_label,
@@ -41,7 +44,8 @@ static bool bluetooth_event(void *context, const gm_plugin_event_t *event)
     (void)context;
     if (event == 0) return false;
     if (event->type == GM_PLUGIN_EVENT_CONNECTION) {
-        s_host->log("phone connected=%u", event->data.connection.connected);
+        s_host->log("phone connected=%u",
+                    (unsigned int)event->data.connection.connected);
         return true;
     }
     if (event->type != GM_PLUGIN_EVENT_BT_MESSAGE ||
@@ -52,7 +56,7 @@ static bool bluetooth_event(void *context, const gm_plugin_event_t *event)
     reply_length = prefix_length + event->data.bt.length;
     reply = s_host->alloc(reply_length + 1U);
     if (reply == 0) return false;
-    for (index = 0; index < prefix_length; ++index) reply[index] = prefix[index];
+    s_libc->memcpy(reply, prefix, prefix_length);
     for (index = 0; index < event->data.bt.length; ++index) {
         uint8_t value = event->data.bt.data[index];
         /* Modify visible ASCII while preserving every UTF-8 byte unchanged. */
@@ -61,7 +65,7 @@ static bool bluetooth_event(void *context, const gm_plugin_event_t *event)
         reply[prefix_length + index] = (char)value;
     }
     reply[reply_length] = '\0';
-    s_lvgl->label_set_text(s_label, reply);
+    if (s_label != 0) s_lvgl->label_set_text(s_label, reply);
     result = s_host->bt_send(TEXT_CHANNEL, reply, reply_length);
     s_host->free(reply);
     return result == GM_PLUGIN_OK;
@@ -71,7 +75,10 @@ static void bluetooth_stop(void *context)
 {
     (void)context;
     s_label = 0;
-    s_lvgl->obj_clean(s_lvgl->root_get());
+    {
+        gm_plugin_lvgl_obj_t *root = s_lvgl->root_get();
+        if (root != 0) s_lvgl->obj_clean(root);
+    }
 }
 
 gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
@@ -89,6 +96,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_ENOTSUP;
     s_host = host;
     s_lvgl = host->graphics.lvgl;
+    if (gm_plugin_libc_get(host, &s_libc) != GM_PLUGIN_OK)
+        return GM_PLUGIN_ENOTSUP;
     if (s_lvgl == 0 || s_lvgl->struct_size < GM_PLUGIN_LVGL_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(s_lvgl->api_version,
                                       GM_PLUGIN_LVGL_API_MIN_VERSION))

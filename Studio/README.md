@@ -36,9 +36,31 @@ plugin-open-platform/
     `-- macos/
 ```
 
-Desktop Studio searches upward from its executable to locate `WebSDK` and
-`GlassSDK`. Moving only the executable outside this layout prevents automatic
-example and package discovery.
+Use the single **Import workspace** button in the top toolbar to select the
+`plugin-open-platform` directory. Studio then scans valid plugin manifests one,
+two, or three plugin levels below each SDK's first-level collection directories
+(for example, `WebSDK/examples/<plugin>/manifest.json`). SDK infrastructure
+such as tools, dependencies, documentation, and build output is excluded. The two
+plugin cards only need their refresh and individual package-import actions.
+Studio can also locate the SDKs automatically when the repository layout
+remains intact.
+
+Studio does not contain a built-in list of example or plugin names. Add a
+plugin at `GlassSDK/examples/<relative-path>/`, run `GlassSDK/build.py`, and
+refresh Studio: it discovers the example's `manifest.json` recursively, then
+loads the generated package from the matching
+`GlassSDK/build-host/.build/<relative-path>/` output directory.
+
+`WebSDK/examples` and `GlassSDK/examples` remain the recommended locations, but
+they are not required. A plugin can live one to three levels below any
+non-infrastructure first-level collection directory. Deeper source workspaces are not scanned;
+import their built `.mmpkg` or `.gmp` package directly.
+
+For glasses plugins, manifest metadata is used only for display and optional
+pairing hints. Unknown fields are ignored, and unavailable metadata does not
+block execution. Studio does not pre-validate a GMP package header before
+sharing it; the software runtime or physical glasses validates the package
+when loading it.
 
 On Windows, run:
 
@@ -52,7 +74,7 @@ application package included in the matching platform directory.
 
 ## What Desktop Studio provides
 
-- Web plugin workspace and `.mmpkg` loading.
+- Unified platform-workspace discovery and individual `.mmpkg` loading.
 - Glasses `.gmp` loading through the software RV32 and Host API previewer.
 - Web-to-glasses plugin message routing.
 - Virtual display, primary button, accessory navigation buttons, and raw head

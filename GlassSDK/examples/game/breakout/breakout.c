@@ -1,4 +1,5 @@
 #include "gm_plugin_lvgl_api.h"
+#include "gm_plugin_libc.h"
 #include "breakout_translations.h"
 
 #define COLS 15
@@ -34,6 +35,7 @@
 typedef struct {
     const gm_plugin_host_api_t *host;
     const gm_plugin_lvgl_api_t *ui;
+    const gm_plugin_libc_extension_api_t *libc;
     const breakout_strings_t *strings;
     gm_plugin_lvgl_obj_t *root;
     gm_plugin_lvgl_obj_t *board;
@@ -83,18 +85,14 @@ static breakout_t game;
 static uint8_t tag_equals(const char *left, const char *right,
                           uint8_t primary_only)
 {
-    while (*left != '\0' && *right != '\0') {
-        if (primary_only != 0U &&
-            (*left == '-' || *left == '_' || *right == '-' || *right == '_'))
-            break;
-        if (*left != *right) return 0;
-        ++left;
-        ++right;
-    }
-    if (primary_only != 0U)
-        return (*left == '\0' || *left == '-' || *left == '_') &&
-               (*right == '\0' || *right == '-' || *right == '_');
-    return *left == '\0' && *right == '\0';
+    size_t left_length;
+    size_t right_length;
+    if (primary_only == 0U)
+        return game.libc->strcmp(left, right) == 0;
+    left_length = game.libc->strcspn(left, "-_");
+    right_length = game.libc->strcspn(right, "-_");
+    return left_length == right_length &&
+           game.libc->strncmp(left, right, left_length) == 0;
 }
 
 static const breakout_strings_t *select_strings(const char *language_tag)
@@ -111,11 +109,6 @@ static const breakout_strings_t *select_strings(const char *language_tag)
             return &translations[index];
     }
     return &translations[1];
-}
-
-static void append_text(char **cursor, const char *text)
-{
-    while (*text != '\0') *(*cursor)++ = *text++;
 }
 
 #define number gm_plugin_lvgl_style_number
@@ -166,27 +159,12 @@ static void style_panel(breakout_t *self, gm_plugin_lvgl_obj_t *label)
                         number(12), GM_PLUGIN_LVGL_SELECTOR_MAIN);
 }
 
-static void append_uint(char **cursor, uint32_t value, uint8_t minimum_digits)
-{
-    char reverse[10];
-    uint8_t count = 0;
-    uint8_t index;
-    do {
-        reverse[count++] = (char)('0' + value % 10U);
-        value /= 10U;
-    } while (value != 0U && count < sizeof(reverse));
-    while (count < minimum_digits) reverse[count++] = '0';
-    for (index = 0; index < count; ++index)
-        *(*cursor)++ = reverse[count - index - 1U];
-}
-
 static void set_score(breakout_t *self)
 {
     char text[40];
-    char *cursor = text;
-    append_text(&cursor, self->strings->score);
-    append_uint(&cursor, self->score, 1);
-    *cursor = '\0';
+    self->libc->snprintf(text, sizeof(text), "%s%u",
+                              self->strings->score,
+                              (unsigned int)self->score);
     self->ui->label_set_text(self->score_label, text);
 }
 
@@ -201,11 +179,9 @@ static void set_timer(breakout_t *self, uint32_t seconds)
 {
     /* uint32_t milliseconds can represent more than 99 minutes. */
     char text[16];
-    char *cursor = text;
-    append_uint(&cursor, seconds / 60U, 2);
-    *cursor++ = ':';
-    append_uint(&cursor, seconds % 60U, 2);
-    *cursor = '\0';
+    self->libc->snprintf(text, sizeof(text), "%02u:%02u",
+                              (unsigned int)(seconds / 60U),
+                              (unsigned int)(seconds % 60U));
     self->ui->label_set_text(self->timer_label, text);
 }
 
@@ -217,11 +193,10 @@ static void set_control_text(breakout_t *self, const char *text)
 static void set_exit_countdown(breakout_t *self, uint8_t seconds)
 {
     char text[48];
-    char *cursor = text;
-    append_text(&cursor, self->strings->exit_prefix);
-    append_uint(&cursor, seconds, 1);
-    append_text(&cursor, self->strings->exit_suffix);
-    *cursor = '\0';
+    self->libc->snprintf(text, sizeof(text), "%s%u%s",
+                              self->strings->exit_prefix,
+                              (unsigned int)seconds,
+                              self->strings->exit_suffix);
     set_control_text(self, text);
 }
 
@@ -586,21 +561,13 @@ static void brick_collision(breakout_t *self)
 static void finish_game(breakout_t *self, uint8_t won)
 {
     char text[192];
-    char *cursor = text;
     uint32_t seconds = active_elapsed_ms(self, self->host->monotonic_ms()) / 1000U;
-    append_text(&cursor, won != 0U ? self->strings->victory
-                                  : self->strings->game_over);
-    *cursor++ = '\n';
-    append_text(&cursor, self->strings->score);
-    append_uint(&cursor, self->score, 1);
-    *cursor++ = '\n';
-    append_text(&cursor, self->strings->time);
-    append_uint(&cursor, seconds / 60U, 2);
-    *cursor++ = ':';
-    append_uint(&cursor, seconds % 60U, 2);
-    *cursor++ = '\n';
-    append_text(&cursor, self->strings->restart);
-    *cursor = '\0';
+    self->libc->snprintf(
+        text, sizeof(text), "%s\n%s%u\n%s%02u:%02u\n%s",
+        won != 0U ? self->strings->victory : self->strings->game_over,
+        self->strings->score, (unsigned int)self->score,
+        self->strings->time, (unsigned int)(seconds / 60U),
+        (unsigned int)(seconds % 60U), self->strings->restart);
     self->ended = 1;
     set_message(self, text, 1, RESULT_PANEL_MIN_W, RESULT_PANEL_MIN_H);
 }
@@ -610,10 +577,10 @@ static void render(breakout_t *self)
     int16_t x = (int16_t)(self->ball_x / Q);
     int16_t y = (int16_t)(self->ball_y / Q);
     int8_t index;
-    for (index = TRAILS - 1; index > 0; --index) {
-        self->trail_x[index] = self->trail_x[index - 1];
-        self->trail_y[index] = self->trail_y[index - 1];
-    }
+    self->libc->memmove(&self->trail_x[1], &self->trail_x[0],
+                            (TRAILS - 1U) * sizeof(self->trail_x[0]));
+    self->libc->memmove(&self->trail_y[1], &self->trail_y[0],
+                            (TRAILS - 1U) * sizeof(self->trail_y[0]));
     self->trail_x[0] = x;
     self->trail_y[0] = y;
     for (index = 0; index < TRAILS; ++index)
@@ -742,6 +709,7 @@ static void on_loop(void *opaque, uint32_t elapsed_ms)
     breakout_t *self = opaque;
     uint32_t now = self->host->monotonic_ms();
     uint32_t seconds = active_elapsed_ms(self, now) / 1000U;
+    if (elapsed_ms > 150U) elapsed_ms = 150U;
     if (self->button_holding_exit != 0U) {
         self->button_hold_ms += elapsed_ms;
         if (self->button_hold_ms >= BUTTON_EXIT_MS) {
@@ -854,6 +822,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_EVERSION;
     game.host = host;
     game.ui = host->graphics.lvgl;
+    if (gm_plugin_libc_get(host, &game.libc) != GM_PLUGIN_OK)
+        return GM_PLUGIN_ENOTSUP;
     if (game.ui == 0 ||
         game.ui->struct_size < GM_PLUGIN_LVGL_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(game.ui->api_version,

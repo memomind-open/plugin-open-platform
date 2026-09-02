@@ -57,7 +57,7 @@ server.listen(options.port, options.host, () => {
 });
 
 function parseArguments(arguments_) {
-  const result = { plugin: 'examples/basic-counter', host: '127.0.0.1', port: 4173 };
+  const result = { plugin: 'examples/app-counter', host: '127.0.0.1', port: 4173 };
   for (let index = 0; index < arguments_.length; index += 1) {
     const name = arguments_[index];
     const value = arguments_[index + 1];

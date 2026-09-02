@@ -32,6 +32,3 @@ between `lock` and `unlock`; LVGL already performs its own display
 synchronization. Release the surface first, and avoid drawing LVGL objects over
 the same pixels because a later LVGL refresh may replace direct framebuffer
 contents.
-
-After changing this example, run `./gm-build` from the SDK root. The output is
-`build-host/framebuffer/framebuffer.gmp` and the command displays its QR code.

@@ -37,13 +37,14 @@ static gm_plugin_result_t framebuffer_draw(void)
     gm_plugin_result_t result;
     uint16_t next_y = 0;
     if (s_host->display_get_info(&display) != GM_PLUGIN_OK ||
-        display.width == 0U || display.height == 0U) {
+        display.width == 0U || display.height == 0U ||
+        display.pixel_format != GM_PLUGIN_PIXEL_GRAY_4) {
         s_host->log("framebuffer: invalid display information\n");
         return GM_PLUGIN_ENOTSUP;
     }
 
     while (next_y < display.height) {
-        uint16_t slice_end;
+        uint32_t slice_end;
         uint16_t marker_height;
         gm_plugin_rect_t dirty;
 
@@ -54,8 +55,9 @@ static gm_plugin_result_t framebuffer_draw(void)
             return result;
         }
 
-        slice_end = (uint16_t)(surface.y + surface.height);
+        slice_end = (uint32_t)surface.y + surface.height;
         if (surface.pixels == 0 || surface.width < display.width ||
+            surface.stride < (surface.width + 1U) / 2U ||
             surface.height == 0U || surface.y > next_y ||
             slice_end <= next_y || slice_end > display.height) {
             (void)s_host->graphics.framebuffer.unlock(0, false);
@@ -85,7 +87,7 @@ static gm_plugin_result_t framebuffer_draw(void)
                         (unsigned int)dirty.y, (int)result);
             return result;
         }
-        next_y = slice_end;
+        next_y = (uint16_t)slice_end;
     }
 
     s_host->log("framebuffer: checker stripes displayed\n");

@@ -1,4 +1,5 @@
 #include "gm_plugin_lvgl_api.h"
+#include "gm_plugin_libc.h"
 
 #define BOARD_SIZE 4U
 #define CELL_COUNT (BOARD_SIZE * BOARD_SIZE)
@@ -17,6 +18,7 @@ typedef enum {
 typedef struct {
     const gm_plugin_host_api_t *host;
     const gm_plugin_lvgl_api_t *ui;
+    const gm_plugin_libc_extension_api_t *libc;
     gm_plugin_lvgl_obj_t *root;
     gm_plugin_lvgl_obj_t *board_object;
     gm_plugin_lvgl_obj_t *score_label;
@@ -64,24 +66,6 @@ static void style_box(game_2048_t *self, gm_plugin_lvgl_obj_t *object,
     self->ui->obj_clear_flag(object, GM_PLUGIN_LVGL_FLAG_SCROLLABLE);
 }
 
-static void append_text(char **cursor, const char *text)
-{
-    while (*text != '\0') *(*cursor)++ = *text++;
-}
-
-static void append_uint(char **cursor, uint32_t value)
-{
-    char reverse[10];
-    uint8_t count = 0;
-    uint8_t index;
-    do {
-        reverse[count++] = (char)('0' + value % 10U);
-        value /= 10U;
-    } while (value != 0U && count < sizeof(reverse));
-    for (index = 0; index < count; ++index)
-        *(*cursor)++ = reverse[count - index - 1U];
-}
-
 static uint32_t random_next(game_2048_t *self)
 {
     self->random_state = self->random_state * UINT32_C(1664525) +
@@ -92,10 +76,8 @@ static uint32_t random_next(game_2048_t *self)
 static void show_score(game_2048_t *self)
 {
     char text[32];
-    char *cursor = text;
-    append_text(&cursor, "SCORE  ");
-    append_uint(&cursor, self->score);
-    *cursor = '\0';
+    self->libc->snprintf(text, sizeof(text), "SCORE  %u",
+                              (unsigned int)self->score);
     self->ui->label_set_text(self->score_label, text);
 }
 
@@ -119,15 +101,15 @@ static void render(game_2048_t *self)
         for (x = 0; x < BOARD_SIZE; ++x) {
             uint32_t value = self->board[y][x];
             char text[12];
-            char *cursor = text;
             uint8_t shade;
             if (self->shown[y][x] == value) continue;
             self->shown[y][x] = value;
             shade = tile_shade(value);
             set_style(self, self->cells[y][x],
                       GM_PLUGIN_LVGL_STYLE_BG_COLOR, color(shade));
-            if (value != 0U) append_uint(&cursor, value);
-            *cursor = '\0';
+            if (value == 0U) text[0] = '\0';
+            else self->libc->snprintf(text, sizeof(text), "%u",
+                                           (unsigned int)value);
             self->ui->label_set_text(self->cell_labels[y][x], text);
             self->ui->obj_align(self->cell_labels[y][x],
                                 GM_PLUGIN_LVGL_ALIGN_CENTER, 0, 0);
@@ -247,14 +229,8 @@ static bool move_board(game_2048_t *self, move_direction_t direction)
 
 static void reset_game(game_2048_t *self)
 {
-    uint8_t y;
-    uint8_t x;
-    for (y = 0; y < BOARD_SIZE; ++y) {
-        for (x = 0; x < BOARD_SIZE; ++x) {
-            self->board[y][x] = 0U;
-            self->shown[y][x] = UINT32_MAX;
-        }
-    }
+    self->libc->memset(self->board, 0, sizeof(self->board));
+    self->libc->memset(self->shown, 0xFF, sizeof(self->shown));
     self->score = 0U;
     self->game_over = false;
     self->random_state ^= self->host->monotonic_ms() | 1U;
@@ -382,12 +358,6 @@ static gm_plugin_result_t plugin_start(void *opaque)
     return result;
 }
 
-static void plugin_loop(void *opaque, uint32_t elapsed_ms)
-{
-    (void)opaque;
-    (void)elapsed_ms;
-}
-
 static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
 {
     game_2048_t *self = opaque;
@@ -425,16 +395,6 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
     return false;
 }
 
-static void plugin_suspend(void *opaque)
-{
-    (void)opaque;
-}
-
-static void plugin_resume(void *opaque)
-{
-    (void)opaque;
-}
-
 static void plugin_stop(void *opaque)
 {
     game_2048_t *self = opaque;
@@ -457,6 +417,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_EVERSION;
     game.host = host;
     game.ui = host->graphics.lvgl;
+    if (gm_plugin_libc_get(host, &game.libc) != GM_PLUGIN_OK)
+        return GM_PLUGIN_ENOTSUP;
     if (game.ui == 0 ||
         game.ui->struct_size < GM_PLUGIN_LVGL_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(game.ui->api_version,
@@ -466,10 +428,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &game;
     plugin->on_start = plugin_start;
-    plugin->on_loop = plugin_loop;
     plugin->on_event = plugin_event;
-    plugin->on_suspend = plugin_suspend;
-    plugin->on_resume = plugin_resume;
     plugin->on_stop = plugin_stop;
     return GM_PLUGIN_OK;
 }

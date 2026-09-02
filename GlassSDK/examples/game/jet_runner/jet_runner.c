@@ -1,4 +1,5 @@
 #include "gm_plugin_lvgl_api.h"
+#include "gm_plugin_libc.h"
 #include "jet_runner_translations.h"
 
 #define OBSTACLE_COUNT 4
@@ -42,6 +43,7 @@ typedef struct {
 typedef struct {
     const gm_plugin_host_api_t *host;
     const gm_plugin_lvgl_api_t *ui;
+    const gm_plugin_libc_extension_api_t *libc;
     const jet_runner_strings_t *strings;
     gm_plugin_lvgl_obj_t *root;
     gm_plugin_lvgl_obj_t *board;
@@ -74,16 +76,13 @@ static jet_t game;
 static bool tag_matches(const char *left, const char *right,
                         bool primary_only)
 {
-    while (*left != '\0' && *right != '\0') {
-        if (primary_only &&
-            (*left == '-' || *left == '_' || *right == '-' || *right == '_'))
-            break;
-        if (*left++ != *right++) return false;
-    }
-    if (primary_only)
-        return (*left == '\0' || *left == '-' || *left == '_') &&
-               (*right == '\0' || *right == '-' || *right == '_');
-    return *left == '\0' && *right == '\0';
+    size_t left_length;
+    size_t right_length;
+    if (!primary_only) return game.libc->strcmp(left, right) == 0;
+    left_length = game.libc->strcspn(left, "-_");
+    right_length = game.libc->strcspn(right, "-_");
+    return left_length == right_length &&
+           game.libc->strncmp(left, right, left_length) == 0;
 }
 
 static const jet_runner_strings_t *select_strings(const char *tag)
@@ -98,11 +97,6 @@ static const jet_runner_strings_t *select_strings(const char *tag)
         if (tag_matches(tag, jet_runner_translations[index].tag, true))
             return &jet_runner_translations[index];
     return &jet_runner_translations[1];
-}
-
-static void append_text(char **cursor, const char *text)
-{
-    while (*text != '\0') *(*cursor)++ = *text++;
 }
 
 #define number gm_plugin_lvgl_style_number
@@ -163,26 +157,12 @@ static int16_t random_gap(jet_t *self)
     return (int16_t)(GAP_MARGIN + random_next(self) % range);
 }
 
-static void append_uint(char **cursor, uint32_t value)
-{
-    char reverse[10];
-    uint8_t count = 0;
-    uint8_t index;
-    do {
-        reverse[count++] = (char)('0' + value % 10U);
-        value /= 10U;
-    } while (value != 0U && count < sizeof(reverse));
-    for (index = 0; index < count; ++index)
-        *(*cursor)++ = reverse[count - index - 1U];
-}
-
 static void show_score(jet_t *self)
 {
     char text[40];
-    char *cursor = text;
-    append_text(&cursor, self->strings->score);
-    append_uint(&cursor, self->score);
-    *cursor = '\0';
+    self->libc->snprintf(text, sizeof(text), "%s%u",
+                              self->strings->score,
+                              (unsigned int)self->score);
     self->ui->label_set_text(self->score_label, text);
 }
 
@@ -251,12 +231,11 @@ static void reset_game(jet_t *self)
 static void finish(jet_t *self)
 {
     char text[160];
-    char *cursor = text;
     self->game_over = true;
-    append_text(&cursor, self->strings->collision);
-    append_uint(&cursor, self->score);
-    append_text(&cursor, self->strings->restart);
-    *cursor = '\0';
+    self->libc->snprintf(text, sizeof(text), "%s%u%s",
+                              self->strings->collision,
+                              (unsigned int)self->score,
+                              self->strings->restart);
     self->ui->label_set_text(self->end_label, text);
     self->ui->obj_clear_flag(self->end_label, GM_PLUGIN_LVGL_FLAG_HIDDEN);
 }
@@ -595,6 +574,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_EVERSION;
     game.host = host;
     game.ui = host->graphics.lvgl;
+    if (gm_plugin_libc_get(host, &game.libc) != GM_PLUGIN_OK)
+        return GM_PLUGIN_ENOTSUP;
     game.random_state = UINT32_C(0x4A455452);
     if (game.ui == 0 || game.ui->struct_size < GM_PLUGIN_LVGL_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(game.ui->api_version,

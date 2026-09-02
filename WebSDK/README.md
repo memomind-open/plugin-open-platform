@@ -44,7 +44,7 @@ and glasses plugin there.
 Build a distributable Web plugin package:
 
 ```sh
-npm run pack:plugin -- examples/basic-counter dist/basic-counter.mmpkg
+npm run pack:plugin -- examples/app-counter dist/app-counter.mmpkg
 ```
 
 Build the standalone DevKit ZIP, which includes Browser Studio:
@@ -77,8 +77,9 @@ or add files there.
 
 - Put reusable SDK code in `packages/<package-name>/` and keep package tests
   beside that package.
-- Put every runnable plugin, whether static or toolchain-based, in
-  `examples/<plugin-name>/`.
+- Put every runnable plugin, whether static or toolchain-based, somewhere below
+  `examples/`; nested organization such as `examples/vendor/<plugin-name>/` is
+  supported.
 - Keep Browser Studio implementation under `tools/browser-studio` and its
   reusable Host implementation under `packages/studio-runtime`.
 - Put public Web plugin documentation in `docs/web-plugin/`.

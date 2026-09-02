@@ -2,7 +2,7 @@
 
 `examples/` is the single home for runnable Web plugin examples and complete
 plugin workspaces maintained with this SDK. Create one self-contained
-subdirectory for each plugin:
+directory at any depth for each plugin:
 
 ```text
 examples/
@@ -10,35 +10,35 @@ examples/
 |   |-- index.html
 |   |-- manifest.json
 |   `-- ...
-`-- <another-plugin>/
-    |-- index.html
-    |-- manifest.json
-    `-- ...
+`-- vendor/
+    `-- <another-plugin>/
+        |-- index.html
+        |-- manifest.json
+        `-- ...
 ```
 
 WebSDK Browser Studio currently runs one plugin at a time:
 
 ```sh
-node tools/run-browser-studio.mjs --plugin examples/<plugin-name>
+node tools/run-browser-studio.mjs --plugin examples/<relative-path>
 ```
 
 Use a different port when running more than one Browser Studio instance:
 
 ```sh
-node tools/run-browser-studio.mjs --plugin examples/<plugin-name> --port 4174
+node tools/run-browser-studio.mjs --plugin examples/<relative-path> --port 4174
 ```
 
 Build a distributable package outside the plugin source directory:
 
 ```sh
-npm run pack:plugin -- examples/<plugin-name> dist/<plugin-name>.mmpkg
+npm run pack:plugin -- examples/<relative-path> dist/<plugin-name>.mmpkg
 ```
 
 ## Included plugins
 
 | Directory | Plugin ID | Development form |
 | --- | --- | --- |
-| `basic-counter/` | `com.memomind.example.counter` | Minimal static SDK example |
 | `app-counter/` | `com.memomind.demo.counter` | App built-in counter example |
 | `talking-pet/` | `com.memomind.example.talking-pet` | Interactive talking-pet game |
 | `tic-tac-toe/` | `com.memomind.demo.tictactoe` | TypeScript/Vite source project |
@@ -48,4 +48,7 @@ npm run pack:plugin -- examples/<plugin-name> dist/<plugin-name>.mmpkg
 
 Static plugins can run directly in Desktop Studio or WebSDK Browser Studio.
 Build TypeScript/Vite plugins first so either tool can select their `dist/`
-output; generated `dist/` directories remain ignored by Git.
+output; generated `dist/` directories remain ignored by Git. Desktop Studio
+recursively discovers every runnable `manifest.json` below `examples/`, so a
+new plugin does not require a Studio source change or a predefined directory
+name.
