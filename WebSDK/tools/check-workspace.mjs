@@ -20,7 +20,7 @@ const requiredDocs = [
   'docs/web-plugin/api-reference.md',
   'docs/web-plugin/studio.md',
   'docs/web-plugin/package-format.md',
-  'examples/basic-counter/manifest.json',
+  'examples/app-counter/manifest.json',
 ];
 for (const path of requiredDocs) {
   try {

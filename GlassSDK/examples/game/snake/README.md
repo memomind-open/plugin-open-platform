@@ -12,6 +12,3 @@ An IMU-controlled Snake game built with the core LVGL plugin API.
 - A single click restarts after game over. A long press shows a two-second exit
   countdown; release the button to cancel it.
 - Reversing directly into the snake body is filtered out.
-
-After changing this example, run `./gm-build` from the SDK root. The output is
-`build-host/game/snake/snake.gmp` and the command displays its QR code.

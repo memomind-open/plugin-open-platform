@@ -46,16 +46,8 @@ are controlled by the phone state packet; the device plugin does not subscribe
 to or process IMU gesture events.
 
 The checked-in `momo_sprites.h` is reproducible from the transparent sprite
-sheet when Pillow is installed:
+sheet. Install Pillow only when regenerating this optional asset:
 
 ```sh
 python3 examples/talking_pet/build_sprites.py
 ```
-
-Build it from `GlassSDK`:
-
-```sh
-./gm-build build --example talking_pet
-```
-
-The output is `build-host/talking_pet/talking_pet.gmp`.

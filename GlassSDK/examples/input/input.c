@@ -144,8 +144,9 @@ static bool input_event(void *context, const gm_plugin_event_t *event)
     default:
         return false;
     }
-    self->host->log("button=%u action=%u", event->data.button.button,
-                    event->data.button.action);
+    self->host->log("button=%u action=%u",
+                    (unsigned int)event->data.button.button,
+                    (unsigned int)event->data.button.action);
     if (self->event_label != 0)
         self->ui->label_set_text(self->event_label, message);
     return true;

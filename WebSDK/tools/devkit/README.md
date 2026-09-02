@@ -7,7 +7,7 @@ npm packages are published. It contains:
   and Web plugins.
 - `studio/`: the WebSDK Browser Studio launcher for Web-only simulation.
 - `tools/`: the final `.mmpkg` packager.
-- `examples/`: the Counter example configured to use the local SDK.
+- `examples/`: the runnable App Counter example.
 - `docs/web-plugin/`: draft public developer documentation.
 
 Requirement: Node.js 18 or later.
@@ -20,7 +20,7 @@ plugins.
 ## Run immediately
 
 ```sh
-node studio/gm-plugin-studio.mjs --plugin examples/basic-counter
+node studio/gm-plugin-studio.mjs --plugin examples/app-counter
 ```
 
 Open `http://127.0.0.1:4173`.
@@ -45,9 +45,9 @@ node tools/build-mmpkg.mjs \
   /absolute/path/to/release/plugin-1.0.0.mmpkg
 ```
 
-Start with [docs/web-plugin/README.md](docs/web-plugin/README.md) for the full
-workflow. See [docs/web-plugin/devkit-zip.md](docs/web-plugin/devkit-zip.md) for
-ZIP-specific details.
+Start with `docs/web-plugin/README.md` for the full workflow. See
+`docs/web-plugin/devkit-zip.md` for ZIP-specific details. These paths refer to
+the generated DevKit ZIP layout.
 
 ## Distribution model
 

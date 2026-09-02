@@ -32,9 +32,15 @@ plugin-open-platform/
 `-- Studio/<platform>/
 ```
 
-Start the application from the platform directory. Desktop Studio discovers
-the SDKs and their examples by walking upward from its executable. Select a Web
-workspace or `.mmpkg` on the left and a built or imported `.gmp` on the right.
+Start the application from the platform directory, then use the single
+**Import workspace** action in the top toolbar to select the
+`plugin-open-platform` root. Studio discovers valid plugin manifests one, two,
+or three plugin levels below a first-level collection directory in `WebSDK` and
+`GlassSDK`, excluding SDK infrastructure directories. The `examples`
+collections remain recommended but are not required. For a glasses plugin, Studio loads a GMP beside
+the manifest or from the corresponding relative directory below
+`GlassSDK/build-host/.build`. Deeper source directories are not scanned, but
+their built `.mmpkg` and `.gmp` packages can be imported directly.
 
 Desktop Studio provides:
 
@@ -55,7 +61,7 @@ From the public `WebSDK` directory, run:
 
 ```sh
 npm ci
-node tools/run-browser-studio.mjs --plugin examples/basic-counter
+node tools/run-browser-studio.mjs --plugin examples/app-counter
 ```
 
 For a Vite, Webpack, or similar project, build it first and point Browser

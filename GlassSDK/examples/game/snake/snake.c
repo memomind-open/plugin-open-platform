@@ -1,4 +1,5 @@
 #include "gm_plugin_lvgl_api.h"
+#include "gm_plugin_libc.h"
 
 #define COLS 24
 #define ROWS 14
@@ -34,6 +35,7 @@ typedef struct {
 typedef struct {
     const gm_plugin_host_api_t *host;
     const gm_plugin_lvgl_api_t *ui;
+    const gm_plugin_libc_extension_api_t *libc;
     gm_plugin_lvgl_obj_t *root;
     gm_plugin_lvgl_obj_t *board;
     gm_plugin_lvgl_obj_t *score_label;
@@ -93,24 +95,6 @@ static void style_box(snake_game_t *self, gm_plugin_lvgl_obj_t *object,
     self->ui->obj_clear_flag(object, GM_PLUGIN_LVGL_FLAG_SCROLLABLE);
 }
 
-static void append_text(char **cursor, const char *text)
-{
-    while (*text != '\0') *(*cursor)++ = *text++;
-}
-
-static void append_uint(char **cursor, uint32_t value)
-{
-    char reverse[10];
-    uint8_t count = 0;
-    uint8_t index;
-    do {
-        reverse[count++] = (char)('0' + value % 10U);
-        value /= 10U;
-    } while (value != 0U && count < sizeof(reverse));
-    for (index = 0; index < count; ++index)
-        *(*cursor)++ = reverse[count - index - 1U];
-}
-
 static uint32_t random_next(snake_game_t *self)
 {
     self->random_state = self->random_state * UINT32_C(1664525) +
@@ -130,10 +114,8 @@ static bool snake_contains(const snake_game_t *self, uint8_t x, uint8_t y,
 static void show_score(snake_game_t *self)
 {
     char text[32];
-    char *cursor = text;
-    append_text(&cursor, "SCORE  ");
-    append_uint(&cursor, self->score);
-    *cursor = '\0';
+    self->libc->snprintf(text, sizeof(text), "SCORE  %u",
+                              (unsigned int)self->score);
     self->ui->label_set_text(self->score_label, text);
 }
 
@@ -190,15 +172,12 @@ static void finish_game(snake_game_t *self)
 static void reset_game(snake_game_t *self)
 {
     uint16_t index;
-    uint8_t y;
-    uint8_t x;
     self->length = 5;
     for (index = 0; index < self->length; ++index) {
         self->snake[index].x = (uint8_t)(COLS / 2 - index);
         self->snake[index].y = ROWS / 2;
     }
-    for (y = 0; y < ROWS; ++y)
-        for (x = 0; x < COLS; ++x) self->shown[y][x] = 3;
+    self->libc->memset(self->shown, 3, sizeof(self->shown));
     self->direction = DIR_RIGHT;
     self->pending_direction = DIR_RIGHT;
     self->score = 0;
@@ -331,7 +310,6 @@ static void step(snake_game_t *self)
     point_t next = self->snake[0];
     bool eating;
     uint16_t collision_count;
-    uint16_t index;
     self->direction = self->pending_direction;
     self->turn_queued = false;
     if (self->direction == DIR_UP) {
@@ -354,8 +332,9 @@ static void step(snake_game_t *self)
         return;
     }
     if (eating && self->length < MAX_SNAKE) ++self->length;
-    for (index = self->length - 1U; index > 0U; --index)
-        self->snake[index] = self->snake[index - 1U];
+    self->libc->memmove(&self->snake[1], &self->snake[0],
+                            (size_t)(self->length - 1U) *
+                            sizeof(self->snake[0]));
     self->snake[0] = next;
     if (eating) {
         self->score = (uint16_t)(self->score + 10U);
@@ -602,6 +581,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_EVERSION;
     game.host = host;
     game.ui = host->graphics.lvgl;
+    if (gm_plugin_libc_get(host, &game.libc) != GM_PLUGIN_OK)
+        return GM_PLUGIN_ENOTSUP;
     if (game.ui->struct_size < GM_PLUGIN_LVGL_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(game.ui->api_version,
                                       GM_PLUGIN_LVGL_API_MIN_VERSION))

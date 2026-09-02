@@ -1,4 +1,5 @@
 #include "gm_plugin_lvgl_api.h"
+#include "gm_plugin_libc.h"
 #include "tetris_translations.h"
 
 #define COLS 10
@@ -37,6 +38,7 @@ typedef struct {
 typedef struct {
     const gm_plugin_host_api_t *host;
     const gm_plugin_lvgl_api_t *ui;
+    const gm_plugin_libc_extension_api_t *libc;
     const tetris_strings_t *strings;
     gm_plugin_lvgl_obj_t *root;
     gm_plugin_lvgl_obj_t *board_obj;
@@ -76,16 +78,13 @@ static tetris_t game;
 static bool tag_matches(const char *left, const char *right,
                         bool primary_only)
 {
-    while (*left != '\0' && *right != '\0') {
-        if (primary_only &&
-            (*left == '-' || *left == '_' || *right == '-' || *right == '_'))
-            break;
-        if (*left++ != *right++) return false;
-    }
-    if (primary_only)
-        return (*left == '\0' || *left == '-' || *left == '_') &&
-               (*right == '\0' || *right == '-' || *right == '_');
-    return *left == '\0' && *right == '\0';
+    size_t left_length;
+    size_t right_length;
+    if (!primary_only) return game.libc->strcmp(left, right) == 0;
+    left_length = game.libc->strcspn(left, "-_");
+    right_length = game.libc->strcspn(right, "-_");
+    return left_length == right_length &&
+           game.libc->strncmp(left, right, left_length) == 0;
 }
 
 static const tetris_strings_t *select_strings(const char *tag)
@@ -100,11 +99,6 @@ static const tetris_strings_t *select_strings(const char *tag)
         if (tag_matches(tag, tetris_translations[index].tag, true))
             return &tetris_translations[index];
     return &tetris_translations[1];
-}
-
-static void append_text(char **cursor, const char *text)
-{
-    while (*text != '\0') *(*cursor)++ = *text++;
 }
 
 /* 7 pieces x 4 rotations. One bit per cell instead of 448 byte matrices. */
@@ -156,27 +150,13 @@ static uint32_t random_next(tetris_t *self)
     return self->random_state;
 }
 
-static void append_uint(char **cursor, uint32_t value)
-{
-    char reverse[10];
-    uint8_t count = 0;
-    uint8_t index;
-    do {
-        reverse[count++] = (char)('0' + value % 10U);
-        value /= 10U;
-    } while (value != 0U && count < sizeof(reverse));
-    for (index = 0; index < count; ++index)
-        *(*cursor)++ = reverse[count - index - 1U];
-}
-
 static void show_exit_countdown(tetris_t *self, uint8_t seconds)
 {
     char text[48];
-    char *cursor = text;
-    append_text(&cursor, self->strings->exit_prefix);
-    append_uint(&cursor, seconds);
-    append_text(&cursor, self->strings->exit_suffix);
-    *cursor = '\0';
+    self->libc->snprintf(text, sizeof(text), "%s%u%s",
+                              self->strings->exit_prefix,
+                              (unsigned int)seconds,
+                              self->strings->exit_suffix);
     {
         gm_plugin_lvgl_point_t size = {0, 0};
         self->ui->text_get_size(&size, text, self->ui->font_default,
@@ -195,10 +175,9 @@ static void show_exit_countdown(tetris_t *self, uint8_t seconds)
 static void show_score(tetris_t *self)
 {
     char text[40];
-    char *cursor = text;
-    append_text(&cursor, self->strings->score);
-    append_uint(&cursor, self->score);
-    *cursor = '\0';
+    self->libc->snprintf(text, sizeof(text), "%s%u",
+                              self->strings->score,
+                              (unsigned int)self->score);
     self->ui->label_set_text(self->score_label, text);
 }
 
@@ -357,26 +336,22 @@ static void finish_line_clear(tetris_t *self)
 {
     int8_t read_row;
     int8_t write_row = ROWS - 1;
-    uint8_t row;
-    uint8_t x;
     for (read_row = ROWS - 1; read_row >= 0; --read_row) {
         if (self->clear_rows[(uint8_t)read_row] != 0U) {
             self->score = (uint16_t)(self->score + 100U);
             continue;
         }
         if (write_row != read_row) {
-            for (x = 0; x < COLS; ++x)
-                self->board[(uint8_t)write_row][x] =
-                    self->board[(uint8_t)read_row][x];
+            self->libc->memcpy(self->board[(uint8_t)write_row],
+                               self->board[(uint8_t)read_row],
+                               sizeof(self->board[0]));
         }
         --write_row;
     }
-    while (write_row >= 0) {
-        for (x = 0; x < COLS; ++x)
-            self->board[(uint8_t)write_row][x] = 0;
-        --write_row;
-    }
-    for (row = 0; row < ROWS; ++row) self->clear_rows[row] = 0;
+    if (write_row >= 0)
+        self->libc->memset(self->board, 0,
+                           (size_t)(write_row + 1) * sizeof(self->board[0]));
+    self->libc->memset(self->clear_rows, 0, sizeof(self->clear_rows));
     self->clearing_lines = false;
     self->clear_animation_ms = 0;
     show_score(self);
@@ -432,17 +407,11 @@ static void rotate(tetris_t *self)
 
 static void reset_game(tetris_t *self)
 {
-    uint8_t y;
-    uint8_t x;
-    for (y = 0; y < ROWS; ++y)
-        for (x = 0; x < COLS; ++x) {
-            self->board[y][x] = 0;
-            self->shown[y][x] = 0xFF;
-        }
-    for (y = 0; y < ROWS; ++y) self->clear_rows[y] = 0;
-    for (y = 0; y < PREVIEW_SIDE; ++y)
-        for (x = 0; x < PREVIEW_SIDE; ++x)
-            self->preview_shown[y][x] = 2;
+    self->libc->memset(self->board, 0, sizeof(self->board));
+    self->libc->memset(self->shown, 0xFF, sizeof(self->shown));
+    self->libc->memset(self->clear_rows, 0, sizeof(self->clear_rows));
+    self->libc->memset(self->preview_shown, 2,
+                       sizeof(self->preview_shown));
     self->score = 0;
     self->drop_accumulator = 0;
     self->clear_animation_ms = 0;
@@ -757,6 +726,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_EVERSION;
     game.host = host;
     game.ui = host->graphics.lvgl;
+    if (gm_plugin_libc_get(host, &game.libc) != GM_PLUGIN_OK)
+        return GM_PLUGIN_ENOTSUP;
     if (game.ui == 0 || game.ui->struct_size < GM_PLUGIN_LVGL_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(game.ui->api_version,
                                       GM_PLUGIN_LVGL_API_MIN_VERSION))

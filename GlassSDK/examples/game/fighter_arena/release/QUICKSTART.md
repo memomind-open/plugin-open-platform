@@ -8,7 +8,7 @@ Plugin manifest version: `30`
 - A complete `plugin-open-platform` release checkout
 - MemoMind Plugin Studio for Windows x64, Linux x64, or macOS Universal 2
 - `fighter-controller.mmpkg`
-- `fighter_arena.gmp`
+- `GlassSDK/build-host/.build/game/fighter_arena/fighter_arena.gmp`
 
 Desktop Studio is distributed as a prebuilt application under
 `Studio/<platform>/`. Its source repository is not part of the public SDK.
@@ -17,7 +17,9 @@ Desktop Studio is distributed as a prebuilt application under
 
 1. Start MemoMind Plugin Studio from `Studio/<platform>/`.
 2. Select or import `fighter-controller.mmpkg` as the Web plugin.
-3. Select or import `fighter_arena.gmp` as the glasses plugin.
+3. Select or import
+   `GlassSDK/build-host/.build/game/fighter_arena/fighter_arena.gmp` as the
+   glasses plugin.
 4. Start the pair and keep the Web plugin panel focused while using keyboard
    controls.
 5. Use the controller UI or mapped keyboard controls to move, jump, crouch,
@@ -28,15 +30,16 @@ Desktop Studio runs both packages in one process and routes their custom
 
 ## Run on physical glasses
 
-1. Serve `fighter_arena.gmp` with the GlassSDK QR installation workflow and
-   scan it from the official App's device-plugin debug page.
+1. Serve `GlassSDK/build-host/.build/game/fighter_arena/fighter_arena.gmp`
+   with the GlassSDK QR installation workflow and scan it from the official
+   App's device-plugin debug page.
 2. Import or launch `fighter-controller.mmpkg` in an official App version that
    supports Web plugins.
 3. Connect the App to the glasses and start both plugins.
 4. Keep the Fighter Controller Web plugin active while playing.
 
-See [`../../../../INSTALLATION.md`](../../../../INSTALLATION.md) for the current GMP
-installation workflow and
+See [`../../../../docs/INSTALLATION.md`](../../../../docs/INSTALLATION.md) for
+the current GMP installation workflow and
 [`../../../../../WebSDK/docs/web-plugin/quick-start.md`](../../../../../WebSDK/docs/web-plugin/quick-start.md)
 for Web plugin packaging and App delivery.
 

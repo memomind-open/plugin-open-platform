@@ -5,7 +5,7 @@ Date: 2026-08-21
 ## Completed
 
 - The RISC-V build completed with `-Wall -Wextra -Werror`.
-- `fighter_arena.gmp` validated at 75,920 bytes, below the 80,000-byte beta
+- `fighter_arena.gmp` validated at 76,420 bytes, below the 80,000-byte beta
   budget.
 - Both mascot combat and reaction sheets were visually inspected after
   normalization. Their head molds remain consistent across poses, detached

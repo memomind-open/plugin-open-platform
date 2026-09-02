@@ -39,7 +39,7 @@ gm-web-plugin-devkit-0.1.0/
 ├── tools/
 │   └── build-mmpkg.mjs
 ├── examples/
-│   └── basic-counter/
+│   └── app-counter/
 ├── docs/web-plugin/
 └── internal/
 ```
@@ -59,7 +59,7 @@ Extract the DevKit and start Counter:
 ```sh
 unzip gm-web-plugin-devkit-0.1.0.zip
 cd gm-web-plugin-devkit-0.1.0
-node studio/gm-plugin-studio.mjs --plugin examples/basic-counter
+node studio/gm-plugin-studio.mjs --plugin examples/app-counter
 ```
 
 Open:
@@ -80,7 +80,7 @@ In WebSDK Browser Studio:
 Use another port if `4173` is unavailable:
 
 ```sh
-node studio/gm-plugin-studio.mjs --plugin examples/basic-counter --port 4174
+node studio/gm-plugin-studio.mjs --plugin examples/app-counter --port 4174
 ```
 
 ## 4. Create a plugin
@@ -585,7 +585,8 @@ Use the prebuilt Desktop Studio under
 Web workspace or `.mmpkg`, execute a compatible glasses `.gmp`, route custom
 plugin messages, and show separate Web and glasses simulator logs. Keep the
 `Studio`, `WebSDK`, and `GlassSDK` directories together so it can discover the
-public examples automatically.
+public examples automatically. Discovery is recursive below `WebSDK/examples`
+and does not require a predefined plugin directory name.
 
 Use WebSDK Browser Studio for lightweight Web-only checks that do not require a
 running `.gmp`.

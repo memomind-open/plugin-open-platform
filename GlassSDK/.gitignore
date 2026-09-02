@@ -1,6 +1,5 @@
-build/
-.toolchains/
-build-host/
+/build-host/.build/linux-*/
+/build-host/.build/darwin-*/
 __pycache__/
 *.o
 *.elf

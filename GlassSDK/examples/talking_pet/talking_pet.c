@@ -1,4 +1,5 @@
 #include "gm_plugin_lvgl_api.h"
+#include "gm_plugin_libc.h"
 #include "momo_sprites.h"
 
 #define PET_STATE_CHANNEL UINT16_C(0x4D50)
@@ -27,6 +28,7 @@ enum {
 typedef struct {
     const gm_plugin_host_api_t *host;
     const gm_plugin_lvgl_api_t *ui;
+    const gm_plugin_libc_extension_api_t *libc;
     gm_plugin_lvgl_obj_t *root;
     gm_plugin_lvgl_obj_t *title_label;
     gm_plugin_lvgl_obj_t *subtitle_label;
@@ -89,10 +91,9 @@ static void rectangle(gm_plugin_framebuffer_surface_t *surface,
         target = surface->pixels +
             (uint32_t)(row - (int16_t)surface->y) * surface->stride +
             ((uint16_t)column >> 1);
-        while (column + 1 < end_x) {
-            *target++ = packed;
-            column = (int16_t)(column + 2);
-        }
+        s_pet.libc->memset(target, packed,
+                               (size_t)(end_x - column) >> 1);
+        column = (int16_t)(column + ((end_x - column) & ~1));
         if (column < end_x) pixel(surface, column, row, gray);
     }
 }
@@ -149,18 +150,9 @@ static void ellipse(gm_plugin_framebuffer_surface_t *surface,
     }
 }
 
-static void number_text(char *output, uint32_t value)
+static void number_text(char *output, size_t capacity, uint32_t value)
 {
-    char reverse[10];
-    uint8_t count = 0;
-    uint8_t index;
-    do {
-        reverse[count++] = (char)('0' + value % 10U);
-        value /= 10U;
-    } while (value != 0U && count < sizeof(reverse));
-    for (index = 0; index < count; ++index)
-        output[index] = reverse[count - index - 1U];
-    output[count] = '\0';
+    s_pet.libc->snprintf(output, capacity, "%u", (unsigned int)value);
 }
 
 static const char *mood_text(uint8_t mood)
@@ -296,7 +288,7 @@ static void update_text_labels(pet_t *self)
     uint8_t values[3] = {self->happy, self->food, self->energy};
     uint8_t index;
     for (index = 0; index < 3U; ++index) {
-        number_text(number, values[index]);
+        number_text(number, sizeof(number), values[index]);
         self->ui->label_set_text(self->stat_value_labels[index], number);
         if (self->stat_bar_fills[index] != 0)
             self->ui->obj_set_size(self->stat_bar_fills[index],
@@ -306,7 +298,7 @@ static void update_text_labels(pet_t *self)
     number[1] = 'V';
     number[2] = '.';
     number[3] = ' ';
-    number_text(number + 4, self->level);
+    number_text(number + 4, sizeof(number) - 4U, self->level);
     self->ui->label_set_text(self->level_label, number);
     self->ui->label_set_text(self->mood_label, mood_text(self->mood));
 }
@@ -431,7 +423,9 @@ static void draw_sprite(gm_plugin_framebuffer_surface_t *surface,
         uint8_t count = encoded[offset++];
         uint8_t value = encoded[offset++];
         uint8_t run;
-        for (run = 0; run < count; ++run, ++index) {
+        for (run = 0;
+             run < count && index < MOMO_SPRITE_WIDTH * MOMO_SPRITE_HEIGHT;
+             ++run, ++index) {
             int16_t y;
             if (value == 0U) continue;
             y = (int16_t)(sprite_y + index / MOMO_SPRITE_WIDTH);
@@ -529,14 +523,30 @@ static gm_plugin_result_t render(pet_t *self)
     while (next_y < self->height) {
         gm_plugin_framebuffer_surface_t surface;
         gm_plugin_rect_t dirty;
+        uint32_t surface_end;
         uint16_t part_end;
         gm_plugin_result_t result =
             self->host->graphics.framebuffer.lock(next_y, &surface);
         if (result != GM_PLUGIN_OK) return result;
-        part_end = (uint16_t)(surface.y + surface.height);
+        surface_end = (uint32_t)surface.y + surface.height;
+        if (surface.pixels == 0 || surface.height == 0U ||
+            surface.width < self->width ||
+            surface.stride < (surface.width + 1U) / 2U ||
+            surface.y > next_y || surface_end <= next_y ||
+            surface_end > self->height) {
+            (void)self->host->graphics.framebuffer.unlock(0, false);
+            return GM_PLUGIN_ESTATE;
+        }
+        part_end = (uint16_t)surface_end;
         if (part_end > self->height) part_end = self->height;
         int16_t dirty_y = surface.y > ANIMATION_TOP
             ? (int16_t)surface.y : ANIMATION_TOP;
+        if (dirty_y >= (int16_t)part_end) {
+            result = self->host->graphics.framebuffer.unlock(0, false);
+            if (result != GM_PLUGIN_OK) return result;
+            next_y = part_end;
+            continue;
+        }
         draw_animation(&surface, self, 1);
         dirty.x = ANIMATION_LEFT;
         dirty.y = dirty_y;
@@ -614,7 +624,8 @@ static gm_plugin_result_t on_start(void *opaque)
     gm_plugin_display_info_t display;
     gm_plugin_result_t result = self->host->display_get_info(&display);
     if (result != GM_PLUGIN_OK) return result;
-    if (display.width < 500U || display.height < 300U)
+    if (display.width < 500U || display.height < 300U ||
+        display.pixel_format != GM_PLUGIN_PIXEL_GRAY_4)
         return GM_PLUGIN_ENOTSUP;
     self->width = display.width;
     self->height = display.height;
@@ -628,18 +639,26 @@ static gm_plugin_result_t on_start(void *opaque)
     self->energy = 84;
     self->level = 1;
     result = create_text_ui(self);
-    if (result != GM_PLUGIN_OK) return result;
-    return render(self);
+    if (result == GM_PLUGIN_OK) result = render(self);
+    if (result != GM_PLUGIN_OK) {
+        if (self->root != 0) self->ui->obj_clean(self->root);
+        self->root = 0;
+    }
+    return result;
 }
 
 static void on_loop(void *opaque, uint32_t elapsed_ms)
 {
     pet_t *self = opaque;
-    self->frame_accumulator += elapsed_ms;
-    if (self->frame_accumulator > 320U) self->frame_accumulator = 320U;
+    bool render_needed = false;
+    if (elapsed_ms >= 320U - self->frame_accumulator)
+        self->frame_accumulator = 320U;
+    else
+        self->frame_accumulator += elapsed_ms;
     while (self->frame_accumulator >= FRAME_MS) {
         self->frame_accumulator -= FRAME_MS;
         self->animation_ms += FRAME_MS;
+        render_needed = true;
         if (self->local_mood_ms != 0U) {
             if (self->local_mood_ms <= FRAME_MS) {
                 self->local_mood_ms = 0;
@@ -648,8 +667,8 @@ static void on_loop(void *opaque, uint32_t elapsed_ms)
                 self->local_mood_ms -= FRAME_MS;
             }
         }
-        (void)render(self);
     }
+    if (render_needed) (void)render(self);
 }
 
 static bool on_event(void *opaque, const gm_plugin_event_t *event)
@@ -678,11 +697,6 @@ static bool on_event(void *opaque, const gm_plugin_event_t *event)
         return true;
     }
     return false;
-}
-
-static void on_suspend(void *opaque)
-{
-    (void)opaque;
 }
 
 static void on_resume(void *opaque)
@@ -718,6 +732,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_ENOTSUP;
     s_pet.host = host;
     s_pet.ui = host->graphics.lvgl;
+    if (gm_plugin_libc_get(host, &s_pet.libc) != GM_PLUGIN_OK)
+        return GM_PLUGIN_ENOTSUP;
     if (s_pet.ui->struct_size < GM_PLUGIN_LVGL_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(s_pet.ui->api_version,
                                       GM_PLUGIN_LVGL_API_MIN_VERSION))
@@ -728,7 +744,6 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
     plugin->on_resume = on_resume;
     plugin->on_loop = on_loop;
     plugin->on_event = on_event;
-    plugin->on_suspend = on_suspend;
     plugin->on_stop = on_stop;
     return GM_PLUGIN_OK;
 }

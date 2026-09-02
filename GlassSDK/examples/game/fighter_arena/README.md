@@ -83,14 +83,11 @@ Events enter a small non-blocking queue. Temporary Bluetooth-busy results are
 retried for a bounded number of game loops, preventing ordinary attack and hit
 sounds from being lost while the Web controller is also sending 50 ms input snapshots.
 
-The encoded sheets are stored in `zen_combat_sprites.h` and
-`rival_combat_sprites.h`; their generated, alpha and normalized source sheets
-are kept beside the game for regeneration and visual review. Combat sheets use
-a fixed per-character scale in a 112 x 98 action canvas, so wide punches and
-kicks extend across transparent space instead of shrinking the whole fighter.
-The build tool also anchors each figure inside the established action bounds
-and filters small detached components, preventing both size pulsing and
-isolated cell-leak pixels.
+The release-ready encoded sheets are stored in `zen_combat_sprites.h`,
+`rival_combat_sprites.h`, `zen_hurt_sprites.h`, and
+`rival_hurt_sprites.h`. Source-art production intermediates are intentionally
+excluded from the public SDK. Combat sheets use a fixed per-character scale in
+a 112 x 98 action canvas, so wide attacks preserve fighter scale.
 Rendering treats source row 95 as the ground contact and enforces a minimum
 brightness across the final foot rows, preventing dark shoe pixels from fading
 out or hovering above the stage line.
@@ -107,15 +104,7 @@ falling away from the attacker, including after either fighter changes sides.
 
 The animation state priority is hurt, guard, attack, landing, airborne, crouch,
 turn, walk, then idle. Walk frames advance on a stable timer and stop on the
-same logic frame as movement. The simulator overlay shows body boxes, inset
-hurt boxes, attack boxes, projectile boxes, pose number, hurt state, landing
-recovery, turn timer, and facing direction.
-
-Build with:
-
-```sh
-gm-build build --example game/fighter_arena
-```
+same logic frame as movement.
 
 See [`release/QUICKSTART.md`](release/QUICKSTART.md) for the paired Desktop
 Studio and physical-device verification paths.

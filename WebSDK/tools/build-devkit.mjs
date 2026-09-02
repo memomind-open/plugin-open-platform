@@ -25,7 +25,7 @@ await copy('packages/bridge-contract/src', 'internal/packages/bridge-contract/sr
 await copy('packages/device-renderer/src', 'internal/packages/device-renderer/src');
 await copy('packages/studio-runtime/src', 'internal/packages/studio-runtime/src');
 await copy('packages/web-sdk/src', 'internal/packages/web-sdk/src');
-await copy('examples/basic-counter', 'examples/basic-counter');
+await copy('examples/app-counter', 'examples/app-counter');
 await copy('tools/build-mmpkg.mjs', 'tools/build-mmpkg.mjs');
 await copy('tools/run-browser-studio.mjs', 'studio/gm-plugin-studio.mjs');
 await copy('tools/browser-studio-paths.mjs', 'studio/browser-studio-paths.mjs');
@@ -80,7 +80,7 @@ async function copy(source, target) {
 }
 
 async function prepareStandaloneExample(sdk) {
-  const exampleRoot = resolve(staging, 'examples/basic-counter');
+  const exampleRoot = resolve(staging, 'examples/app-counter');
   const indexPath = resolve(exampleRoot, 'index.html');
   const pluginPath = resolve(exampleRoot, 'plugin.js');
   const index = await readFile(indexPath, 'utf8');

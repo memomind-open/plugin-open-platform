@@ -1,14 +1,15 @@
 # GM Plugin examples
 
-Examples are ordered from the smallest ABI skeleton through one Host module at
-a time. Edit one example, then run `./gm-build` from the SDK root. CMake and
+Examples progress from focused Host modules to complete applications. Edit one
+example, then run `python3 build.py` from the SDK root. CMake and
 Ninja rebuild the affected source files, create
-`build-host/<example>/<example>.gmp`, and starts the QR installation server. A
-copied example must remain below the SDK's `examples/` directory so the driver
-can discover it. Source files can use any descriptive `.c` name; `plugin.c` is
-not a required convention. Do not add an example-local `CMakeLists.txt`: the
-SDK-root build file discovers every `manifest.json` and compiles all `.c` files
-in its example directory.
+`build-host/.build/<relative-path>/<example>.gmp`, and start the QR installation
+server. A copied example may use any nesting depth but must remain below the
+SDK's `examples/` directory so the build driver and Desktop Studio can discover
+it. Source files can use any descriptive `.c` name; `plugin.c` is not a required
+convention. Do not add an example-local `CMakeLists.txt`: the internal build
+definition discovers every `manifest.json` and compiles all `.c` files in its
+example directory.
 
 After the build completes, the QR server selects the valid example `.gmp` with
 the newest modification time. The same rule applies after a full build, when
@@ -21,38 +22,43 @@ spacing, or minimum usable layout sizes rather than device width or height.
 
 | Example | What it teaches | Required capability |
 | --- | --- | --- |
-| `minimal` | entry point and lifecycle | none |
-| `extension` | query, validate and call an `extension_get` function table | LZ4 extension |
-| `lz4` | compress and decompress a raw LZ4 block through the Host | LZ4 extension |
+| `extension` | query, validate and call `extension_get` function tables | LZ4 + libc extensions |
 | `lvgl_ui` | core `host->graphics.lvgl` drawing, text and `on_loop` | none (core LVGL) |
 | `framebuffer` | zero-copy lock/draw/unlock across Host framebuffer slices | display bitmap |
 | `input` | button events and active exit | button |
-| `imu` | gesture events and pull-based raw IMU | IMU events/raw |
-| `bluetooth` | bidirectional channel + byte messages | Bluetooth |
-| `device_state` | battery, charging, wearing and connection state | device state |
-| `scene_bridge` | phone-driven text/rect/line/bitmap scene | display bitmap + Bluetooth |
-| `web_bridge` | WebView-driven Scene rendering plus button/IMU uplink and framed LZ4 transfer | display bitmap + Bluetooth + button + IMU; optional LZ4 |
-| `game/breakout` | complete local game | button + raw IMU + locale |
-| `game/tetris` | grid game with IMU movement and button rotation | button + raw IMU + locale |
-| `game/jet_runner` | scrolling IMU-controlled runner | button + raw IMU + locale |
-| `game/snake` | IMU-controlled snake game | button + raw IMU + locale |
-| `game/2048` | 4 x 4 number-merging puzzle with accessory navigation | button |
-| `game/fighter_arena` | fixed two-fighter best-of-three match with specials and character AI | button + Bluetooth |
+| `imu` | gesture events and pull-based raw IMU | IMU events/raw + libc extension |
+| `bluetooth` | bidirectional channel + byte messages | Bluetooth + libc extension |
+| `web_bridge` | WebView-driven Scene rendering plus button/IMU uplink and framed LZ4 transfer | display bitmap + Bluetooth + button + IMU + libc; optional LZ4 |
+| `talking_pet` | native animated companion paired with the phone-side Talking Pet | display bitmap + Bluetooth + button + libc extension |
+| `game/breakout` | complete local game | button + raw IMU + locale + libc extension |
+| `game/tetris` | grid game with IMU movement and button rotation | button + raw IMU + locale + libc extension |
+| `game/jet_runner` | scrolling IMU-controlled runner | button + raw IMU + locale + libc extension |
+| `game/snake` | IMU-controlled snake game | button + raw IMU + libc extension |
+| `game/2048` | 4 x 4 number-merging puzzle with accessory navigation | button + libc extension |
+| `game/fighter_arena` | fixed two-fighter best-of-three match with specials and character AI | button + Bluetooth + libc extension |
 
 Build the changed module from the SDK root:
 
 ```sh
-./gm-build
+python3 build.py
 ```
 
 On Windows, use Windows PowerShell or Terminal (PowerShell) and run
-`.\gm-build`. Do not use Command Prompt.
+`py build.py`. Do not use Command Prompt.
 
 Build every maintained example:
 
 ```sh
-./gm-build all
+python3 build.py all
 ```
+
+Build only one example by passing its path from this table:
+
+```sh
+python3 build.py build --example game/2048
+```
+
+On Windows, replace `python3` with `py`.
 
 Audio is intentionally outside the plugin ABI. A plugin requests phone-side
 playback/capture through Bluetooth messages; the glasses remain the phone's HFP

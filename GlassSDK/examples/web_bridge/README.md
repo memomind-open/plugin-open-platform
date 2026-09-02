@@ -1,13 +1,13 @@
 # GM web bridge
 
-This example combines the scene bridge, button input, Bluetooth uplink and IMU
+This example combines scene rendering, button input, Bluetooth uplink and IMU
 gesture capabilities in one plugin. It is intended for a phone WebView that
 owns application state while the glasses plugin renders the scene and forwards
 device input.
 
-The existing scene command channels remain identical to
-[`scene_bridge`](../scene_bridge/README.md). Web Bridge adds one optional
-compressed drawing channel. Every multi-byte integer is big-endian.
+The base scene channels support text, rectangles, lines, and raw bitmaps. Web
+Bridge also adds optional compressed drawing channels. Every multi-byte integer
+is big-endian.
 
 ## Compressed bitmap channel
 
@@ -137,11 +137,3 @@ block the display task to retry.
 
 Keep framebuffer tiles separate from active LVGL objects. A later LVGL redraw
 may overwrite direct framebuffer pixels in an overlapping region.
-
-```sh
-cd GlassSDK
-./gm-build build --example web_bridge
-```
-
-On Windows PowerShell, run `.\gm-build build --example web_bridge` from the
-SDK root.

@@ -1,4 +1,5 @@
 #include "gm_plugin.h"
+#include "gm_plugin_libc.h"
 #include "zen_combat_sprites.h"
 #undef PIXEL_FIGHTER_SPRITES_H
 #define pf_sprite_offsets rival_sprite_offsets
@@ -208,6 +209,7 @@ typedef struct {
 
 typedef struct {
     const gm_plugin_host_api_t *host;
+    const gm_plugin_libc_extension_api_t *libc;
     fighter_t player;
     fighter_t cpu;
     projectile_t projectiles[PROJECTILE_COUNT];
@@ -390,10 +392,9 @@ static void rectangle(gm_plugin_framebuffer_surface_t *surface,
         target = surface->pixels +
                  (uint32_t)(row - (int16_t)surface->y) * surface->stride +
                  ((uint16_t)column >> 1);
-        while (column + 1 < end_x) {
-            *target++ = packed;
-            column = (int16_t)(column + 2);
-        }
+        game.libc->memset(target, packed,
+                              (size_t)(end_x - column) >> 1);
+        column = (int16_t)(column + ((end_x - column) & ~1));
         if (column < end_x) pixel(surface, column, row, gray);
     }
 }
@@ -505,9 +506,7 @@ static void text(gm_plugin_framebuffer_surface_t *surface, int16_t x,
 
 static uint8_t text_length(const char *value)
 {
-    uint8_t length = 0;
-    while (*value++ != '\0') ++length;
-    return length;
+    return (uint8_t)game.libc->strlen(value);
 }
 
 static void centered_text(gm_plugin_framebuffer_surface_t *surface,
@@ -570,29 +569,15 @@ static void draw_exit_countdown(game_t *self,
                   "EXIT", self->scale, 10U);
 }
 
-static void number_text(char *output, uint32_t value)
+static void number_text(char *output, size_t capacity, uint32_t value)
 {
-    char reverse[10];
-    uint8_t count = 0;
-    uint8_t index;
-    do {
-        reverse[count++] = (char)('0' + value % 10U);
-        value /= 10U;
-    } while (value != 0U && count < sizeof(reverse));
-    for (index = 0; index < count; ++index)
-        output[index] = reverse[count - index - 1U];
-    output[count] = '\0';
+    game.libc->snprintf(output, capacity, "%u", (unsigned int)value);
 }
 
 static void clear_slice(gm_plugin_framebuffer_surface_t *surface)
 {
-    uint16_t local_y;
-    uint16_t byte;
-    for (local_y = 0; local_y < surface->height; ++local_y) {
-        uint8_t *row = surface->pixels + (uint32_t)local_y * surface->stride;
-        for (byte = 0; byte < surface->stride; ++byte)
-            row[byte] = 0U;
-    }
+    game.libc->memset(surface->pixels, 0,
+                          (size_t)surface->height * surface->stride);
 }
 
 static uint8_t sprite_frame(const fighter_t *fighter)
@@ -846,7 +831,8 @@ static void draw_hud(game_t *self, gm_plugin_framebuffer_surface_t *surface)
     rectangle(surface, (int16_t)(self->width - margin - ui - cpu_health),
               (int16_t)(ui * 3U), cpu_health,
               (int16_t)(bar_h - ui * 2U), 11U);
-    number_text(timer, (self->round_left_ms + 999U) / 1000U);
+    number_text(timer, sizeof(timer),
+                (self->round_left_ms + 999U) / 1000U);
     centered_text(surface, self->width, (int16_t)(ui * 2U), timer, ui, 15U);
     text(surface, margin, (int16_t)(ui * 15U),
          characters[self->player.character].name, label, 13U);
@@ -1049,7 +1035,7 @@ static void draw_interstitial(game_t *self,
         centered_text(surface, self->width,
                       (int16_t)(self->height / 2U + 20 * self->scale),
                       score, self->scale, 15U);
-        number_text(&max_hit[8], self->max_combo);
+        number_text(&max_hit[8], sizeof(max_hit) - 8U, self->max_combo);
         centered_text(surface, self->width,
                       (int16_t)(self->height / 2U + 28 * self->scale),
                       max_hit, self->scale, 10U);
@@ -1101,7 +1087,7 @@ static void draw_fight(game_t *self, gm_plugin_framebuffer_surface_t *surface)
     if (self->combo >= 2U && self->combo_ms != 0U) {
         char count[4];
         int16_t combo_x;
-        number_text(count, self->combo);
+        number_text(count, sizeof(count), self->combo);
         combo_x = (int16_t)(self->cpu.x + FIGHTER_W * self->scale / 2 -
                   5 * 4 * self->scale / 2);
         if (combo_x < 4 * self->scale) combo_x = (int16_t)(4 * self->scale);
@@ -1144,14 +1130,17 @@ static gm_plugin_result_t render(game_t *self)
     uint16_t next_y = 0;
     while (next_y < self->height) {
         gm_plugin_rect_t dirty;
+        uint32_t surface_end;
         uint16_t end_y;
         gm_plugin_result_t result =
             self->host->graphics.framebuffer.lock(next_y, &surface);
         if (result != GM_PLUGIN_OK) return result;
-        end_y = (uint16_t)(surface.y + surface.height);
+        surface_end = (uint32_t)surface.y + surface.height;
+        end_y = (uint16_t)surface_end;
         if (surface.pixels == 0 || surface.height == 0U ||
             surface.width < self->width || surface.y > next_y ||
-            end_y <= next_y || end_y > self->height) {
+            surface.stride < (surface.width + 1U) / 2U ||
+            surface_end <= next_y || surface_end > self->height) {
             (void)self->host->graphics.framebuffer.unlock(0, false);
             return GM_PLUGIN_ESTATE;
         }
@@ -2072,7 +2061,8 @@ static gm_plugin_result_t plugin_start(void *opaque)
                         (unsigned int)self->scale);
     before = self->host->monotonic_ms();
     result = render(self);
-    send_fight_event(self, EVENT_MUSIC, MUSIC_TITLE);
+    if (result == GM_PLUGIN_OK)
+        send_fight_event(self, EVENT_MUSIC, MUSIC_TITLE);
     if (self->host->log != 0)
         self->host->log("fighter_arena: first frame result=%d time=%u ms\n",
                         (int)result,
@@ -2202,6 +2192,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         plugin->struct_size < GM_PLUGIN_DESCRIPTOR_MIN_SIZE)
         return GM_PLUGIN_EVERSION;
     game.host = host;
+    if (gm_plugin_libc_get(host, &game.libc) != GM_PLUGIN_OK)
+        return GM_PLUGIN_ENOTSUP;
     game.random_state = UINT32_C(0x4152454E);
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &game;

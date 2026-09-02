@@ -1,4 +1,5 @@
 #include "gm_plugin_lvgl_api.h"
+#include "gm_plugin_libc.h"
 #include "head_sprites.h"
 
 #define SAMPLE_INTERVAL_MS 50U
@@ -21,6 +22,7 @@ typedef struct {
 
 static const gm_plugin_host_api_t *s_host;
 static const gm_plugin_lvgl_api_t *s_lvgl;
+static const gm_plugin_libc_extension_api_t *s_libc;
 static gm_plugin_display_info_t s_display;
 static gm_plugin_lvgl_obj_t *s_motion_label;
 static gm_plugin_lvgl_obj_t *s_pitch_label;
@@ -37,32 +39,6 @@ static uint8_t s_sprite_pixels[HEAD_SPRITE_ROW_BYTES * HEAD_SPRITE_HEIGHT];
 static uint32_t s_sample_elapsed_ms;
 static uint32_t s_log_elapsed_ms;
 static bool s_sprite_dirty;
-
-static char *append_text(char *cursor, const char *text)
-{
-    while (*text != '\0') *cursor++ = *text++;
-    return cursor;
-}
-
-static char *append_signed(char *cursor, int32_t value)
-{
-    char digits[10];
-    uint32_t count = 0;
-    uint32_t magnitude;
-    if (value < 0) {
-        *cursor++ = '-';
-        magnitude = (uint32_t)-value;
-    } else {
-        *cursor++ = '+';
-        magnitude = (uint32_t)value;
-    }
-    do {
-        digits[count++] = (char)('0' + magnitude % 10U);
-        magnitude /= 10U;
-    } while (magnitude != 0U);
-    while (count != 0U) *cursor++ = digits[--count];
-    return cursor;
-}
 
 static int32_t clamp_value(int32_t value, int32_t minimum, int32_t maximum)
 {
@@ -122,14 +98,8 @@ static void set_axis_text(gm_plugin_lvgl_obj_t *label, const char *prefix,
                           const int16_t axes[3])
 {
     char text[64];
-    char *cursor = append_text(text, prefix);
-    cursor = append_text(cursor, " X ");
-    cursor = append_signed(cursor, axes[0]);
-    cursor = append_text(cursor, "  Y ");
-    cursor = append_signed(cursor, axes[1]);
-    cursor = append_text(cursor, "  Z ");
-    cursor = append_signed(cursor, axes[2]);
-    *cursor = '\0';
+    s_libc->snprintf(text, sizeof(text), "%s X %+d  Y %+d  Z %+d",
+                          prefix, (int)axes[0], (int)axes[1], (int)axes[2]);
     s_lvgl->label_set_text(label, text);
 }
 
@@ -183,7 +153,6 @@ static void decode_sprite(void)
         else
             s_sprite_pixels[byte_index] |= gray;
     }
-    s_sprite_dirty = false;
 }
 
 static gm_plugin_result_t render_sprite(void)
@@ -193,15 +162,25 @@ static gm_plugin_result_t render_sprite(void)
     while (next_y < sprite_bottom) {
         gm_plugin_framebuffer_surface_t surface;
         gm_plugin_rect_t dirty;
+        uint32_t surface_end;
         uint16_t draw_top;
         uint16_t draw_bottom;
         uint16_t row;
         gm_plugin_result_t result =
             s_host->graphics.framebuffer.lock(next_y, &surface);
         if (result != GM_PLUGIN_OK) return result;
+        surface_end = (uint32_t)surface.y + surface.height;
+        if (surface.pixels == 0 || surface.height == 0U ||
+            surface.y > next_y || surface_end <= next_y ||
+            surface_end > s_display.height ||
+            (uint32_t)s_sprite_x + HEAD_SPRITE_WIDTH > surface.width ||
+            surface.stride < (surface.width + 1U) / 2U) {
+            (void)s_host->graphics.framebuffer.unlock(0, false);
+            return GM_PLUGIN_ESTATE;
+        }
         draw_top = surface.y > (uint16_t)s_sprite_y
             ? surface.y : (uint16_t)s_sprite_y;
-        draw_bottom = (uint16_t)(surface.y + surface.height);
+        draw_bottom = (uint16_t)surface_end;
         if (draw_bottom > sprite_bottom) draw_bottom = sprite_bottom;
         if (draw_top >= draw_bottom) {
             (void)s_host->graphics.framebuffer.unlock(0, false);
@@ -214,9 +193,7 @@ static gm_plugin_result_t render_sprite(void)
             uint8_t *target = surface.pixels +
                 (uint32_t)(row - surface.y) * surface.stride +
                 ((uint16_t)s_sprite_x >> 1);
-            uint16_t column;
-            for (column = 0; column < HEAD_SPRITE_ROW_BYTES; ++column)
-                target[column] = source[column];
+            s_libc->memcpy(target, source, HEAD_SPRITE_ROW_BYTES);
         }
         dirty.x = s_sprite_x;
         dirty.y = (int16_t)draw_top;
@@ -257,12 +234,9 @@ static void update_pose(const gm_plugin_imu_sample_t *sample)
 static void update_sample(const gm_plugin_imu_sample_t *sample)
 {
     char text[32];
-    char *cursor;
     s_lvgl->label_set_text(s_motion_label, motion_text(sample));
-    cursor = append_text(text, "Pitch ");
-    cursor = append_signed(cursor, sample->pitch_degrees);
-    cursor = append_text(cursor, " deg");
-    *cursor = '\0';
+    s_libc->snprintf(text, sizeof(text), "Pitch %+d deg",
+                          (int)sample->pitch_degrees);
     s_lvgl->label_set_text(s_pitch_label, text);
     set_axis_text(s_gyro_label, "Gyro", sample->gyro_raw);
     set_axis_text(s_accel_label, "Accel", sample->accel_raw);
@@ -335,8 +309,16 @@ static void imu_loop(void *context, uint32_t elapsed_ms)
     gm_plugin_imu_sample_t sample;
     bool sample_updated = false;
     (void)context;
-    s_sample_elapsed_ms += elapsed_ms;
-    s_log_elapsed_ms += elapsed_ms;
+    if (s_sample_elapsed_ms < SAMPLE_INTERVAL_MS) {
+        uint32_t remaining = SAMPLE_INTERVAL_MS - s_sample_elapsed_ms;
+        s_sample_elapsed_ms = elapsed_ms >= remaining
+            ? SAMPLE_INTERVAL_MS : s_sample_elapsed_ms + elapsed_ms;
+    }
+    if (s_log_elapsed_ms < LOG_INTERVAL_MS) {
+        uint32_t remaining = LOG_INTERVAL_MS - s_log_elapsed_ms;
+        s_log_elapsed_ms = elapsed_ms >= remaining
+            ? LOG_INTERVAL_MS : s_log_elapsed_ms + elapsed_ms;
+    }
     if (s_sample_elapsed_ms >= SAMPLE_INTERVAL_MS) {
         s_sample_elapsed_ms = 0;
         if (s_host->imu_read(&sample) == GM_PLUGIN_OK) {
@@ -344,8 +326,10 @@ static void imu_loop(void *context, uint32_t elapsed_ms)
             sample_updated = true;
         }
     }
-    if (s_sprite_dirty) decode_sprite();
-    (void)render_sprite();
+    if (s_sprite_dirty) {
+        decode_sprite();
+        if (render_sprite() == GM_PLUGIN_OK) s_sprite_dirty = false;
+    }
     if (sample_updated && s_log_elapsed_ms >= LOG_INTERVAL_MS) {
         s_log_elapsed_ms = 0;
         s_host->log("imu pitch=%d accel=%d,%d,%d gyro=%d,%d,%d",
@@ -359,17 +343,16 @@ static void imu_loop(void *context, uint32_t elapsed_ms)
 static bool imu_event(void *context, const gm_plugin_event_t *event)
 {
     char text[48];
-    char *cursor;
     (void)context;
     if (event == 0 || event->type != GM_PLUGIN_EVENT_IMU_GESTURE) return false;
-    cursor = append_text(text, "Gesture: ");
-    cursor = append_text(cursor, gesture_text(event->data.imu_gesture.gesture));
-    cursor = append_text(cursor,
-                         event->data.imu_gesture.active ? " active" : " released");
-    *cursor = '\0';
+    s_libc->snprintf(
+        text, sizeof(text), "Gesture: %s %s",
+        gesture_text(event->data.imu_gesture.gesture),
+        event->data.imu_gesture.active ? "active" : "released");
     s_lvgl->label_set_text(s_gesture_label, text);
-    s_host->log("imu gesture=%u active=%u", event->data.imu_gesture.gesture,
-                event->data.imu_gesture.active);
+    s_host->log("imu gesture=%u active=%u",
+                (unsigned int)event->data.imu_gesture.gesture,
+                (unsigned int)event->data.imu_gesture.active);
     return true;
 }
 
@@ -404,6 +387,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_ENOTSUP;
     s_host = host;
     s_lvgl = host->graphics.lvgl;
+    if (gm_plugin_libc_get(host, &s_libc) != GM_PLUGIN_OK)
+        return GM_PLUGIN_ENOTSUP;
     if (s_lvgl->struct_size < GM_PLUGIN_LVGL_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(s_lvgl->api_version,
                                       GM_PLUGIN_LVGL_API_MIN_VERSION))
