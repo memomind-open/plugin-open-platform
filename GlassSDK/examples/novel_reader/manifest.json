@@ -1,7 +1,7 @@
 {
   "id": "com.memomind.example.novel-reader",
   "name": "Memo Novel Reader",
-  "version": 7,
+  "version": 8,
   "abi_version": 256,
   "provides": {
     "protocols": [

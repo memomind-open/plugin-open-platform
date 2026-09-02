@@ -13,6 +13,8 @@ Automatic scrolling batches display movement to 10 frames per second and only
 updates the progress label when its percentage changes, reducing long-running
 CPU load and repeated label allocations without changing reading speed.
 The centered reading viewport displays five scrolling text lines at a time.
+The implementation uses the Host libc extension for memory operations and
+formatting, avoiding private libc replacements and redundant window clearing.
 
 Controls:
 

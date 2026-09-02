@@ -1,4 +1,5 @@
 #include "gm_plugin_lvgl_api.h"
+#include "gm_plugin_libc.h"
 
 #define READER_CHANNEL UINT16_C(0x4E52)
 #define READER_EVENT_CHANNEL UINT16_C(0x4E53)
@@ -51,6 +52,7 @@
 typedef struct {
     const gm_plugin_host_api_t *host;
     const gm_plugin_lvgl_api_t *ui;
+    const gm_plugin_libc_extension_api_t *libc;
     gm_plugin_lvgl_obj_t *root;
     gm_plugin_lvgl_obj_t *viewport;
     gm_plugin_lvgl_obj_t *chapter_label;
@@ -133,41 +135,6 @@ static void write_u32(uint8_t *data, uint32_t value)
     data[3] = (uint8_t)value;
 }
 
-static char *append_text(char *cursor, const char *text)
-{
-    while (*text != '\0') *cursor++ = *text++;
-    return cursor;
-}
-
-static char *append_uint(char *cursor, uint32_t value)
-{
-    char digits[10];
-    uint8_t count = 0;
-    if (value == 0U) {
-        *cursor++ = '0';
-        return cursor;
-    }
-    while (value != 0U && count < sizeof(digits)) {
-        digits[count++] = (char)('0' + value % 10U);
-        value /= 10U;
-    }
-    while (count != 0U) *cursor++ = digits[--count];
-    return cursor;
-}
-
-static void zero_memory(void *memory, uint32_t length)
-{
-    uint8_t *bytes = memory;
-    while (length-- != 0U) *bytes++ = 0;
-}
-
-static void copy_memory(void *destination, const void *source, uint32_t length)
-{
-    uint8_t *out = destination;
-    const uint8_t *in = source;
-    while (length-- != 0U) *out++ = *in++;
-}
-
 static const gm_plugin_lvgl_font_t *active_font(novel_reader_t *self)
 {
     return self->font_mode == FONT_LARGE ? self->ui->font_large
@@ -188,15 +155,13 @@ static uint32_t visible_offset(const novel_reader_t *self)
 static void update_footer(novel_reader_t *self)
 {
     char text[16];
-    char *cursor = text;
     uint32_t percent = self->total_bytes == 0U ? 0U :
         (visible_offset(self) * 100U) / self->total_bytes;
     if (percent > 100U) percent = 100U;
     if (self->shown_percent == (uint8_t)percent) return;
     self->shown_percent = (uint8_t)percent;
-    cursor = append_uint(cursor, percent);
-    cursor = append_text(cursor, "%");
-    *cursor = '\0';
+    self->libc->snprintf(text, sizeof(text), "%u%%",
+                         (unsigned int)percent);
     self->ui->label_set_text(self->footer, text);
 }
 
@@ -311,8 +276,8 @@ static bool build_page(novel_reader_t *self, uint8_t slot,
         if (step == 0U || cursor + step > self->window_length ||
             output + step >= PAGE_BYTES)
             return false;
-        copy_memory(self->page_text[slot] + output,
-                    self->window + cursor, step);
+        self->libc->memcpy(self->page_text[slot] + output,
+                           self->window + cursor, step);
         output += step;
         cursor += step;
         ++lines;
@@ -370,9 +335,8 @@ static void promote_page(novel_reader_t *self)
         self->history[self->history_count++] =
             self->page_start[self->current_page];
     else {
-        uint8_t index;
-        for (index = 1U; index < HISTORY_PAGES; ++index)
-            self->history[index - 1U] = self->history[index];
+        self->libc->memmove(self->history, self->history + 1,
+                            (HISTORY_PAGES - 1U) * sizeof(self->history[0]));
         self->history[HISTORY_PAGES - 1U] =
             self->page_start[self->current_page];
     }
@@ -415,11 +379,13 @@ static void previous_page(novel_reader_t *self)
 
 static void reset_private_data(novel_reader_t *self)
 {
-    zero_memory(self->window, sizeof(self->window));
-    zero_memory(self->page_text, sizeof(self->page_text));
-    zero_memory(self->chapter_title, sizeof(self->chapter_title));
-    zero_memory(self->page_line_offset, sizeof(self->page_line_offset));
-    zero_memory(self->history, sizeof(self->history));
+    self->libc->memset(self->window, 0, sizeof(self->window));
+    self->libc->memset(self->page_text, 0, sizeof(self->page_text));
+    self->libc->memset(self->chapter_title, 0,
+                       sizeof(self->chapter_title));
+    self->libc->memset(self->page_line_offset, 0,
+                       sizeof(self->page_line_offset));
+    self->libc->memset(self->history, 0, sizeof(self->history));
     self->window_offset = 0U;
     self->window_length = 0U;
     self->page_start[0] = self->page_start[1] = 0U;
@@ -444,14 +410,12 @@ static void reset_private_data(novel_reader_t *self)
 static void show_exit(novel_reader_t *self)
 {
     char text[24];
-    char *cursor = text;
     uint8_t seconds = (uint8_t)((EXIT_HOLD_MS - self->exit_elapsed + 999U) /
                                 1000U);
     if (seconds == self->exit_seconds) return;
     self->exit_seconds = seconds;
-    cursor = append_text(cursor, "EXIT IN ");
-    cursor = append_uint(cursor, seconds);
-    *cursor = '\0';
+    self->libc->snprintf(text, sizeof(text), "EXIT IN %u",
+                         (unsigned int)seconds);
     self->ui->label_set_text(self->exit_label, text);
     self->ui->obj_clear_flag(self->exit_label, GM_PLUGIN_LVGL_FLAG_HIDDEN);
     self->ui->obj_clear_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
@@ -515,8 +479,7 @@ static bool handle_window(novel_reader_t *self, const uint8_t *data,
     if (session != self->session || text_length > WINDOW_BYTES ||
         (self->waiting != 0U && offset != self->requested_offset))
         return false;
-    zero_memory(self->window, sizeof(self->window));
-    copy_memory(self->window, data + 11, text_length);
+    self->libc->memcpy(self->window, data + 11, text_length);
     self->window[text_length] = '\0';
     self->window_offset = offset;
     self->window_length = text_length;
@@ -581,8 +544,8 @@ static bool handle_chapter(novel_reader_t *self, const uint8_t *data,
         read_u32(data + 2) != self->session)
         return false;
     title_length = length - 6U;
-    zero_memory(self->chapter_title, sizeof(self->chapter_title));
-    copy_memory(self->chapter_title, data + 6, title_length);
+    self->libc->memcpy(self->chapter_title, data + 6, title_length);
+    self->chapter_title[title_length] = '\0';
     self->ui->label_set_text(self->chapter_label, self->chapter_title);
     return true;
 }
@@ -873,6 +836,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_ENOTSUP;
     reader.host = host;
     reader.ui = host->graphics.lvgl;
+    if (gm_plugin_libc_get(host, &reader.libc) != GM_PLUGIN_OK)
+        return GM_PLUGIN_ENOTSUP;
     if (reader.ui->struct_size < GM_PLUGIN_LVGL_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(reader.ui->api_version,
                                       GM_PLUGIN_LVGL_API_MIN_VERSION))
