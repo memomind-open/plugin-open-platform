@@ -1,0 +1,14 @@
+{
+  "id": "com.memomind.example.novel-reader",
+  "name": "Memo Novel Reader",
+  "version": "0.1.11",
+  "entry": "index.html",
+  "bridgeVersion": "1.0",
+  "permissions": ["device.events", "storage"],
+  "deviceRequirements": {
+    "requiredPluginId": "com.memomind.example.novel-reader",
+    "protocols": [
+      { "id": "gm.novel-reader", "minVersion": "1.2" }
+    ]
+  }
+}
