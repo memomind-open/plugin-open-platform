@@ -203,7 +203,7 @@
       </div>`;
     elements.forecast.innerHTML = weather.days.map((day, index) => `
       <div class="forecast-row">
-        <span class="forecast-day">${index === 0 ? 'Today' : index === 1 ? 'Tomorrow' : weekday(day.date)}</span>
+        <span class="forecast-day">${forecastDayLabel(index, day.date)}</span>
         <span class="forecast-icon" title="${escapeHtml(day.condition)}">${weatherIcon(day.code)}</span>
         <span class="forecast-temp">${day.high}° <span class="forecast-low">${day.low}°</span></span>
         <span class="forecast-rain">${day.rain > 0 ? `Rain ${day.rain}%` : '&nbsp;'}</span>
@@ -276,7 +276,9 @@
     drawMetric(context, 130, 208, 'HUMIDITY', `${weather.humidity}%`);
     drawMetric(context, 236, 208, 'WIND', `${weather.wind} km/h`);
 
-    context.fillStyle = '#141414';
+    // Stay below the first GRAY4 rounding threshold so the forecast panel
+    // remains nearly black on the green-tinted glasses display.
+    context.fillStyle = '#080808';
     roundedRect(context, 346, 14, 200, 244, 20);
     context.fill();
     context.fillStyle = '#fff';
@@ -285,11 +287,13 @@
 
     weather.days.forEach((day, index) => {
       const top = 59 + index * 62;
-      const label = index === 0 ? 'TODAY' : index === 1 ? 'TOMORROW' : weekday(day.date);
+      const label = forecastDayLabel(index, day.date, true);
       context.fillStyle = '#aaa';
-      context.font = '15px sans-serif';
-      context.fillText(label, 364, top + 21);
-      drawWeatherSymbol(context, day.code, 414, top + 4, 32);
+      context.font = '14px sans-serif';
+      // Keep the compact day label inside its own column. The previous
+      // TOMORROW label extended underneath the weather symbol.
+      context.fillText(label, 364, top + 21, 52);
+      drawWeatherSymbol(context, day.code, 423, top + 5, 30);
       context.fillStyle = '#fff';
       context.font = '700 17px sans-serif';
       context.textAlign = 'right';
@@ -547,8 +551,14 @@
     }[weatherTheme(code)];
   }
 
+  function forecastDayLabel(index, date, compact = false) {
+    if (index === 0) return compact ? 'TODAY' : 'Today';
+    if (index === 1) return compact ? 'TMRW' : 'Tomorrow';
+    return weekday(date).toUpperCase();
+  }
+
   function weekday(date) {
-    return new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(
+    return new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(
       new Date(`${date}T12:00:00`),
     );
   }
