@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+    <title>Memo Novel Reader</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">MEMO NOVEL READER</p>
+        <h1>Novel Reader</h1>
+      </div>
+      <button id="bridge-state" class="connection" type="button">Connecting to glasses…</button>
+    </header>
+
+    <main class="layout">
+      <aside class="library-panel">
+        <div class="section-heading">
+          <h2>My Library</h2>
+          <span id="book-count">0 books</span>
+        </div>
+        <div class="import-button">
+          <span aria-hidden="true">Import TXT</span>
+          <input id="novel-file" type="file" accept=".txt,text/plain" aria-label="Import TXT" aria-describedby="file-import-hint">
+        </div>
+        <label class="field-label" for="encoding">Text Encoding</label>
+        <select id="encoding">
+          <option value="auto">Auto Detect</option>
+          <option value="utf-8">UTF-8</option>
+          <option value="gb18030">GBK / GB18030</option>
+          <option value="utf-16le">UTF-16 LE</option>
+          <option value="utf-16be">UTF-16 BE</option>
+        </select>
+        <p id="file-import-hint" class="hint">Up to 20 MB per book. Text stays on your phone.</p>
+        <div id="book-list" class="book-list"></div>
+      </aside>
+
+      <section class="reader-panel">
+        <div id="empty-state" class="empty-state">
+          <span class="empty-icon">TXT</span>
+          <h2>Import a novel to start reading</h2>
+          <p>Your phone stores the book; your glasses lay out and scroll the text.</p>
+        </div>
+
+        <div id="reader" hidden>
+          <div class="reader-heading">
+            <div>
+              <p id="chapter-name" class="eyebrow">Full Text</p>
+              <h2 id="book-title"></h2>
+            </div>
+            <div class="heading-actions">
+              <button type="button" data-action="directory">Contents</button>
+              <button type="button" data-action="bookmark">Bookmarks</button>
+              <button type="button" data-action="delete" class="danger">Delete</button>
+            </div>
+          </div>
+
+          <article id="phone-preview" class="phone-preview"></article>
+
+          <div class="progress-row">
+            <progress id="progress" max="100" value="0"></progress>
+            <span id="progress-text">0%</span>
+          </div>
+
+          <div class="controls">
+            <button type="button" data-control="pageUp">Previous Page</button>
+            <button type="button" data-control="lineUp">Previous Line</button>
+            <button id="play-toggle" type="button" data-control="pause" class="primary">Pause Auto-scroll</button>
+            <button type="button" data-control="lineDown">Next Line</button>
+            <button type="button" data-control="pageDown">Next Page</button>
+          </div>
+
+          <div class="settings">
+            <label>Glasses Font
+              <select id="font-mode">
+                <option value="0">Standard</option>
+                <option value="1">Large</option>
+              </select>
+            </label>
+            <label>Scroll Speed
+              <select id="scroll-speed">
+                <option value="8">Slow</option>
+                <option value="16" selected>Standard</option>
+                <option value="24">Fast</option>
+              </select>
+            </label>
+            <button id="push-to-glasses" type="button" class="primary">Send to Glasses</button>
+          </div>
+        </div>
+
+        <p id="status" class="status">Initializing local library…</p>
+      </section>
+    </main>
+
+    <dialog id="list-dialog">
+      <div class="dialog-heading">
+        <h2 id="dialog-title">Contents</h2>
+        <button id="dialog-close" type="button">Close</button>
+      </div>
+      <div id="dialog-list" class="dialog-list"></div>
+    </dialog>
+
+    <script type="module" src="./plugin.js"></script>
+  </body>
+</html>

@@ -41,6 +41,7 @@ npm run pack:plugin -- examples/<relative-path> dist/<plugin-name>.mmpkg
 | --- | --- | --- |
 | `app-counter/` | `com.memomind.demo.counter` | App built-in counter example |
 | `talking-pet/` | `com.memomind.example.talking-pet` | Interactive talking-pet game |
+| `novel-reader/` | `com.memomind.example.novel-reader` | TXT reader with glasses-side layout and scrolling |
 | `tic-tac-toe/` | `com.memomind.demo.tictactoe` | TypeScript/Vite source project |
 | `weather/` | `com.memomind.demo.weather` | Static HTML/CSS/JavaScript |
 | `fighter-controller/` | `com.memomind.fighter.controller` | Multi-touch GMP game controller |
