@@ -2,6 +2,7 @@ import {
   BRIDGE_VERSION,
   CAPABILITIES,
   DEVICE_PROFILE,
+  FILE_PROFILE,
   PLUGIN_MESSAGE_PROFILE,
   SCENE_TRANSPORT_PROFILE,
   isMethodName,
@@ -20,14 +21,29 @@ export class StudioBridgeError extends Error {
 }
 
 export class StudioRuntime {
-  constructor({ renderer, sessionToken = randomToken(), runtimeGeneration = 1, pluginMessageHandler } = {}) {
+  constructor({
+    renderer,
+    sessionToken = randomToken(),
+    runtimeGeneration = 1,
+    pluginMessageHandler,
+    storage = new Map(),
+    fileStore = new Map(),
+    filePicker,
+    fileStreamFactory = createMessagePortResource,
+  } = {}) {
     if (!renderer) throw new TypeError('renderer is required');
     this.renderer = renderer;
     this.sessionToken = sessionToken;
     this.runtimeGeneration = runtimeGeneration;
     this.lifecycleState = 'running';
     this.connected = true;
-    this.storage = new Map();
+    this.storage = storage;
+    this.fileStore = fileStore;
+    this.filePicker = filePicker;
+    this.fileStreamFactory = fileStreamFactory;
+    this.fileStreams = new Map();
+    this.fileStreamSequence = 0;
+    this.fileSequence = fileStore.size;
     this.subscriptions = new Map();
     this.subscriptionSequence = 0;
     this.eventSequence = 0;
@@ -88,6 +104,23 @@ export class StudioRuntime {
       case 'storage.clear':
         this.storage.clear();
         return { cleared: true };
+      case 'files.pick':
+        return this.pickFiles(params);
+      case 'files.list':
+        return { files: this.listFiles() };
+      case 'files.stat':
+        return { file: { ...this.requireFile(params.fileId).metadata } };
+      case 'files.openRead':
+        return this.openFileRead(params);
+      case 'files.getUsage':
+        return {
+          fileCount: this.fileStore.size,
+          totalBytes: [...this.fileStore.values()]
+            .reduce((total, entry) => total + entry.bytes.length, 0),
+          maxTotalBytes: FILE_PROFILE.maxTotalBytes,
+        };
+      case 'files.delete':
+        return this.deleteFile(params.fileId);
       case 'display.createPage':
         this.requireConnection();
         return { created: true };
@@ -168,6 +201,133 @@ export class StudioRuntime {
     return { sent: true, channel, payloadBytes: data.length };
   }
 
+  async pickFiles(params) {
+    const extensions = normalizeExtensions(params.extensions);
+    const allowMultiple = params.allowMultiple === true;
+    if (params.allowMultiple !== undefined && typeof params.allowMultiple !== 'boolean') {
+      throw new StudioBridgeError('INVALID_REQUEST', 'allowMultiple must be boolean');
+    }
+    if (!this.filePicker) return { files: [] };
+    const selected = await this.filePicker({ extensions, allowMultiple });
+    if (!Array.isArray(selected)) {
+      throw new StudioBridgeError('INTERNAL_ERROR', 'Studio file picker returned invalid data');
+    }
+    const bounded = allowMultiple
+      ? selected.slice(0, FILE_PROFILE.maxPickFiles)
+      : selected.slice(0, 1);
+    const files = [];
+    for (const item of bounded) {
+      const name = requirePickedFileName(item?.name);
+      const bytes = normalizePickedBytes(item?.bytes);
+      const extension = fileExtension(name);
+      if (extensions.length && (!extension || !extensions.includes(extension))) continue;
+      const totalBytes = [...this.fileStore.values()]
+        .reduce((total, entry) => total + entry.bytes.length, 0);
+      if (totalBytes + bytes.length > FILE_PROFILE.maxTotalBytes) {
+        throw new StudioBridgeError('QUOTA_EXCEEDED', 'User file storage quota exceeded');
+      }
+      let fileId;
+      do {
+        fileId = (++this.fileSequence).toString(16).padStart(32, '0');
+      } while (this.fileStore.has(fileId));
+      const metadata = {
+        fileId,
+        name,
+        size: bytes.length,
+        importedAt: new Date().toISOString(),
+        ...(extension ? { extension } : {}),
+      };
+      this.fileStore.set(fileId, { metadata, bytes });
+      files.push({ ...metadata });
+    }
+    return { files };
+  }
+
+  listFiles() {
+    return [...this.fileStore.values()]
+      .map((entry) => ({ ...entry.metadata }))
+      .sort((left, right) => right.importedAt.localeCompare(left.importedAt));
+  }
+
+  requireFile(fileId) {
+    const normalized = requireFileId(fileId);
+    const entry = this.fileStore.get(normalized);
+    if (!entry) throw new StudioBridgeError('FILE_NOT_FOUND', 'fileId does not exist');
+    return entry;
+  }
+
+  async openFileRead(params) {
+    const entry = this.requireFile(params.fileId);
+    const offset = optionalInteger(params, 'offset', 0);
+    if (offset < 0 || offset > entry.bytes.length) {
+      throw new StudioBridgeError('INVALID_REQUEST', 'offset is outside the file');
+    }
+    const available = entry.bytes.length - offset;
+    const requestedLength = params.length === undefined
+      ? available
+      : optionalInteger(params, 'length', available);
+    if (params.length !== undefined && requestedLength < 1) {
+      throw new StudioBridgeError('INVALID_REQUEST', 'length must be greater than zero');
+    }
+    const length = Math.min(requestedLength, available);
+    const bytes = entry.bytes.subarray(offset, offset + length);
+    const streamId = `stream-${++this.fileStreamSequence}`;
+    const resource = await this.fileStreamFactory({
+      fileId: entry.metadata.fileId,
+      bytes,
+      size: entry.bytes.length,
+      offset,
+      length,
+      sessionToken: this.sessionToken,
+      runtimeGeneration: this.runtimeGeneration,
+      onClose: () => this.releaseFileStream(streamId),
+    });
+    if (!resource?.streamPort?.postMessage || typeof resource.cancel !== 'function') {
+      throw new StudioBridgeError('INTERNAL_ERROR', 'Studio file stream factory failed');
+    }
+    const timer = setTimeout(() => this.cancelFileStream(streamId), 60_000);
+    timer.unref?.();
+    this.fileStreams.set(streamId, {
+      fileId: entry.metadata.fileId,
+      cancel: resource.cancel,
+      timer,
+    });
+    return {
+      streamPort: resource.streamPort,
+      fileId: entry.metadata.fileId,
+      size: entry.bytes.length,
+      offset,
+      length,
+    };
+  }
+
+  cancelFileStream(streamId) {
+    const resource = this.fileStreams.get(streamId);
+    if (!resource) return;
+    this.releaseFileStream(streamId);
+    resource.cancel(new StudioBridgeError('FILE_NOT_FOUND', 'File read stream is no longer valid'));
+  }
+
+  releaseFileStream(streamId) {
+    const resource = this.fileStreams.get(streamId);
+    if (resource?.timer) clearTimeout(resource.timer);
+    this.fileStreams.delete(streamId);
+  }
+
+  invalidateFileStreams(fileId) {
+    for (const [streamId, resource] of [...this.fileStreams.entries()]) {
+      if (fileId !== undefined && resource.fileId !== fileId) continue;
+      this.cancelFileStream(streamId);
+    }
+  }
+
+  deleteFile(fileId) {
+    const normalized = requireFileId(fileId);
+    const deleted = this.fileStore.delete(normalized);
+    if (deleted) this.invalidateFileStreams(normalized);
+    return { deleted };
+  }
+
   subscribeEvents(types) {
     const supported = new Set(CAPABILITIES.events);
     if (!Array.isArray(types) || types.length === 0 || types.length > supported.size || types.some((type) => typeof type !== 'string' || !supported.has(type))) {
@@ -203,6 +363,7 @@ export class StudioRuntime {
     const allowed = new Set(['starting', 'running', 'suspended', 'stopped', 'failed']);
     if (!allowed.has(state)) throw new RangeError(`Unknown lifecycle state: ${state}`);
     this.lifecycleState = state;
+    if (state !== 'running') this.invalidateFileStreams();
     this.emit('runtime.lifecycleChanged', { state });
   }
 
@@ -354,6 +515,51 @@ export class StudioRuntime {
   }
 }
 
+function normalizeExtensions(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 32 ||
+      value.some((extension) => typeof extension !== 'string')) {
+    throw new StudioBridgeError(
+      'INVALID_REQUEST',
+      'extensions must be an array of at most 32 strings',
+    );
+  }
+  return [...new Set(value
+    .map((extension) => extension.trim().replace(/^\./u, '').toLowerCase())
+    .filter(Boolean))];
+}
+
+function requireFileId(value) {
+  if (typeof value !== 'string' || !/^[0-9a-f]{32}$/u.test(value)) {
+    throw new StudioBridgeError(
+      'INVALID_REQUEST',
+      'fileId must be a 32-character lowercase hexadecimal string',
+    );
+  }
+  return value;
+}
+
+function requirePickedFileName(value) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new StudioBridgeError('INTERNAL_ERROR', 'Picked file name is invalid');
+  }
+  return value.trim();
+}
+
+function normalizePickedBytes(value) {
+  if (value instanceof Uint8Array) return Uint8Array.from(value);
+  if (ArrayBuffer.isView(value)) {
+    return Uint8Array.from(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+  }
+  if (value instanceof ArrayBuffer) return new Uint8Array(value.slice(0));
+  throw new StudioBridgeError('INTERNAL_ERROR', 'Picked file bytes are invalid');
+}
+
+function fileExtension(name) {
+  const match = /\.([^.]+)$/u.exec(name);
+  return match?.[1]?.toLowerCase();
+}
+
 function requireString(values, key) {
   const value = values[key];
   if (typeof value !== 'string' || value.length === 0) throw new StudioBridgeError('INVALID_REQUEST', `${key} must be a non-empty string`);
@@ -364,6 +570,63 @@ function requireInteger(values, key) {
   const value = values[key];
   if (!Number.isInteger(value)) throw new StudioBridgeError('INVALID_REQUEST', `${key} must be an integer`);
   return value;
+}
+
+function optionalInteger(values, key, fallback) {
+  if (values[key] === undefined) return fallback;
+  return requireInteger(values, key);
+}
+
+function createMessagePortResource({ bytes, onClose }) {
+  if (typeof globalThis.MessageChannel !== 'function') {
+    throw new StudioBridgeError('CAPABILITY_UNAVAILABLE', 'Binary file streaming is unavailable');
+  }
+  const channel = new globalThis.MessageChannel();
+  let offset = 0;
+  let finished = false;
+  channel.port1.addEventListener('message', (event) => {
+    if (finished) return;
+    if (event.data?.type === 'cancel') {
+      finished = true;
+      channel.port1.close();
+      onClose?.();
+      return;
+    }
+    if (event.data?.type !== 'pull') return;
+    if (offset >= bytes.length) {
+      finished = true;
+      channel.port1.postMessage({ type: 'end' });
+      channel.port1.close();
+      onClose?.();
+      return;
+    }
+    const end = Math.min(offset + 256 * 1024, bytes.length);
+    const buffer = bytes.slice(offset, end).buffer;
+    offset = end;
+    channel.port1.postMessage({ type: 'chunk', buffer }, [buffer]);
+  });
+  channel.port1.addEventListener('messageerror', () => {
+    if (!finished) {
+      finished = true;
+      channel.port1.close();
+      onClose?.();
+    }
+  });
+  channel.port1.start();
+  return {
+    streamPort: channel.port2,
+    cancel(reason) {
+      if (finished) return;
+      finished = true;
+      channel.port1.postMessage({
+        type: 'error',
+        code: reason?.code ?? 'INTERNAL_ERROR',
+        message: reason?.message ?? 'File read stream was cancelled',
+      });
+      channel.port1.close();
+      onClose?.();
+    },
+  };
 }
 
 function requireUint32(values, key) {

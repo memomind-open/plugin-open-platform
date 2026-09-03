@@ -19,6 +19,7 @@ const SUPPORTED_PERMISSIONS = new Set([
   'storage',
   'network',
   'audio.capture',
+  'files.user-selected',
 ]);
 const PLUGIN_ID = /^[a-zA-Z][a-zA-Z0-9_-]*(\.[a-zA-Z0-9_-]+)+$/;
 const SEMVER = /^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/;

@@ -13,6 +13,7 @@ test('example SDK copies match the formal standalone SDK', async () => {
   for (const plugin of [
     'examples/fighter-controller',
     'examples/life-desk',
+    'examples/novel-reader',
     'examples/talking-pet',
   ]) {
     const actual = await readFile(

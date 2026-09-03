@@ -12,6 +12,7 @@ const bundled = await bundleWebSdk(repositoryRoot, packageJson.version);
 for (const plugin of [
   'examples/fighter-controller',
   'examples/life-desk',
+  'examples/novel-reader',
   'examples/talking-pet',
 ]) {
   const vendorDirectory = resolve(repositoryRoot, plugin, 'vendor');

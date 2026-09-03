@@ -1,6 +1,7 @@
-export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 export const DEFAULT_SCROLL_SPEED = 16;
 export const SCROLL_SPEED_PROFILE_VERSION = 2;
+
+let chapterLinePattern;
 
 const chapterPattern = /^\s*(?:第[0-9零〇一二三四五六七八九十百千万两]+[章回卷节部篇]|序章|楔子|前言|后记|尾声|番外(?:篇)?|chapter\s+[0-9ivxlcdm]+).*$/gimu;
 
@@ -12,6 +13,33 @@ export function normalizeNovelText(value) {
     .replace(/[\t\u00a0]+/gu, ' ')
     .replace(/\n{4,}/gu, '\n\n\n')
     .trim();
+}
+
+export function normalizeNovelSegment(value, stripBom = false) {
+  const normalized = value
+    .replace(/\r\n?/gu, '\n')
+    .replace(/\u0000/gu, '')
+    .replace(/[\t\u00a0]/gu, ' ');
+  return stripBom ? normalized.replace(/^\uFEFF/u, '') : normalized;
+}
+
+export function detectNovelEncoding(buffer, requestedEncoding = 'auto') {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  if (bytes.length === 0) throw new Error('TXT file is empty');
+  if (requestedEncoding !== 'auto') return requestedEncoding;
+  const structural = detectBom(bytes) ?? detectUtf16Pattern(bytes);
+  if (structural) return structural;
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(bytes, { stream: true });
+    return 'utf-8';
+  } catch {
+    return 'gb18030';
+  }
+}
+
+export function isChapterTitle(value) {
+  chapterLinePattern ??= new RegExp(chapterPattern.source, 'iu');
+  return chapterLinePattern.test(String(value ?? ''));
 }
 
 export function decodeNovel(buffer, requestedEncoding = 'auto') {
@@ -80,21 +108,6 @@ export function chapterIndexAt(chapters, byteOffset) {
 export function safeBookTitle(filename) {
   const title = String(filename ?? '').replace(/\.txt$/iu, '').trim();
   return title || 'Untitled Novel';
-}
-
-export async function createBookId(bytes) {
-  if (globalThis.crypto?.subtle) {
-    const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
-    return [...new Uint8Array(digest)]
-      .map((value) => value.toString(16).padStart(2, '0'))
-      .join('');
-  }
-  let hash = 2166136261;
-  for (const value of bytes) {
-    hash ^= value;
-    hash = Math.imul(hash, 16777619);
-  }
-  return `fallback-${bytes.length}-${(hash >>> 0).toString(16)}`;
 }
 
 export function trimWindowEnd(bytes, start, requestedLength) {
