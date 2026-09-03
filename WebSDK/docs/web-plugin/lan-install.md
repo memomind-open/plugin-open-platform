@@ -13,9 +13,10 @@ The QR payload contains only the direct Studio server address:
 mmapp+tcp://192.168.1.8:18765
 ```
 
-The QR does not contain JSON or package metadata. See the repository-level
-[Developer App ZIP](../../../APP_BUNDLE.md) contract for composition and
-incremental-update rules.
+The QR does not contain JSON or package metadata. Studio serves a ZIP with at
+most one phone `.mmpkg` and at most one glasses `.gmp`; both files are placed
+directly at the ZIP root. ZIP composition and incremental updates are handled
+internally by Desktop Studio and the App.
 
 The scheme is always `mmapp+tcp`. The authority contains Studio's LAN host and
 port. The server returns the percent-encoded application ZIP name in its

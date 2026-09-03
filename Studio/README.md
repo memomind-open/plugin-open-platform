@@ -87,7 +87,7 @@ application package included in the matching platform directory.
 - Interface language selection and plugin locale propagation.
 - One developer-app ZIP and QR for the selected phone/glasses combination.
   New installs fetch the complete selection; updates transfer only changed
-  components. See [`APP_BUNDLE.md`](../APP_BUNDLE.md).
+  components.
 
 Simulation is not a substitute for final testing on physical glasses. Optical
 brightness, timing, Bluetooth behavior, sensors, memory pressure, and firmware

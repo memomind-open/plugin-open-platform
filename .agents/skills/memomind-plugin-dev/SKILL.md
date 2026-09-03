@@ -39,9 +39,9 @@ online instructions.
 
 1. Locate the relevant root without assuming a fixed absolute path:
    - A complete Plugin Open Platform release contains `GlassSDK/`, `WebSDK/`,
-     and `Studio/`.
-   - A GlassSDK root contains `gm-build`, `gm-build.exe`, `include/`, and
-     `examples/`.
+     `Studio/`, the short `tools/build` and `tools/build.cmd` launchers, and
+     their shared top-level `build.py` implementation.
+   - A GlassSDK root contains `build.py`, `include/`, and `examples/`.
    - A WebSDK source root contains `package.json`, `packages/`, `tools/`, and
      `examples/`.
    - An extracted WebSDK DevKit contains `DEVKIT-MANIFEST.json`, `sdk/`,
@@ -63,7 +63,7 @@ online instructions.
 - Inspect local README files, manifests, package scripts, and tool help before
   inventing commands or file names.
 - Work offline by default. A first GlassSDK build can download a pinned RISC-V
-  toolchain and Python dependencies; `npm ci` accesses the configured npm
+  toolchain plus CMake and Ninja; `npm ci` accesses the configured npm
   registry. Explain this before running either operation when the required
   cache or dependencies are absent.
 - Do not install system software, modify system environment variables, change
@@ -82,6 +82,13 @@ online instructions.
 
 ## Execute and verify
 
+From a complete Plugin Open Platform root, prefer `./tools/build` on
+macOS/Linux or `.\tools\build` in Windows PowerShell to discover and
+incrementally build both SDKs. Append `web` or `glass` when the developer
+requests only one side, and append `--watch` only when continuous rebuilding
+is requested. The launchers share the top-level `build.py`; continue to use
+each SDK's narrower command when the developer asks for one specific plugin.
+
 Before changing a plugin, inspect its manifest and the closest maintained
 example. Preserve the local SDK's ABI, Bridge, lifecycle, packaging, and
 capability rules.
@@ -97,8 +104,8 @@ only on command exit status:
   Web-to-glasses message paths behave as applicable.
 - Packaging: `manifest.json` is at the package root and the local packager
   accepts the output.
-- Device preparation: the selected package is served from the intended trusted
-  LAN address and the developer is told how to stop the server.
+- Device preparation: Desktop Studio selects the intended package and exposes
+  its developer-app QR code on the intended trusted LAN.
 
 If an operation fails, preserve the first actionable error and read
 [references/troubleshooting.md](references/troubleshooting.md). Avoid broad

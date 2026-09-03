@@ -24,6 +24,16 @@ not load or execute `.gmp` files.
 
 ## Quick start
 
+When WebSDK is kept inside the complete Plugin Open Platform directory, the
+top-level `build.py` can discover and incrementally package every Web plugin:
+
+```sh
+../tools/build web
+```
+
+Use `..\tools\build web` in Windows PowerShell. The commands below remain
+available when working with WebSDK by itself or with one specific plugin.
+
 Install the WebSDK development dependencies and run its validation:
 
 ```sh

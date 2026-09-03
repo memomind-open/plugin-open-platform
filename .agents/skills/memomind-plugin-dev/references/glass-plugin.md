@@ -4,13 +4,12 @@ Use this guide for native RV32 glasses plugins packaged as `.gmp` files.
 
 ## Prepare the local SDK
 
-Confirm the GlassSDK root contains `gm-build`, `gm-build.exe`, `include/`, and
-`examples/`. Verify Python 3.8 or newer. A system C compiler, GNU Make, CMake,
-and Ninja are not prerequisites: the SDK driver manages its pinned build
-components.
+Confirm the GlassSDK root contains `build.py`, `include/`, and `examples/`.
+Verify Python 3.8 or newer. A system C compiler, GNU Make, CMake, and Ninja are
+not prerequisites: the SDK driver manages its pinned build components.
 
 The first build can download and verify the pinned RISC-V toolchain and install
-Python-based build dependencies. Explain this before the first run when the
+the CMake and Ninja Python packages. Explain this before the first run when the
 cache is absent. If the developer supplies `GM_RISCV_TOOLCHAIN`, verify that it
 contains a compatible `riscv-none-elf-gcc` rather than replacing it.
 
@@ -30,44 +29,45 @@ contains a compatible `riscv-none-elf-gcc` rather than replacing it.
 
 ## Build narrowly
 
-Run commands from the GlassSDK root. Use `.\gm-build` on Windows PowerShell and
-`./gm-build` on macOS or Linux.
+Run commands from the GlassSDK root. Use `py build.py` on Windows PowerShell and
+`python3 build.py` on macOS or Linux.
 
 Build one top-level example:
 
 ```text
-gm-build build --example bluetooth
+python3 build.py build --example bluetooth
 ```
 
 Build one nested example:
 
 ```text
-gm-build build --example game/2048
+python3 build.py build --example game/2048
 ```
 
-Use `gm-build all` only when the developer requests a complete maintained
-example build. Use `gm-build inspect --example <path>` when ELF inspection is
-needed. Do not run `clean` as a generic first fix because it removes outputs
-and the current platform's build cache.
+Use `python3 build.py all` only when the developer requests a complete
+maintained example build. Use `python3 build.py inspect --example <path>` when
+ELF inspection is needed. On Windows, replace `python3` with `py`. Do not run
+`clean` as a generic first fix because it removes outputs and the current
+platform's build cache.
 
-Generated artifacts are under `build-host/<example>/`. Locate and report the
-actual `.gmp` rather than guessing its file name.
+Generated artifacts are under `build-host/.build/<example>/`. Locate and report
+the actual `.gmp` rather than guessing its file name.
 
 ## Preview or install
 
 - For local simulation, preserve the complete public repository layout and use
   a compatible prebuilt Desktop Studio. Read [studio.md](studio.md).
-- For physical glasses, read the local `INSTALLATION.md` before starting the
-  debug server. Build and serve only the intended package.
-- The debug QR channel is unauthenticated and unencrypted. Use it only on a
-  trusted LAN and state that the server runs until `Ctrl+C`.
+- For physical glasses, read the local `INSTALLATION.md`, select the intended
+  package in Desktop Studio, and use Studio's developer-app QR code.
+- The Studio QR channel is unauthenticated and unencrypted. Use it only on a
+  trusted LAN.
 - Only one plugin is currently installed at a time, and it is not persisted
   across a glasses reboot.
 
 ## Verification
 
-- Confirm the `.gmp` exists below `build-host/` and that the build selected the
-  expected RISC-V toolchain.
+- Confirm the `.gmp` exists below `build-host/.build/` and that the build
+  selected the expected RISC-V toolchain.
 - Preview lifecycle, display, button/accessory input, gesture or raw IMU,
   locale, Bluetooth, and plugin logs as applicable.
 - For a physical installation, confirm the App accepts the package and the

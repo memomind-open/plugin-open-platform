@@ -33,20 +33,26 @@ every platform prerequisite preemptively.
 
 ## Command conventions
 
+From a complete Plugin Open Platform root, `./tools/build` on macOS/Linux and
+`.\tools\build` in Windows PowerShell are the short incremental build commands.
+Both launch the same top-level `build.py`, which packages Web plugins with
+Node.js and delegates glasses plugins to the existing CMake/Ninja backend. The
+resulting packages can run through an iOS App, but iOS itself is not a supported
+build host. A future native iOS build step must run on macOS with Xcode.
+
 ### Windows
 
 - Run GlassSDK commands in PowerShell or Windows Terminal using PowerShell.
   Command Prompt is not supported.
-- From the GlassSDK root, invoke the driver as `./gm-build.exe` or
-  `.\gm-build`. Prefer the spelling documented by the local SDK checkout.
+- From the platform root, invoke `.\tools\build`. From a standalone GlassSDK
+  root, invoke `py build.py`.
 - Quote paths with spaces and use resolved absolute paths when passing a plugin
   directory to Studio or packaging tools.
 
 ### macOS and Linux
 
-- Invoke the GlassSDK driver as `./gm-build` from the SDK root.
-- If executable permission was lost while copying or extracting the SDK, use
-  `chmod +x gm-build`, then retry. Do not change permissions recursively.
+- From the platform root, invoke `./tools/build`. From a standalone GlassSDK
+  root, invoke `python3 build.py`.
 - Inspect the actual files under `Studio/macos/` or `Studio/linux/` before
   choosing a launch command; release packaging can vary.
 

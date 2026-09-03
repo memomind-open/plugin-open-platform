@@ -19,11 +19,6 @@ import tarfile
 import urllib.request
 import zipfile
 
-try:
-    from .gmp_serve import choose_lan_address, qr_terminal_text, serve_forever, start_server
-except ImportError:
-    from gmp_serve import choose_lan_address, qr_terminal_text, serve_forever, start_server
-
 
 SDK = pathlib.Path(__file__).resolve().parents[2]
 BUILD_INTERNALS = SDK / "build-host" / ".build"
@@ -243,15 +238,6 @@ def install_python_packages(*packages: str) -> None:
         run(command)
 
 
-def example_names() -> tuple[str, ...]:
-    examples = []
-    root = SDK / "examples"
-    for manifest in root.rglob("manifest.json"):
-        if any(manifest.parent.rglob("*.c")):
-            examples.append(manifest.parent.relative_to(root).as_posix())
-    return tuple(sorted(examples))
-
-
 def cmake_target(example: str) -> str:
     return "gm_plugin_" + example.replace("\\", "/").strip("/").replace("/", "_")
 
@@ -265,22 +251,6 @@ def intermediate_elf_path(example: str) -> pathlib.Path:
     normalized = pathlib.PurePosixPath(example.replace("\\", "/").strip("/"))
     return cmake_build_path().joinpath(
         "artifacts", *normalized.parts, f"{normalized.name}.elf"
-    )
-
-
-def latest_package(
-    build_root: pathlib.Path, examples: tuple[str, ...] | None = None,
-) -> pathlib.Path:
-    candidates = [
-        package_path(build_root, example)
-        for example in (examples if examples is not None else example_names())
-        if package_path(build_root, example).is_file()
-    ]
-    if not candidates:
-        raise RuntimeError(f"no built GMP packages found in {build_root}")
-    return max(
-        candidates,
-        key=lambda candidate: (candidate.stat().st_mtime_ns, candidate.as_posix()),
     )
 
 
@@ -340,57 +310,36 @@ def build_cmake(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build GM RISC-V plugins on Windows, macOS, or Linux")
-    parser.add_argument("command", nargs="?", choices=("build", "all", "clean", "inspect", "toolchain", "serve"), default="serve")
+    parser.add_argument("command", nargs="?", choices=("build", "all", "clean", "inspect", "toolchain"), default="build")
     parser.add_argument("--example", help="example path below examples/")
     parser.add_argument("--build-dir", type=pathlib.Path, default=BUILD_INTERNALS)
     parser.add_argument("--insecure-download", action="store_true", help="disable TLS certificate checks; the pinned SHA-256 is still verified")
-    parser.add_argument("--host", help="LAN address encoded in the QR code (auto-detected by default)")
-    parser.add_argument("--port", type=int, default=18765, help="TCP port for serve (default: 18765; use 0 for a free port)")
-    parser.add_argument("--qr-output", type=pathlib.Path, help="QR PNG path for serve (default: next to the GMP)")
-    parser.add_argument("--gmp", type=pathlib.Path, help="serve an existing GMP without rebuilding")
     args = parser.parse_args()
-    serve_after_build = args.command in ("build", "serve")
     build_root = args.build_dir.expanduser().resolve()
     if args.command == "clean":
         shutil.rmtree(cmake_build_path(), ignore_errors=True)
         print("Removed temporary build files; prebuilt GMP packages were kept")
         return 0
-    if args.command == "serve" and args.gmp is not None:
-        gmp = args.gmp.expanduser().resolve()
-    else:
-        if args.command == "toolchain":
-            bin_dir = ensure_toolchain(args.insecure_download)
-            run([tool(bin_dir, "gcc"), "--version"])
-            return 0
-        cmake, ninja = ensure_build_tools()
+    if args.command == "toolchain":
         bin_dir = ensure_toolchain(args.insecure_download)
-        configure_cmake(cmake, ninja, build_root, bin_dir)
-        if args.command == "all":
-            build_cmake(cmake, build_root)
-            return 0
-        if args.example is not None:
-            example = args.example.replace("\\", "/").strip("/")
-            build_cmake(cmake, build_root, cmake_target(example))
-            gmp = package_path(build_root, example)
-        elif args.command == "serve":
-            build_cmake(cmake, build_root)
-            gmp = latest_package(build_root)
-            print(f"Using the most recently updated package: {gmp}")
-        else:
-            example = "game/breakout"
-            build_cmake(cmake, build_root, cmake_target(example))
-            gmp = package_path(build_root, example)
-    if serve_after_build:
-        advertised_host = args.host or choose_lan_address()
-        qr_output = (args.qr_output or gmp.with_suffix(".qr.png")).expanduser().resolve()
-        server, metadata = start_server(gmp, advertised_host, args.port, qr_output)
-        print(f"Serving {gmp}")
-        print(f"Address: {metadata.host}:{metadata.port}")
-        print(f"QR code: {qr_output}")
-        print(qr_terminal_text(metadata.to_qr_payload()))
-        print("Scan the QR code in Aphrodite. Press Ctrl+C to stop.")
-        serve_forever(server)
+        run([tool(bin_dir, "gcc"), "--version"])
         return 0
+    if args.command == "inspect" and args.example is None:
+        parser.error("inspect requires --example")
+    if args.command == "all" and args.example is not None:
+        parser.error("all does not accept --example")
+
+    cmake, ninja = ensure_build_tools()
+    bin_dir = ensure_toolchain(args.insecure_download)
+    configure_cmake(cmake, ninja, build_root, bin_dir)
+    if args.example is None:
+        build_cmake(cmake, build_root)
+        print(f"Built plugins under {build_root}")
+        return 0
+
+    example = args.example.replace("\\", "/").strip("/")
+    build_cmake(cmake, build_root, cmake_target(example))
+    gmp = package_path(build_root, example)
     if args.command == "inspect":
         run([
             tool(bin_dir, "readelf"), "-h", "-l", "-S", "-r", "-s",

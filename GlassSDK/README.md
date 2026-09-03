@@ -9,11 +9,16 @@ The SDK is self-contained and supports Windows x64, macOS Intel/Apple Silicon,
 and Linux x64/ARM64. Python 3.8 or newer is required. GNU Make, CMake, and a
 system-wide compiler installation are not required.
 
+When GlassSDK is kept inside the complete Plugin Open Platform directory, run
+`../tools/build glass` (`..\tools\build glass` in Windows PowerShell) to use
+the top-level discovery and incremental-build entry point. The GlassSDK-local
+commands below remain available for standalone use and single-plugin builds.
+
 ## Quick start
 
 Open a terminal in the SDK root. The first command builds every plugin. Later
 commands use CMake and Ninja's compiler dependency graph to rebuild only the
-affected source files and packages, then start a local QR installation server.
+affected source files and packages.
 
 Windows (PowerShell only):
 
@@ -42,9 +47,9 @@ copies of this SDK reuse the cached compiler. Set
 `GM_RISCV_TOOLCHAIN` to a directory containing `riscv-none-elf-gcc` to use an
 existing compatible toolchain instead.
 
-The driver also installs CMake, Ninja, and the QR generator through the Python
-interpreter it starts when they are absent. Third-party developers do not need
-to install GNU Make, a system compiler, CMake, Ninja, or the QR package first.
+The driver also installs CMake and Ninja through the Python interpreter it
+starts when they are absent. Third-party developers do not need to install GNU
+Make, a system compiler, CMake, or Ninja first.
 
 ## Build your first plugin
 
@@ -90,9 +95,9 @@ refresh action to display the new plugin automatically.
 
 | Command | Description |
 | --- | --- |
-| `python3 build.py` | Rebuild affected plugins, then serve the most recently updated GMP |
-| `python3 build.py build --example bluetooth` | Build one example, then serve its installation QR code |
-| `python3 build.py build --example game/2048` | Build one nested example, then serve its installation QR code |
+| `python3 build.py` | Rebuild all affected plugins |
+| `python3 build.py build --example bluetooth` | Build one example |
+| `python3 build.py build --example game/2048` | Build one nested example |
 | `python3 build.py all` | Build all maintained examples |
 | `python3 build.py inspect --example extension` | Build and inspect the RISC-V ELF |
 | `python3 build.py clean` | Remove temporary build files while keeping prebuilt GMP packages |
@@ -101,17 +106,12 @@ refresh action to display the new plugin automatically.
 Use `py build.py` on Windows PowerShell and `python3 build.py` on macOS/Linux. Outputs are
 stored under `build-host/.build/<example>/`.
 
-## QR package selection
+## Preview and delivery
 
-After a single-example build completes, the driver wraps that example's valid
-`.gmp` in a single-component developer-app ZIP and serves one App-compatible
-QR code. With no command, it instead serves the valid example `.gmp` with the
-newest modification time after the incremental build. This also applies to the
-first full build, a no-change run, and a shared-input change that rebuilds
-several packages. If modification times are identical, the example path
-provides a stable tie-breaker.
-
-See [Developer App ZIP](../APP_BUNDLE.md) for the shared ZIP and LAN protocol.
+The build command only creates `.gmp` packages and exits. Open MemoMind Plugin
+Studio, refresh the workspace, and select the generated package for simulation.
+Studio owns developer-app ZIP assembly, sharing, and QR generation for the
+current phone/glasses selection, including glasses-only plugins.
 
 Examples do not need their own `CMakeLists.txt`. The build driver discovers
 every example directory containing `manifest.json` and compiles all of its
@@ -139,9 +139,9 @@ See [ABI.md](docs/ABI.md) for the complete ABI and lifecycle contract and
 ## Install on glasses
 
 After building, use the prebuilt Desktop Studio under `../Studio/<platform>/`
-for local simulation. To install on physical glasses, run the SDK QR server and
-scan its `mmapp+tcp` developer-app ZIP code from the official App's Developer
-Workbench entry.
+for local simulation. To install on physical glasses, select the package in
+Studio and scan Studio's developer-app QR code from the official App's
+Developer Workbench entry.
 
 The public workflow does not require a separate installer source repository.
 See [INSTALLATION.md](docs/INSTALLATION.md) for the complete preview and
@@ -170,7 +170,7 @@ need:
 
 | Path | Purpose |
 | --- | --- |
-| `build.py` | Single cross-platform build and QR-server entry point |
+| `build.py` | Single cross-platform build and inspection entry point |
 | `examples/` | Plugin source examples to copy or modify |
 | `include/` | Public SDK headers |
 | `docs/` | ABI, graphics, installation, protocol, and security guides |
@@ -214,9 +214,9 @@ the complete ELF file.
 
 ### Why is the plugin gone after reboot?
 
-Plugins currently run from RAM and are not persisted in Flash. Start the SDK or
-Desktop Studio QR server again and reinstall the `.gmp` through the official
-App's GMP debug installation entry after the glasses reboot.
+Plugins currently run from RAM and are not persisted in Flash. Start Desktop
+Studio again and reinstall the `.gmp` with Studio's QR code through the official
+App's Developer Workbench after the glasses reboot.
 
 ### Which graphics API should I use?
 
