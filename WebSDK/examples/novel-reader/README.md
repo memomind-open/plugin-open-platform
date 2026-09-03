@@ -46,6 +46,11 @@ and keeps a small six-window memory cache. Reopening an indexed book does not
 rescan or load the full file. Reading progress is persisted at a throttled
 interval together with its source-window anchor.
 
+Reading mode is saved separately for each book. `Scroll` is the default and
+moves a fixed five-line page continuously. `Page Turn` fills the available
+glasses display and replaces the complete page without a transition. Its
+separate interval slider supports 4 through 20 seconds and defaults to 10.
+
 The three automatic scrolling presets are 8, 16, and 24 pixels per second.
 Saved settings from the earlier 4/8/12 profile are migrated once on open.
 

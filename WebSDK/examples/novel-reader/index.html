@@ -75,12 +75,23 @@
                 <option value="1">Large</option>
               </select>
             </label>
-            <label>Scroll Speed
+            <label>Reading Mode
+              <select id="reading-mode">
+                <option value="scroll" selected>Scroll</option>
+                <option value="page">Page Turn</option>
+              </select>
+            </label>
+            <label id="scroll-speed-setting">Scroll Speed
               <select id="scroll-speed">
                 <option value="8">Slow</option>
                 <option value="16" selected>Standard</option>
                 <option value="24">Fast</option>
               </select>
+            </label>
+            <label id="page-interval-setting" hidden>
+              <span class="setting-heading">Page Interval <output id="page-interval-value">10s</output></span>
+              <input id="page-interval" type="range" min="4" max="20" step="1" value="10">
+              <span class="range-limits"><span>4s</span><span>20s</span></span>
             </label>
             <button id="push-to-glasses" type="button" class="primary">Send to Glasses</button>
           </div>

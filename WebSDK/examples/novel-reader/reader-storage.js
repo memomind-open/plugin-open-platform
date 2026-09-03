@@ -138,6 +138,8 @@ export function createDefaultMetadata(file) {
     bookmarks: [],
     fontMode: 0,
     speed: 16,
+    readingMode: 'scroll',
+    pageIntervalSeconds: 10,
     speedProfileVersion: 2,
     playing: true,
   };

@@ -12,6 +12,13 @@ export const readerControl = Object.freeze({
   pageDown: 6,
   setFont: 7,
   setSpeed: 8,
+  setMode: 9,
+  setPageInterval: 10,
+});
+
+export const readerMode = Object.freeze({
+  scroll: 0,
+  page: 1,
 });
 
 export const readerAction = Object.freeze({
@@ -20,8 +27,16 @@ export const readerAction = Object.freeze({
   bookmark: 3,
 });
 
-export function encodeOpen({ session, totalBytes, offset, fontMode, speed }) {
-  const data = new Uint8Array(16);
+export function encodeOpen({
+  session,
+  totalBytes,
+  offset,
+  fontMode,
+  speed,
+  mode = readerMode.scroll,
+  pageIntervalSeconds = 10,
+}) {
+  const data = new Uint8Array(18);
   const view = new DataView(data.buffer);
   data[0] = PROTOCOL_VERSION;
   data[1] = 1;
@@ -30,6 +45,8 @@ export function encodeOpen({ session, totalBytes, offset, fontMode, speed }) {
   view.setUint32(10, offset);
   data[14] = fontMode === 1 ? 1 : 0;
   data[15] = Math.max(2, Math.min(30, Math.round(speed)));
+  data[16] = mode === readerMode.page ? readerMode.page : readerMode.scroll;
+  data[17] = Math.max(4, Math.min(20, Math.round(pageIntervalSeconds)));
   return data;
 }
 

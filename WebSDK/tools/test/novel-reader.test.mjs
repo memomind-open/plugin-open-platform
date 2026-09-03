@@ -18,11 +18,13 @@ import {
   encodeOpen,
   encodeWindow,
   readerControl,
+  readerMode,
 } from '../../examples/novel-reader/reader-protocol.js';
 import {
   NOVEL_INDEX_VERSION,
   indexPersistentNovel,
   readNovelWindow,
+  readNovelWindowSpan,
 } from '../../examples/novel-reader/reader-file.js';
 import { ReaderStorage } from '../../examples/novel-reader/reader-storage.js';
 
@@ -62,10 +64,15 @@ test('doubles legacy scroll presets exactly once', () => {
 });
 
 test('encodes commands and decodes glasses events in network byte order', () => {
-  const open = encodeOpen({ session: 0x01020304, totalBytes: 9000, offset: 120, fontMode: 1, speed: 16 });
-  assert.equal(open.length, 16);
+  const open = encodeOpen({
+    session: 0x01020304, totalBytes: 9000, offset: 120, fontMode: 1, speed: 16,
+    mode: readerMode.page, pageIntervalSeconds: 12,
+  });
+  assert.equal(open.length, 18);
   assert.deepEqual([...open.slice(2, 6)], [1, 2, 3, 4]);
   assert.equal(open[15], 16);
+  assert.equal(open[16], readerMode.page);
+  assert.equal(open[17], 12);
   const control = encodeControl(0x01020304, readerControl.pageDown, 0);
   assert.equal(control[6], 6);
   const chapter = encodeChapter(0x01020304, '第三章 山雨欲来');
@@ -133,6 +140,44 @@ test('indexes a binary stream and reads only the requested novel window', async 
   assert.equal(calls.some((call) => 'dataBase64' in call), false);
 });
 
+test('fills a forward-reading span across persistent window boundaries', async () => {
+  const lines = Array.from(
+    { length: 2000 },
+    (_, index) => `line-${String(index).padStart(4, '0')} novel text`,
+  );
+  const source = new TextEncoder().encode(lines.join('\r\n'));
+  const normalized = new TextEncoder().encode(lines.join('\n'));
+  const storage = {
+    async openRead(fileId, { offset = 0, length = source.length - offset } = {}) {
+      const selected = source.subarray(offset, offset + length);
+      return {
+        fileId,
+        size: source.length,
+        offset,
+        length,
+        stream: new ReadableStream({
+          start(controller) {
+            controller.enqueue(selected.slice());
+            controller.close();
+          },
+        }),
+      };
+    },
+  };
+  const file = { fileId: '3'.repeat(32), size: source.length };
+  const first = {
+    ...(await readNovelWindow(storage, file, 'utf-8', 0, 1024)),
+    byteOffset: 0,
+  };
+  const start = first.bytes.length - 160;
+  const span = await readNovelWindowSpan(storage, file, 'utf-8', first, start, 1024);
+
+  assert.ok(span.bytes.length > first.bytes.length - start);
+  assert.ok(span.loadedWindows.length >= 1);
+  assert.deepEqual(span.bytes, normalized.subarray(start, start + span.bytes.length));
+  assert.equal(span.final, false);
+});
+
 test('indexes a very long source line with bounded streaming carry-over', async () => {
   const source = new TextEncoder().encode('A'.repeat(1024 * 1024 + 65_537));
   const storage = {
@@ -198,6 +243,8 @@ test('restores metadata by stable fileId and deletes file state together', async
   const [initial] = await firstRun.listBooks();
   assert.equal(initial.fileId, fileId);
   assert.equal(initial.sourceBytes, 32 * 1024 * 1024);
+  assert.equal(initial.readingMode, 'scroll');
+  assert.equal(initial.pageIntervalSeconds, 10);
   const chapters = Array.from({ length: 1200 }, (_, index) => ({
     title: `Chapter ${index} ${'title'.repeat(8)}`,
     sourceOffset: index * 1000,
@@ -208,12 +255,16 @@ test('restores metadata by stable fileId and deletes file state together', async
     indexVersion: NOVEL_INDEX_VERSION,
     chapters,
     progressOffset: 12_345,
+    readingMode: 'page',
+    pageIntervalSeconds: 14,
     bookmarks: [{ offset: 12_345, sourceOffset: 10_000, windowOffset: 12_000 }],
   }, { writeIndex: true });
 
   const restarted = await new ReaderStorage(gm).open();
   const [restored] = await restarted.listBooks();
   assert.equal(restored.progressOffset, 12_345);
+  assert.equal(restored.readingMode, 'page');
+  assert.equal(restored.pageIntervalSeconds, 14);
   assert.equal('chapters' in restored, false);
   const restoredBook = await restarted.getBook(fileId);
   assert.deepEqual(restoredBook.meta.chapters, chapters);
