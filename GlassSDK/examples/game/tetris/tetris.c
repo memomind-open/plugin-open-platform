@@ -314,11 +314,8 @@ static bool begin_line_clear(tetris_t *self)
     uint8_t y;
     bool found = false;
     for (y = 0; y < ROWS; ++y) {
-        uint8_t x;
-        bool full = true;
-        for (x = 0; x < COLS; ++x)
-            if (self->board[y][x] == 0U) full = false;
-        if (full) {
+        if (self->libc->memchr(self->board[y], 0,
+                              sizeof(self->board[y])) == 0) {
             self->clear_rows[y] = 1U;
             found = true;
         }

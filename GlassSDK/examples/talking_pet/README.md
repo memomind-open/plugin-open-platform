@@ -1,4 +1,4 @@
-# Momo Talking Pet
+# Memo Talking Pet
 
 This device example is the native companion for the WebSDK `talking-pet`
 example. It draws only the center playroom and character through the native
@@ -45,7 +45,7 @@ use the standard `gm.device-events` uplink channel. Pet actions
 are controlled by the phone state packet; the device plugin does not subscribe
 to or process IMU gesture events.
 
-The checked-in `momo_sprites.h` is reproducible from the transparent sprite
+The checked-in `memo_sprites.h` is reproducible from the transparent sprite
 sheet. Install Pillow only when regenerating this optional asset:
 
 ```sh

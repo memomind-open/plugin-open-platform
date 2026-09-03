@@ -1,6 +1,6 @@
 {
   "id": "com.memomind.example.talking-pet",
-  "name": "Momo Talking Pet",
+  "name": "Memo Talking Pet",
   "version": "0.7.2",
   "entry": "index.html",
   "bridgeVersion": "1.0",

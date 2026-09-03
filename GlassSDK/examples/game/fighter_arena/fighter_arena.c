@@ -504,16 +504,12 @@ static void text(gm_plugin_framebuffer_surface_t *surface, int16_t x,
     }
 }
 
-static uint8_t text_length(const char *value)
-{
-    return (uint8_t)game.libc->strlen(value);
-}
-
 static void centered_text(gm_plugin_framebuffer_surface_t *surface,
                           uint16_t width, int16_t y, const char *value,
                           uint8_t scale, uint8_t gray)
 {
-    int16_t x = (int16_t)((width - text_length(value) * 4U * scale) / 2U);
+    int16_t x = (int16_t)((width - game.libc->strlen(value) * 4U * scale) /
+                          2U);
     text(surface, x, y, value, scale, gray);
 }
 
@@ -522,7 +518,7 @@ static void centered_text_panel(gm_plugin_framebuffer_surface_t *surface,
                                 const char *value, uint8_t scale,
                                 uint8_t gray)
 {
-    int16_t text_width = (int16_t)(text_length(value) * 4U * scale);
+    int16_t text_width = (int16_t)(game.libc->strlen(value) * 4U * scale);
     int16_t x = (int16_t)((width - text_width) / 2U);
     rectangle(surface, (int16_t)(x - 3 * scale),
               (int16_t)(y - 2 * scale),
@@ -567,17 +563,6 @@ static void draw_exit_countdown(game_t *self,
     centered_text(surface, self->width,
                   (int16_t)(center_y + 2 * self->scale),
                   "EXIT", self->scale, 10U);
-}
-
-static void number_text(char *output, size_t capacity, uint32_t value)
-{
-    game.libc->snprintf(output, capacity, "%u", (unsigned int)value);
-}
-
-static void clear_slice(gm_plugin_framebuffer_surface_t *surface)
-{
-    game.libc->memset(surface->pixels, 0,
-                          (size_t)surface->height * surface->stride);
 }
 
 static uint8_t sprite_frame(const fighter_t *fighter)
@@ -831,19 +816,19 @@ static void draw_hud(game_t *self, gm_plugin_framebuffer_surface_t *surface)
     rectangle(surface, (int16_t)(self->width - margin - ui - cpu_health),
               (int16_t)(ui * 3U), cpu_health,
               (int16_t)(bar_h - ui * 2U), 11U);
-    number_text(timer, sizeof(timer),
-                (self->round_left_ms + 999U) / 1000U);
+    self->libc->snprintf(timer, sizeof(timer), "%u",
+                        (unsigned int)((self->round_left_ms + 999U) / 1000U));
     centered_text(surface, self->width, (int16_t)(ui * 2U), timer, ui, 15U);
     text(surface, margin, (int16_t)(ui * 15U),
          characters[self->player.character].name, label, 13U);
     text(surface, (int16_t)(margin +
-         (text_length(characters[self->player.character].name) + 1U) *
+         (game.libc->strlen(characters[self->player.character].name) + 1U) *
          4U * label), (int16_t)(ui * 15U), "HP", label, 15U);
     text(surface, (int16_t)(self->width - margin -
-         (text_length(characters[self->cpu.character].name) + 3U) *
+         (game.libc->strlen(characters[self->cpu.character].name) + 3U) *
          4U * label), (int16_t)(ui * 15U), "HP", label, 12U);
     text(surface, (int16_t)(self->width - margin -
-         text_length(characters[self->cpu.character].name) * 4U * label),
+         game.libc->strlen(characters[self->cpu.character].name) * 4U * label),
          (int16_t)(ui * 15U), characters[self->cpu.character].name, label, 10U);
     text(surface, margin, (int16_t)(ui * 20U), "EN", label, 12U);
     outline_rectangle(surface, player_meter_x, (int16_t)(ui * 20U),
@@ -1003,7 +988,7 @@ static void draw_interstitial(game_t *self,
     const char *message;
     const char *prompt = 0;
     char score[4];
-    char max_hit[12] = "MAX HIT ";
+    char max_hit[12];
     if (self->screen == SCREEN_INTRO)
         message = self->screen_ms > 700U ? "ROUND READY" : "FIGHT!";
     else if (self->screen == SCREEN_ROUND_OVER)
@@ -1028,14 +1013,14 @@ static void draw_interstitial(game_t *self,
                       characters[self->selected_character].name,
                       self->scale, 11U);
     if (self->screen == SCREEN_ENDING || self->screen == SCREEN_GAME_OVER) {
-        score[0] = (char)('0' + self->player_rounds);
-        score[1] = '-';
-        score[2] = (char)('0' + self->cpu_rounds);
-        score[3] = '\0';
+        self->libc->snprintf(score, sizeof(score), "%u-%u",
+                            (unsigned int)self->player_rounds,
+                            (unsigned int)self->cpu_rounds);
         centered_text(surface, self->width,
                       (int16_t)(self->height / 2U + 20 * self->scale),
                       score, self->scale, 15U);
-        number_text(&max_hit[8], sizeof(max_hit) - 8U, self->max_combo);
+        self->libc->snprintf(max_hit, sizeof(max_hit), "MAX HIT %u",
+                            (unsigned int)self->max_combo);
         centered_text(surface, self->width,
                       (int16_t)(self->height / 2U + 28 * self->scale),
                       max_hit, self->scale, 10U);
@@ -1087,7 +1072,8 @@ static void draw_fight(game_t *self, gm_plugin_framebuffer_surface_t *surface)
     if (self->combo >= 2U && self->combo_ms != 0U) {
         char count[4];
         int16_t combo_x;
-        number_text(count, sizeof(count), self->combo);
+        self->libc->snprintf(count, sizeof(count), "%u",
+                            (unsigned int)self->combo);
         combo_x = (int16_t)(self->cpu.x + FIGHTER_W * self->scale / 2 -
                   5 * 4 * self->scale / 2);
         if (combo_x < 4 * self->scale) combo_x = (int16_t)(4 * self->scale);
@@ -1103,7 +1089,8 @@ static void draw_fight(game_t *self, gm_plugin_framebuffer_surface_t *surface)
 
 static void draw_slice(game_t *self, gm_plugin_framebuffer_surface_t *surface)
 {
-    clear_slice(surface);
+    self->libc->memset(surface->pixels, 0,
+                       (size_t)surface->height * surface->stride);
     if (self->screen == SCREEN_TITLE) draw_title(self, surface);
     else if (self->screen == SCREEN_DIFFICULTY)
         draw_select(self, surface);
@@ -1157,44 +1144,18 @@ static gm_plugin_result_t render(game_t *self)
     return GM_PLUGIN_OK;
 }
 
-static void clear_projectiles(game_t *self)
-{
-    uint8_t index;
-    for (index = 0; index < PROJECTILE_COUNT; ++index)
-        self->projectiles[index].active = false;
-}
-
 static void reset_fighter(fighter_t *fighter, uint8_t character,
                           int16_t x, int16_t ground, bool facing_right,
                           uint8_t scale)
 {
+    game.libc->memset(fighter, 0, sizeof(*fighter));
     fighter->x = x;
     fighter->y = (int16_t)(ground - FIGHTER_H * scale);
-    fighter->velocity_y = 0;
     fighter->health = characters[character].health;
     fighter->energy = 50U;
     fighter->guard = 100U;
-    fighter->guard_recovery_ms = 0U;
-    fighter->attack_ms = 0U;
-    fighter->hurt_ms = 0U;
-    fighter->hurt_total_ms = 0U;
-    fighter->block_stun_ms = 0U;
-    fighter->landing_ms = 0U;
-    fighter->turn_ms = 0U;
-    fighter->walk_anim_ms = 0U;
     fighter->character = character;
-    fighter->attack = ATTACK_NONE;
-    fighter->queued_attack = ATTACK_NONE;
-    fighter->hurt_kind = HURT_NONE;
     fighter->facing_right = facing_right;
-    fighter->crouching = false;
-    fighter->blocking = false;
-    fighter->hurt_right = false;
-    fighter->hit_landed = false;
-    fighter->special_spawned = false;
-    fighter->walk_phase = false;
-    fighter->moving = false;
-    fighter->turning = false;
 }
 
 static void reset_round(game_t *self)
@@ -1206,7 +1167,7 @@ static void reset_round(game_t *self)
                   (int16_t)(self->width * 3U / 4U -
                             FIGHTER_W * self->scale / 2U),
                   self->ground_y, false, self->scale);
-    clear_projectiles(self);
+    self->libc->memset(self->projectiles, 0, sizeof(self->projectiles));
     self->round_left_ms = ROUND_MS;
     self->hit_stop_ms = 0U;
     self->impact_ms = 0U;

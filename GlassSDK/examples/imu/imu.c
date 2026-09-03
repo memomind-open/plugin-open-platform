@@ -12,14 +12,6 @@
 #define POSE_EXIT_THRESHOLD 5
 #define HEAD_SPRITE_ROW_BYTES ((HEAD_SPRITE_WIDTH + 1U) / 2U)
 
-typedef struct {
-    const uint8_t *data;
-    uint32_t size;
-    uint32_t offset;
-    uint8_t remaining;
-    uint8_t value;
-} sprite_reader_t;
-
 static const gm_plugin_host_api_t *s_host;
 static const gm_plugin_lvgl_api_t *s_lvgl;
 static const gm_plugin_libc_extension_api_t *s_libc;
@@ -103,26 +95,6 @@ static void set_axis_text(gm_plugin_lvgl_obj_t *label, const char *prefix,
     s_lvgl->label_set_text(label, text);
 }
 
-static void reader_init(sprite_reader_t *reader, uint8_t frame)
-{
-    reader->data = head_sprites[frame];
-    reader->size = head_sprite_sizes[frame];
-    reader->offset = 0;
-    reader->remaining = 0;
-    reader->value = 0;
-}
-
-static uint8_t reader_next(sprite_reader_t *reader)
-{
-    if (reader->remaining == 0U) {
-        if (reader->offset + 1U >= reader->size) return 0;
-        reader->remaining = reader->data[reader->offset++];
-        reader->value = reader->data[reader->offset++];
-    }
-    --reader->remaining;
-    return reader->value;
-}
-
 static uint8_t select_pose_axis(int16_t value, uint8_t current)
 {
     if (current == 0U) {
@@ -140,19 +112,41 @@ static uint8_t select_pose_axis(int16_t value, uint8_t current)
 
 static void decode_sprite(void)
 {
-    sprite_reader_t reader;
-    uint32_t sprite_index;
-    reader_init(&reader, (uint8_t)(s_sprite_row * 3U + s_sprite_column));
-    for (sprite_index = 0;
-         sprite_index < HEAD_SPRITE_WIDTH * HEAD_SPRITE_HEIGHT;
-         ++sprite_index) {
-        uint8_t gray = reader_next(&reader);
-        uint32_t byte_index = sprite_index >> 1;
-        if ((sprite_index & 1U) == 0U)
-            s_sprite_pixels[byte_index] = (uint8_t)(gray << 4);
-        else
-            s_sprite_pixels[byte_index] |= gray;
+    uint8_t frame = (uint8_t)(s_sprite_row * 3U + s_sprite_column);
+    const uint8_t *encoded = head_sprites[frame];
+    uint32_t encoded_size = head_sprite_sizes[frame];
+    uint32_t offset = 0U;
+    uint32_t pixel = 0U;
+    const uint32_t pixel_count = HEAD_SPRITE_WIDTH * HEAD_SPRITE_HEIGHT;
+    while (offset + 1U < encoded_size && pixel < pixel_count) {
+        uint32_t run = encoded[offset++];
+        uint8_t gray = (uint8_t)(encoded[offset++] & 0x0FU);
+        uint8_t packed = (uint8_t)((gray << 4) | gray);
+        uint32_t bytes;
+        if (run > pixel_count - pixel) run = pixel_count - pixel;
+        if ((pixel & 1U) != 0U && run != 0U) {
+            s_sprite_pixels[pixel >> 1] |= gray;
+            ++pixel;
+            --run;
+        }
+        bytes = run >> 1;
+        if (bytes != 0U) {
+            s_libc->memset(s_sprite_pixels + (pixel >> 1), packed, bytes);
+            pixel += bytes << 1;
+            run &= 1U;
+        }
+        if (run != 0U) {
+            s_sprite_pixels[pixel >> 1] = (uint8_t)(gray << 4);
+            ++pixel;
+        }
     }
+    if ((pixel & 1U) != 0U) {
+        s_sprite_pixels[pixel >> 1] &= 0xF0U;
+        ++pixel;
+    }
+    if (pixel < pixel_count)
+        s_libc->memset(s_sprite_pixels + (pixel >> 1), 0,
+                       (pixel_count - pixel) >> 1);
 }
 
 static gm_plugin_result_t render_sprite(void)

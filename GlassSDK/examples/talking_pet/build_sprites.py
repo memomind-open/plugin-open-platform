@@ -7,8 +7,8 @@ from typing import List
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parent
-SOURCE = ROOT / "assets" / "momo-sprites.png"
-OUTPUT = ROOT / "momo_sprites.h"
+SOURCE = ROOT / "assets" / "memo-sprites.png"
+OUTPUT = ROOT / "memo_sprites.h"
 FRAME_WIDTH = 144
 FRAME_HEIGHT = 184
 ALPHA_CUTOFF = 40
@@ -141,16 +141,16 @@ def main() -> None:
         montage.convert("RGB").save(arguments.preview)
 
     lines = [
-        "#ifndef MOMO_SPRITES_H",
-        "#define MOMO_SPRITES_H",
+        "#ifndef MEMO_SPRITES_H",
+        "#define MEMO_SPRITES_H",
         "",
-        f"#define MOMO_SPRITE_WIDTH {FRAME_WIDTH}U",
-        f"#define MOMO_SPRITE_HEIGHT {FRAME_HEIGHT}U",
-        f"#define MOMO_SPRITE_COUNT {len(frames)}U",
+        f"#define MEMO_SPRITE_WIDTH {FRAME_WIDTH}U",
+        f"#define MEMO_SPRITE_HEIGHT {FRAME_HEIGHT}U",
+        f"#define MEMO_SPRITE_COUNT {len(frames)}U",
         "",
     ]
     for index, data in enumerate(frames):
-        lines.append(f"static const uint8_t momo_sprite_{index}[] = {{")
+        lines.append(f"static const uint8_t memo_sprite_{index}[] = {{")
         for offset in range(0, len(data), 20):
             chunk = ", ".join(
                 f"0x{value:02X}" for value in data[offset : offset + 20]
@@ -158,17 +158,17 @@ def main() -> None:
             lines.append(f"    {chunk},")
         lines.append("};")
         lines.append("")
-    lines.append("static const uint8_t *const momo_sprites[MOMO_SPRITE_COUNT] = {")
+    lines.append("static const uint8_t *const memo_sprites[MEMO_SPRITE_COUNT] = {")
     lines.append(
         "    "
-        + ", ".join(f"momo_sprite_{index}" for index in range(len(frames)))
+        + ", ".join(f"memo_sprite_{index}" for index in range(len(frames)))
         + ","
     )
     lines.append("};")
-    lines.append("static const uint32_t momo_sprite_sizes[MOMO_SPRITE_COUNT] = {")
+    lines.append("static const uint32_t memo_sprite_sizes[MEMO_SPRITE_COUNT] = {")
     lines.append(
         "    "
-        + ", ".join(f"sizeof(momo_sprite_{index})" for index in range(len(frames)))
+        + ", ".join(f"sizeof(memo_sprite_{index})" for index in range(len(frames)))
         + ","
     )
     lines.append("};")

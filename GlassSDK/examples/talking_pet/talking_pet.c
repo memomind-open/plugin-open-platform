@@ -1,6 +1,6 @@
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_libc.h"
-#include "momo_sprites.h"
+#include "memo_sprites.h"
 
 #define PET_STATE_CHANNEL UINT16_C(0x4D50)
 #define BUTTON_CHANNEL UINT16_C(0x0100)
@@ -150,11 +150,6 @@ static void ellipse(gm_plugin_framebuffer_surface_t *surface,
     }
 }
 
-static void number_text(char *output, size_t capacity, uint32_t value)
-{
-    s_pet.libc->snprintf(output, capacity, "%u", (unsigned int)value);
-}
-
 static const char *mood_text(uint8_t mood)
 {
     static const char *const messages[] = {
@@ -288,17 +283,15 @@ static void update_text_labels(pet_t *self)
     uint8_t values[3] = {self->happy, self->food, self->energy};
     uint8_t index;
     for (index = 0; index < 3U; ++index) {
-        number_text(number, sizeof(number), values[index]);
+        self->libc->snprintf(number, sizeof(number), "%u",
+                            (unsigned int)values[index]);
         self->ui->label_set_text(self->stat_value_labels[index], number);
         if (self->stat_bar_fills[index] != 0)
             self->ui->obj_set_size(self->stat_bar_fills[index],
                                    (int16_t)(118U * values[index] / 100U), 6);
     }
-    number[0] = 'L';
-    number[1] = 'V';
-    number[2] = '.';
-    number[3] = ' ';
-    number_text(number + 4, sizeof(number) - 4U, self->level);
+    self->libc->snprintf(number, sizeof(number), "LV. %u",
+                        (unsigned int)self->level);
     self->ui->label_set_text(self->level_label, number);
     self->ui->label_set_text(self->mood_label, mood_text(self->mood));
 }
@@ -356,7 +349,7 @@ static gm_plugin_result_t create_text_ui(pet_t *self)
                         GM_PLUGIN_LVGL_STYLE_TEXT_LINE_SPACE,
                         gm_plugin_lvgl_style_number(2),
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
-    self->ui->label_set_text(self->title_label, "MOMO");
+    self->ui->label_set_text(self->title_label, "MEMO");
     self->ui->label_set_text(self->subtitle_label, "/ PLAYROOM");
     for (index = 0; index < 3U; ++index)
         self->ui->label_set_text(self->stat_name_labels[index], names[index]);
@@ -389,7 +382,7 @@ static void sprite_offset(const pet_t *self, int16_t *x, int16_t *y)
 {
     static const int8_t bounce[10] = {0,-5,-12,-20,-26,-20,-12,-5,0,2};
     uint32_t step = self->animation_ms / FRAME_MS;
-    *x = (int16_t)((self->width - MOMO_SPRITE_WIDTH) / 2U);
+    *x = (int16_t)((self->width - MEMO_SPRITE_WIDTH) / 2U);
     *y = 91;
     if (self->mood == MOOD_HAPPY) *y += bounce[step % 10U] / 3;
     else if (self->mood == MOOD_EATING) *x += (step & 1U) != 0U ? 2 : -2;
@@ -411,29 +404,34 @@ static void draw_sprite(gm_plugin_framebuffer_surface_t *surface,
                         const pet_t *self)
 {
     uint8_t frame = sprite_frame(self);
-    const uint8_t *encoded = momo_sprites[frame];
-    uint32_t encoded_size = momo_sprite_sizes[frame];
+    const uint8_t *encoded = memo_sprites[frame];
+    uint32_t encoded_size = memo_sprite_sizes[frame];
     uint32_t offset = 0;
     uint32_t index = 0;
     int16_t sprite_x;
     int16_t sprite_y;
     sprite_offset(self, &sprite_x, &sprite_y);
     while (offset + 1U < encoded_size &&
-           index < MOMO_SPRITE_WIDTH * MOMO_SPRITE_HEIGHT) {
-        uint8_t count = encoded[offset++];
+           index < MEMO_SPRITE_WIDTH * MEMO_SPRITE_HEIGHT) {
+        uint32_t count = encoded[offset++];
         uint8_t value = encoded[offset++];
-        uint8_t run;
-        for (run = 0;
-             run < count && index < MOMO_SPRITE_WIDTH * MOMO_SPRITE_HEIGHT;
-             ++run, ++index) {
-            int16_t y;
-            if (value == 0U) continue;
-            y = (int16_t)(sprite_y + index / MOMO_SPRITE_WIDTH);
+        uint32_t remaining = MEMO_SPRITE_WIDTH * MEMO_SPRITE_HEIGHT - index;
+        if (count > remaining) count = remaining;
+        if (value == 0U) {
+            index += count;
+            continue;
+        }
+        while (count != 0U) {
+            uint32_t column = index % MEMO_SPRITE_WIDTH;
+            uint32_t chunk = MEMO_SPRITE_WIDTH - column;
+            int16_t y = (int16_t)(sprite_y + index / MEMO_SPRITE_WIDTH);
+            if (chunk > count) chunk = count;
             if (y >= (int16_t)surface->y &&
                 y < (int16_t)(surface->y + surface->height))
-                pixel(surface,
-                      (int16_t)(sprite_x + index % MOMO_SPRITE_WIDTH),
-                      y, (uint8_t)(value - 1U));
+                rectangle(surface, (int16_t)(sprite_x + column), y,
+                          (int16_t)chunk, 1, (uint8_t)(value - 1U));
+            index += chunk;
+            count -= chunk;
         }
     }
 }

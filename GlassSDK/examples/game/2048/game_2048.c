@@ -208,10 +208,11 @@ static bool move_board(game_2048_t *self, move_direction_t direction)
             line[index] = original[index];
         }
         merge_line(self, line);
+        if (self->libc->memcmp(line, original, sizeof(line)) != 0)
+            changed = true;
         for (index = 0; index < BOARD_SIZE; ++index) {
             uint8_t y;
             uint8_t x;
-            if (line[index] != original[index]) changed = true;
             if (direction == MOVE_LEFT || direction == MOVE_RIGHT) {
                 y = outer;
                 x = direction == MOVE_LEFT ? index :
