@@ -23,6 +23,8 @@
 #define CONTROL_PAGE_DOWN 6U
 #define CONTROL_SET_FONT 7U
 #define CONTROL_SET_SPEED 8U
+#define CONTROL_SET_MODE 9U
+#define CONTROL_SET_PAGE_INTERVAL 10U
 #define ACTION_PREVIOUS_CHAPTER 1U
 #define ACTION_NEXT_CHAPTER 2U
 #define ACTION_BOOKMARK 3U
@@ -32,6 +34,11 @@
 #define DEFAULT_SPEED 16U
 #define MIN_SPEED 2U
 #define MAX_SPEED 30U
+#define MODE_SCROLL 0U
+#define MODE_PAGE 1U
+#define DEFAULT_PAGE_INTERVAL_SECONDS 10U
+#define MIN_PAGE_INTERVAL_SECONDS 4U
+#define MAX_PAGE_INTERVAL_SECONDS 20U
 
 #define WINDOW_BYTES 12288U
 #define PAGE_BYTES 4096U
@@ -47,7 +54,7 @@
 
 #define SIDE_MARGIN 20
 #define TOP_MARGIN 8
-#define BOTTOM_MARGIN 30
+#define BOTTOM_MARGIN 5
 #define LINE_SPACE 5
 
 typedef struct {
@@ -77,6 +84,7 @@ typedef struct {
     uint32_t resume_offset;
     uint32_t scroll_fraction;
     uint32_t scroll_elapsed;
+    uint32_t page_elapsed;
     uint32_t progress_elapsed;
     uint32_t notice_elapsed;
     uint32_t exit_elapsed;
@@ -90,6 +98,8 @@ typedef struct {
     uint8_t history_count;
     uint8_t font_mode;
     uint8_t speed;
+    uint8_t reading_mode;
+    uint8_t page_interval_seconds;
     uint8_t active;
     uint8_t next_ready;
     uint8_t final_window;
@@ -244,18 +254,29 @@ static void calculate_layout(novel_reader_t *self)
 {
     int16_t lines;
     int16_t maximum_lines;
+    int16_t header_y;
     int16_t viewport_y;
     self->line_height = (int16_t)(self->ui->font_get_line_height(
         active_font(self)) + LINE_SPACE);
     if (self->line_height < 1) self->line_height = 1;
-    maximum_lines = self->viewport_height / self->line_height;
-    lines = VISIBLE_LINES;
+    maximum_lines = (int16_t)(self->viewport_height / self->line_height - 1);
+    lines = self->reading_mode == MODE_PAGE ? maximum_lines : VISIBLE_LINES;
     if (lines > maximum_lines) lines = maximum_lines;
     if (lines < 2) lines = 2;
     if (lines > (int16_t)MAX_PAGE_LINES) lines = MAX_PAGE_LINES;
     self->page_height = (int16_t)(lines * self->line_height);
     viewport_y = (int16_t)(TOP_MARGIN + self->viewport_height -
         self->page_height);
+    header_y = (int16_t)(viewport_y - self->line_height);
+    if (header_y < TOP_MARGIN) header_y = TOP_MARGIN;
+    self->ui->obj_set_pos(self->chapter_label, SIDE_MARGIN, header_y);
+    self->ui->obj_set_size(self->chapter_label,
+                           (int16_t)(self->viewport_width - 100),
+                           self->line_height);
+    self->ui->obj_set_pos(self->footer,
+                          (int16_t)(SIDE_MARGIN + self->viewport_width - 92),
+                          header_y);
+    self->ui->obj_set_size(self->footer, 92, self->line_height);
     self->ui->obj_set_pos(self->viewport, SIDE_MARGIN, viewport_y);
     self->ui->obj_set_size(self->viewport, self->viewport_width,
                            self->page_height);
@@ -313,6 +334,9 @@ static void request_seek(novel_reader_t *self, uint32_t offset)
     self->next_ready = 0U;
     self->resume_offset = offset;
     self->scroll_y = 0;
+    self->scroll_fraction = 0U;
+    self->scroll_elapsed = 0U;
+    self->page_elapsed = 0U;
     self->waiting = 0U;
     self->ui->obj_add_flag(self->page[0], GM_PLUGIN_LVGL_FLAG_HIDDEN);
     self->ui->obj_add_flag(self->page[1], GM_PLUGIN_LVGL_FLAG_HIDDEN);
@@ -356,6 +380,7 @@ static void promote_page(novel_reader_t *self)
     self->current_page = (uint8_t)(1U - self->current_page);
     self->scroll_y = 0;
     self->scroll_fraction = 0U;
+    self->page_elapsed = 0U;
     self->next_ready = 0U;
     prepare_following_page(self);
     position_pages(self);
@@ -412,6 +437,7 @@ static void reset_private_data(novel_reader_t *self)
     self->scroll_y = 0;
     self->scroll_fraction = 0U;
     self->scroll_elapsed = 0U;
+    self->page_elapsed = 0U;
     self->progress_elapsed = 0U;
     self->notice_elapsed = 0U;
     self->shown_percent = 0xffU;
@@ -462,7 +488,7 @@ static void set_exit_source(novel_reader_t *self, uint8_t source, bool active)
 static bool handle_open(novel_reader_t *self, const uint8_t *data,
                         uint32_t length)
 {
-    if (length != 16U) return false;
+    if (length < 16U || length > 18U) return false;
     reset_private_data(self);
     self->session = read_u32(data + 2);
     self->total_bytes = read_u32(data + 6);
@@ -471,6 +497,13 @@ static bool handle_open(novel_reader_t *self, const uint8_t *data,
     self->speed = data[15];
     if (self->speed < MIN_SPEED) self->speed = DEFAULT_SPEED;
     if (self->speed > MAX_SPEED) self->speed = MAX_SPEED;
+    self->reading_mode = length >= 17U && data[16] == MODE_PAGE
+        ? MODE_PAGE : MODE_SCROLL;
+    self->page_interval_seconds = length >= 18U ? data[17]
+        : DEFAULT_PAGE_INTERVAL_SECONDS;
+    if (self->page_interval_seconds < MIN_PAGE_INTERVAL_SECONDS ||
+        self->page_interval_seconds > MAX_PAGE_INTERVAL_SECONDS)
+        self->page_interval_seconds = DEFAULT_PAGE_INTERVAL_SECONDS;
     if (self->session == 0U || self->total_bytes == 0U ||
         self->resume_offset >= self->total_bytes)
         return false;
@@ -537,8 +570,14 @@ static bool handle_control(novel_reader_t *self, const uint8_t *data,
         self->playing = 0U;
         show_notice(self, "Paused");
         break;
-    case CONTROL_LINE_UP: advance_pixels(self, (int16_t)-self->line_height); break;
-    case CONTROL_LINE_DOWN: advance_pixels(self, self->line_height); break;
+    case CONTROL_LINE_UP:
+        self->page_elapsed = 0U;
+        advance_pixels(self, (int16_t)-self->line_height);
+        break;
+    case CONTROL_LINE_DOWN:
+        self->page_elapsed = 0U;
+        advance_pixels(self, self->line_height);
+        break;
     case CONTROL_PAGE_UP: previous_page(self); break;
     case CONTROL_PAGE_DOWN: advance_pixels(self, self->page_height); break;
     case CONTROL_SET_FONT:
@@ -551,6 +590,24 @@ static bool handle_control(novel_reader_t *self, const uint8_t *data,
     }
     case CONTROL_SET_SPEED:
         if (value >= MIN_SPEED && value <= MAX_SPEED) self->speed = (uint8_t)value;
+        break;
+    case CONTROL_SET_MODE:
+    {
+        uint32_t offset = visible_offset(self);
+        self->reading_mode = value == MODE_PAGE ? MODE_PAGE : MODE_SCROLL;
+        calculate_layout(self);
+        self->scroll_fraction = 0U;
+        self->scroll_elapsed = 0U;
+        self->page_elapsed = 0U;
+        request_seek(self, offset);
+        break;
+    }
+    case CONTROL_SET_PAGE_INTERVAL:
+        if (value >= MIN_PAGE_INTERVAL_SECONDS &&
+            value <= MAX_PAGE_INTERVAL_SECONDS) {
+            self->page_interval_seconds = (uint8_t)value;
+            self->page_elapsed = 0U;
+        }
         break;
     default: return false;
     }
@@ -640,10 +697,6 @@ static gm_plugin_result_t create_ui(novel_reader_t *self)
                         number(0), GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->style_set(self->viewport, GM_PLUGIN_LVGL_STYLE_OUTLINE_WIDTH,
                         number(0), GM_PLUGIN_LVGL_SELECTOR_MAIN);
-    self->ui->obj_set_pos(self->chapter_label, SIDE_MARGIN,
-                          (int16_t)(display.height - BOTTOM_MARGIN + 2));
-    self->ui->obj_set_size(self->chapter_label,
-                           (int16_t)(self->viewport_width - 100), 24);
     self->ui->label_set_long_mode(self->chapter_label,
                                   GM_PLUGIN_LVGL_LABEL_CLIP);
     self->ui->style_set(self->chapter_label, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
@@ -651,10 +704,6 @@ static gm_plugin_result_t create_ui(novel_reader_t *self)
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->style_set(self->chapter_label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR,
                         color(0xC0U), GM_PLUGIN_LVGL_SELECTOR_MAIN);
-    self->ui->obj_set_pos(self->footer,
-                          (int16_t)(SIDE_MARGIN + self->viewport_width - 92),
-                          (int16_t)(display.height - BOTTOM_MARGIN + 2));
-    self->ui->obj_set_size(self->footer, 92, 24);
     self->ui->label_set_long_mode(self->footer, GM_PLUGIN_LVGL_LABEL_CLIP);
     self->ui->style_set(self->footer, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
                         number(GM_PLUGIN_LVGL_TEXT_ALIGN_RIGHT),
@@ -713,6 +762,8 @@ static gm_plugin_result_t on_start(void *opaque)
     novel_reader_t *self = opaque;
     self->font_mode = FONT_DEFAULT;
     self->speed = DEFAULT_SPEED;
+    self->reading_mode = MODE_SCROLL;
+    self->page_interval_seconds = DEFAULT_PAGE_INTERVAL_SECONDS;
     self->playing = 0U;
     self->connected = 1U;
     self->session = 0U;
@@ -743,8 +794,10 @@ static void on_loop(void *opaque, uint32_t elapsed_ms)
         show_exit(self);
         return;
     }
-    if (self->active != 0U && self->playing != 0U) {
+    if (self->active != 0U && self->playing != 0U &&
+        self->reading_mode == MODE_SCROLL) {
         uint32_t pixels;
+        self->page_elapsed = 0U;
         self->scroll_elapsed += elapsed_ms;
         if (self->scroll_elapsed > 1000U) self->scroll_elapsed = 1000U;
         if (self->scroll_elapsed >= SCROLL_FRAME_MS) {
@@ -755,8 +808,18 @@ static void on_loop(void *opaque, uint32_t elapsed_ms)
             self->scroll_fraction %= 1000U;
             if (pixels != 0U) advance_pixels(self, (int16_t)pixels);
         }
+    } else if (self->active != 0U && self->playing != 0U) {
+        uint32_t interval = (uint32_t)self->page_interval_seconds * 1000U;
+        self->scroll_elapsed = 0U;
+        self->scroll_fraction = 0U;
+        if (self->page_elapsed < interval) self->page_elapsed += elapsed_ms;
+        if (self->page_elapsed >= interval && self->next_ready != 0U) {
+            self->page_elapsed = 0U;
+            promote_page(self);
+        }
     } else {
         self->scroll_elapsed = 0U;
+        self->page_elapsed = 0U;
     }
     self->progress_elapsed += elapsed_ms;
     if (self->progress_elapsed >= PROGRESS_INTERVAL_MS) {
@@ -788,6 +851,7 @@ static bool handle_button(novel_reader_t *self,
         return true;
     }
     if (action != GM_PLUGIN_BUTTON_ACTION_TRIGGER) return false;
+    self->page_elapsed = 0U;
     switch (button) {
     case GM_PLUGIN_BUTTON_UP:
     case GM_PLUGIN_BUTTON_SCROLL_UP:

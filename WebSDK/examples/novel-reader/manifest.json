@@ -8,7 +8,7 @@
   "deviceRequirements": {
     "requiredPluginId": "com.memomind.example.novel-reader",
     "protocols": [
-      { "id": "gm.novel-reader", "minVersion": "1.2" }
+      { "id": "gm.novel-reader", "minVersion": "1.3" }
     ]
   }
 }

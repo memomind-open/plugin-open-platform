@@ -2,6 +2,7 @@ import {
   detectNovelEncoding,
   isChapterTitle,
   normalizeNovelSegment,
+  trimWindowEnd,
 } from './reader-core.js';
 
 export const NOVEL_INDEX_VERSION = 1;
@@ -53,6 +54,63 @@ export async function readNovelWindow(storage, file, encoding, sourceOffset, max
     bytes: prefix.bytes,
     final: sourceOffset + prefix.sourceLength >= file.size,
   };
+}
+
+export async function readNovelWindowSpan(
+  storage,
+  file,
+  encoding,
+  firstWindow,
+  byteOffset,
+  maxUtf8Bytes,
+) {
+  requirePersistentFile(storage, file);
+  requireLogicalWindow(firstWindow, byteOffset);
+  if (!Number.isSafeInteger(maxUtf8Bytes) || maxUtf8Bytes < 1) {
+    throw new TypeError('maxUtf8Bytes must be a positive integer');
+  }
+  let activeWindow = firstWindow;
+  let cursor = byteOffset;
+  let output = new Uint8Array();
+  let final = false;
+  const loadedWindows = [];
+  while (output.length < maxUtf8Bytes) {
+    requireLogicalWindow(activeWindow, cursor);
+    const localStart = cursor - activeWindow.byteOffset;
+    if (localStart < activeWindow.bytes.length) {
+      const localEnd = trimWindowEnd(
+        activeWindow.bytes,
+        localStart,
+        maxUtf8Bytes - output.length,
+      );
+      if (localEnd <= localStart) break;
+      output = concatenate(output, activeWindow.bytes.subarray(localStart, localEnd));
+      cursor += localEnd - localStart;
+      final = activeWindow.final && localEnd === activeWindow.bytes.length;
+      if (localEnd < activeWindow.bytes.length || final || output.length >= maxUtf8Bytes) break;
+    } else if (activeWindow.final) {
+      final = true;
+      break;
+    }
+    const nextSourceOffset = activeWindow.sourceOffset + activeWindow.sourceLength;
+    if (nextSourceOffset >= file.size) {
+      final = true;
+      break;
+    }
+    const loaded = await readNovelWindow(
+      storage,
+      file,
+      encoding,
+      nextSourceOffset,
+      maxUtf8Bytes,
+    );
+    activeWindow = {
+      ...loaded,
+      byteOffset: activeWindow.byteOffset + activeWindow.bytes.length,
+    };
+    loadedWindows.push(activeWindow);
+  }
+  return { bytes: output, final, loadedWindows };
 }
 
 async function scanNovel(storage, file, encoding, onProgress) {
@@ -296,6 +354,17 @@ function concatenate(left, right) {
   output.set(left);
   output.set(right, left.length);
   return output;
+}
+
+function requireLogicalWindow(window, byteOffset) {
+  if (!(window?.bytes instanceof Uint8Array) ||
+      !Number.isSafeInteger(window.byteOffset) || window.byteOffset < 0 ||
+      !Number.isSafeInteger(window.sourceOffset) || window.sourceOffset < 0 ||
+      !Number.isSafeInteger(window.sourceLength) || window.sourceLength < 1 ||
+      !Number.isSafeInteger(byteOffset) || byteOffset < window.byteOffset ||
+      byteOffset > window.byteOffset + window.bytes.length) {
+    throw new TypeError('A logical novel window containing byteOffset is required');
+  }
 }
 
 function requirePersistentFile(storage, file) {

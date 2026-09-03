@@ -17,12 +17,14 @@ import {
   encodeWindow,
   readerAction,
   readerControl,
+  readerMode,
 } from './reader-protocol.js';
 import { ReaderStorage } from './reader-storage.js';
 import {
   NOVEL_INDEX_VERSION,
   indexPersistentNovel,
   readNovelWindow,
+  readNovelWindowSpan,
 } from './reader-file.js';
 
 const element = (selector) => document.querySelector(selector);
@@ -41,7 +43,12 @@ const progress = element('#progress');
 const progressText = element('#progress-text');
 const playToggle = element('#play-toggle');
 const fontMode = element('#font-mode');
+const readingMode = element('#reading-mode');
 const scrollSpeed = element('#scroll-speed');
+const scrollSpeedSetting = element('#scroll-speed-setting');
+const pageIntervalSetting = element('#page-interval-setting');
+const pageInterval = element('#page-interval');
+const pageIntervalValue = element('#page-interval-value');
 const pushButton = element('#push-to-glasses');
 const status = element('#status');
 const dialog = element('#list-dialog');
@@ -130,10 +137,19 @@ function renderReader() {
     : previewText;
   progress.value = percent;
   progressText.textContent = `${percent.toFixed(1)}%`;
-  playToggle.textContent = playing ? 'Pause Auto-scroll' : 'Resume Auto-scroll';
+  const pageTurnMode = current.readingMode === 'page';
+  playToggle.textContent = playing
+    ? `Pause Auto-${pageTurnMode ? 'turn' : 'scroll'}`
+    : `Resume Auto-${pageTurnMode ? 'turn' : 'scroll'}`;
   playToggle.dataset.control = playing ? 'pause' : 'play';
   fontMode.value = String(current.fontMode ?? 0);
+  readingMode.value = current.readingMode === 'page' ? 'page' : 'scroll';
   scrollSpeed.value = String(current.speed ?? DEFAULT_SCROLL_SPEED);
+  const intervalSeconds = Math.max(4, Math.min(20, current.pageIntervalSeconds ?? 10));
+  pageInterval.value = String(intervalSeconds);
+  pageIntervalValue.textContent = `${intervalSeconds}s`;
+  scrollSpeedSetting.hidden = pageTurnMode;
+  pageIntervalSetting.hidden = !pageTurnMode;
 }
 
 async function reloadBooks() {
@@ -263,11 +279,15 @@ async function loadWindow(sourceOffset, byteOffset, maxBytes = GLASSES_WINDOW_BY
     maxBytes,
   );
   const entry = { ...loaded, byteOffset };
+  cacheWindow(entry);
+  return entry;
+}
+
+function cacheWindow(entry) {
   windowCache = [
-    ...windowCache.filter((window) => window.byteOffset !== byteOffset),
+    ...windowCache.filter((window) => window.byteOffset !== entry.byteOffset),
     entry,
   ].slice(-WINDOW_CACHE_LIMIT);
-  return entry;
 }
 
 async function openOnGlasses(cursorOrOffset) {
@@ -289,6 +309,8 @@ async function openOnGlasses(cursorOrOffset) {
       offset: currentOffset,
       fontMode: current.fontMode ?? 0,
       speed: current.speed ?? DEFAULT_SCROLL_SPEED,
+      mode: current.readingMode === 'page' ? readerMode.page : readerMode.scroll,
+      pageIntervalSeconds: current.pageIntervalSeconds ?? 10,
     }));
     await syncChapter(true);
     setStatus(connected ? 'Novel sent. Waiting for the glasses to request text…' : 'Reading session sent. Waiting for the device to connect.');
@@ -312,14 +334,21 @@ async function sendTextWindow(request) {
       requested,
     );
   }
-  const localStart = start - activeWindow.byteOffset;
-  const localEnd = trimWindowEnd(activeWindow.bytes, localStart, requested);
-  if (localEnd <= localStart) return;
+  const span = await readNovelWindowSpan(
+    database,
+    currentFile,
+    current.encoding,
+    activeWindow,
+    start,
+    requested,
+  );
+  for (const loadedWindow of span.loadedWindows) cacheWindow(loadedWindow);
+  if (span.bytes.length === 0) return;
   await gm.plugin.sendMessage(READER_CHANNEL, encodeWindow({
     session: currentSession,
     offset: start,
-    final: activeWindow.final && localEnd === activeWindow.bytes.length,
-    bytes: activeWindow.bytes.subarray(localStart, localEnd),
+    final: span.final,
+    bytes: span.bytes,
   }));
   setStatus('The glasses received a temporary text window for local layout and scrolling.');
 }
@@ -508,12 +537,32 @@ fontMode.addEventListener('change', async () => {
   await sendControl(readerControl.setFont, current.fontMode);
 });
 
+readingMode.addEventListener('change', async () => {
+  if (!current) return;
+  current.readingMode = readingMode.value === 'page' ? 'page' : 'scroll';
+  await database.putMetadata({ ...current, updatedAt: Date.now() });
+  await sendControl(readerControl.setMode,
+    current.readingMode === 'page' ? readerMode.page : readerMode.scroll);
+  renderReader();
+});
+
 scrollSpeed.addEventListener('change', async () => {
   if (!current) return;
   current.speed = Number(scrollSpeed.value);
   current.speedProfileVersion = SCROLL_SPEED_PROFILE_VERSION;
   await database.putMetadata({ ...current, updatedAt: Date.now() });
   await sendControl(readerControl.setSpeed, current.speed);
+});
+
+pageInterval.addEventListener('input', () => {
+  pageIntervalValue.textContent = `${pageInterval.value}s`;
+});
+
+pageInterval.addEventListener('change', async () => {
+  if (!current) return;
+  current.pageIntervalSeconds = Math.max(4, Math.min(20, Number(pageInterval.value)));
+  await database.putMetadata({ ...current, updatedAt: Date.now() });
+  await sendControl(readerControl.setPageInterval, current.pageIntervalSeconds);
 });
 
 pushButton.addEventListener('click', () => void openOnGlasses(currentOffset));

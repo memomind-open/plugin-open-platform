@@ -5,7 +5,7 @@
   "abi_version": 256,
   "provides": {
     "protocols": [
-      { "id": "gm.novel-reader", "version": "1.2" }
+      { "id": "gm.novel-reader", "version": "1.3" }
     ]
   }
 }
