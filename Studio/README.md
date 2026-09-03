@@ -71,9 +71,10 @@ On Windows, run:
 .\Studio\windows\gm-plugin-studio-desktop.exe
 ```
 
-Keep `WebView2Loader.dll` beside the Windows executable. Windows may also
-require the Microsoft Edge WebView2 Runtime. On Linux and macOS, open the
-application package included in the matching platform directory.
+The Windows x64 MSVC build links the WebView2 loader statically, so no loader
+DLL is required beside the executable. The target computer still requires the
+Microsoft Edge WebView2 Runtime. On Linux and macOS, open the application
+package included in the matching platform directory.
 
 ## What Desktop Studio provides
 
