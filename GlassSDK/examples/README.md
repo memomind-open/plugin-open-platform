@@ -33,6 +33,7 @@ spacing, or minimum usable layout sizes rather than device width or height.
 | `game/tetris` | grid game with IMU movement and button rotation | button + raw IMU + locale + libc extension |
 | `game/jet_runner` | scrolling IMU-controlled runner | button + raw IMU + locale + libc extension |
 | `game/snake` | IMU-controlled snake game | button + raw IMU + libc extension |
+| `game/sokoban` | 36-level box-pushing puzzle with head-motion controls, shared pixel art and undo | button + raw IMU + libc extension |
 | `game/2048` | 4 x 4 number-merging puzzle with accessory navigation | button + libc extension |
 | `game/fighter_arena` | fixed two-fighter best-of-three match with specials and character AI | button + Bluetooth + libc extension |
 
