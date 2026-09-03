@@ -28,7 +28,10 @@ window.addEventListener('message', async (message) => {
   const response = await runtime.handle(request);
   log(response.ok ? 'RESPONSE' : 'ERROR', response.ok ? response.result : response.error);
   updateTransportStatus(response);
-  frame.contentWindow?.postMessage({ type: 'gm-plugin:response', response }, '*');
+  const transfer = response.ok && response.result?.streamPort?.postMessage
+    ? [response.result.streamPort]
+    : [];
+  frame.contentWindow?.postMessage({ type: 'gm-plugin:response', response }, '*', transfer);
 });
 
 runtime.onEvent((event) => {

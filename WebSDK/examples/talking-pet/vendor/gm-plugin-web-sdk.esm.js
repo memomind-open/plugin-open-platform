@@ -514,15 +514,27 @@ export function createGMPlugin({
 }
 
 async function openUserFileStream(ticket, requestedFileId, fetchImpl, signal) {
-  if (typeof fetchImpl !== 'function') {
-    throw new GMPluginError('CAPABILITY_UNAVAILABLE', 'Binary file streaming is unavailable');
-  }
   const resourceUrl = ticket?.resourceUrl;
+  const streamPort = ticket?.streamPort;
   const values = [ticket?.size, ticket?.offset, ticket?.length];
-  if (ticket?.fileId !== requestedFileId || typeof resourceUrl !== 'string' ||
-      resourceUrl.length === 0 || values.some((value) => !Number.isSafeInteger(value) || value < 0) ||
+  const hasStreamPort = typeof streamPort?.postMessage === 'function';
+  const hasResourceUrl = typeof resourceUrl === 'string' && resourceUrl.length > 0;
+  if (ticket?.fileId !== requestedFileId || (!hasStreamPort && !hasResourceUrl) ||
+      values.some((value) => !Number.isSafeInteger(value) || value < 0) ||
       ticket.offset > ticket.size || ticket.length > ticket.size - ticket.offset) {
     throw new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid file stream ticket');
+  }
+  if (hasStreamPort) {
+    return {
+      fileId: ticket.fileId,
+      size: ticket.size,
+      offset: ticket.offset,
+      length: ticket.length,
+      stream: createPortReadableStream(streamPort, signal),
+    };
+  }
+  if (typeof fetchImpl !== 'function') {
+    throw new GMPluginError('CAPABILITY_UNAVAILABLE', 'Binary file streaming is unavailable');
   }
   let response;
   try {
@@ -544,6 +556,78 @@ async function openUserFileStream(ticket, requestedFileId, fetchImpl, signal) {
     length: ticket.length,
     stream: response.body,
   };
+}
+
+function createPortReadableStream(port, signal) {
+  let controller;
+  let pullPending = false;
+  let finished = false;
+  const closePort = () => {
+    port.onmessage = null;
+    port.onmessageerror = null;
+    port.close?.();
+  };
+  const fail = (reason) => {
+    if (finished) return;
+    finished = true;
+    try {
+      port.postMessage({ type: 'cancel' });
+    } finally {
+      closePort();
+      controller.error(reason);
+    }
+  };
+  return new ReadableStream({
+    start(value) {
+      controller = value;
+      port.onmessage = (event) => {
+        if (finished) return;
+        pullPending = false;
+        const message = event.data;
+        if (message?.type === 'chunk' && message.buffer instanceof ArrayBuffer && message.buffer.byteLength > 0) {
+          controller.enqueue(new Uint8Array(message.buffer));
+        } else if (message?.type === 'end') {
+          finished = true;
+          signal?.removeEventListener('abort', abort);
+          closePort();
+          controller.close();
+        } else if (message?.type === 'error') {
+          finished = true;
+          signal?.removeEventListener('abort', abort);
+          closePort();
+          controller.error(new GMPluginError(
+            typeof message.code === 'string' ? message.code : 'INTERNAL_ERROR',
+            typeof message.message === 'string' ? message.message : 'Host file stream failed',
+          ));
+        } else {
+          fail(new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid file stream message'));
+        }
+      };
+      port.onmessageerror = () => fail(new GMPluginError('INTERNAL_ERROR', 'Host file stream failed'));
+      port.start?.();
+      if (signal?.aborted) fail(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+      else signal?.addEventListener('abort', abort, { once: true });
+    },
+    pull() {
+      if (finished || pullPending) return;
+      pullPending = true;
+      port.postMessage({ type: 'pull' });
+    },
+    cancel(reason) {
+      if (finished) return;
+      finished = true;
+      signal?.removeEventListener('abort', abort);
+      try {
+        port.postMessage({ type: 'cancel', reason: String(reason ?? '') });
+      } finally {
+        closePort();
+      }
+    },
+  }, { highWaterMark: 0 });
+
+  function abort() {
+    fail(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+  }
 }
 
 function decodeAudioFrames(value) {

@@ -25,6 +25,27 @@ function request(runtime, method, params = {}) {
   });
 }
 
+async function readPort(port) {
+  const chunks = [];
+  port.start();
+  while (true) {
+    const message = new Promise((resolve) => port.addEventListener('message', resolve, { once: true }));
+    port.postMessage({ type: 'pull' });
+    const { data } = await message;
+    if (data.type === 'end') break;
+    if (data.type === 'error') throw Object.assign(new Error(data.message), { code: data.code });
+    chunks.push(new Uint8Array(data.buffer));
+  }
+  const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return bytes;
+}
+
 test('Studio runtime handles every public runtime and storage method', async () => {
   const runtime = new StudioRuntime({ renderer: new FakeRenderer(), sessionToken: 'token' });
   assert.equal((await request(runtime, 'runtime.ready')).ok, true);
@@ -38,7 +59,7 @@ test('Studio runtime handles every public runtime and storage method', async () 
 test('Studio runtime preserves picked files and opens binary range streams', async () => {
   const storage = new Map();
   const fileStore = new Map();
-  const source = Uint8Array.from({ length: 70_000 }, (_, index) => index % 251);
+  const source = Uint8Array.from({ length: 700_000 }, (_, index) => index % 251);
   const firstRun = new StudioRuntime({
     renderer: new FakeRenderer(),
     sessionToken: 'first',
@@ -55,19 +76,11 @@ test('Studio runtime preserves picked files and opens binary range streams', asy
   assert.match(file.fileId, /^[0-9a-f]{32}$/u);
   assert.equal(file.size, source.length);
 
-  const revoked = [];
-  const openedRanges = [];
   const restarted = new StudioRuntime({
     renderer: new FakeRenderer(),
     sessionToken: 'second',
     storage,
     fileStore,
-    fileResourceFactory: ({ bytes, offset, length }) => {
-      assert.deepEqual(bytes, source.subarray(offset, offset + length));
-      openedRanges.push({ offset, length });
-      return `blob:https://studio.invalid/read-token-${openedRanges.length}`;
-    },
-    fileResourceRevoke: (resourceUrl) => revoked.push(resourceUrl),
   });
   assert.deepEqual((await request(restarted, 'files.list')).result.files, [file]);
   assert.deepEqual((await request(restarted, 'files.stat', { fileId: file.fileId })).result, { file });
@@ -76,35 +89,44 @@ test('Studio runtime preserves picked files and opens binary range streams', asy
     offset: 4096,
     length: 65_536,
   });
-  assert.deepEqual(opened.result, {
-    resourceUrl: 'blob:https://studio.invalid/read-token-1',
-    fileId: file.fileId,
-    size: source.length,
-    offset: 4096,
-    length: 65_536,
-  });
+  assert.equal(opened.result.fileId, file.fileId);
+  assert.equal(opened.result.size, source.length);
+  assert.equal(opened.result.offset, 4096);
+  assert.equal(opened.result.length, 65_536);
+  assert.deepEqual(
+    await readPort(opened.result.streamPort),
+    source.slice(4096, 4096 + 65_536),
+  );
   const tail = await request(restarted, 'files.openRead', {
     fileId: file.fileId,
     offset: source.length - 4,
     length: 100,
   });
   assert.equal(tail.result.length, 4);
-  assert.deepEqual(openedRanges, [
-    { offset: 4096, length: 65_536 },
-    { offset: source.length - 4, length: 4 },
-  ]);
+  assert.deepEqual(
+    await readPort(tail.result.streamPort),
+    source.slice(source.length - 4),
+  );
   assert.deepEqual((await request(restarted, 'files.getUsage')).result, {
     fileCount: 1,
     totalBytes: source.length,
     maxTotalBytes: 400 * 1024 * 1024,
   });
+  const active = await request(restarted, 'files.openRead', { fileId: file.fileId });
+  const clientPort = structuredClone(active.result.streamPort, { transfer: [active.result.streamPort] });
+  clientPort.start();
+  const firstChunk = new Promise((resolve) => clientPort.addEventListener('message', resolve, { once: true }));
+  clientPort.postMessage({ type: 'pull' });
+  assert.equal(new Uint8Array((await firstChunk).data.buffer).length, 256 * 1024);
+  const invalidated = new Promise((resolve) => clientPort.addEventListener('message', resolve, { once: true }));
   assert.equal((await request(restarted, 'files.delete', { fileId: file.fileId })).result.deleted, true);
-  assert.deepEqual(revoked, [
-    'blob:https://studio.invalid/read-token-1',
-    'blob:https://studio.invalid/read-token-2',
-  ]);
+  assert.deepEqual((await invalidated).data, {
+    type: 'error',
+    code: 'FILE_NOT_FOUND',
+    message: 'File read stream is no longer valid',
+  });
   restarted.setLifecycle('suspended');
-  assert.equal(revoked.length, 2);
+  assert.equal(restarted.fileStreams.size, 0);
   assert.equal((await request(restarted, 'files.list')).result.files.length, 0);
 });
 

@@ -29,8 +29,7 @@ export class StudioRuntime {
     storage = new Map(),
     fileStore = new Map(),
     filePicker,
-    fileResourceFactory = createObjectUrlResource,
-    fileResourceRevoke = revokeObjectUrlResource,
+    fileStreamFactory = createMessagePortResource,
   } = {}) {
     if (!renderer) throw new TypeError('renderer is required');
     this.renderer = renderer;
@@ -41,9 +40,9 @@ export class StudioRuntime {
     this.storage = storage;
     this.fileStore = fileStore;
     this.filePicker = filePicker;
-    this.fileResourceFactory = fileResourceFactory;
-    this.fileResourceRevoke = fileResourceRevoke;
-    this.fileResources = new Map();
+    this.fileStreamFactory = fileStreamFactory;
+    this.fileStreams = new Map();
+    this.fileStreamSequence = 0;
     this.fileSequence = fileStore.size;
     this.subscriptions = new Map();
     this.subscriptionSequence = 0;
@@ -272,7 +271,8 @@ export class StudioRuntime {
     }
     const length = Math.min(requestedLength, available);
     const bytes = entry.bytes.subarray(offset, offset + length);
-    const resourceUrl = await this.fileResourceFactory({
+    const streamId = `stream-${++this.fileStreamSequence}`;
+    const resource = await this.fileStreamFactory({
       fileId: entry.metadata.fileId,
       bytes,
       size: entry.bytes.length,
@@ -280,18 +280,20 @@ export class StudioRuntime {
       length,
       sessionToken: this.sessionToken,
       runtimeGeneration: this.runtimeGeneration,
+      onClose: () => this.releaseFileStream(streamId),
     });
-    if (typeof resourceUrl !== 'string' || resourceUrl.length === 0) {
-      throw new StudioBridgeError('INTERNAL_ERROR', 'Studio file resource factory failed');
+    if (!resource?.streamPort?.postMessage || typeof resource.cancel !== 'function') {
+      throw new StudioBridgeError('INTERNAL_ERROR', 'Studio file stream factory failed');
     }
-    const timer = setTimeout(() => this.revokeFileResource(resourceUrl), 60_000);
+    const timer = setTimeout(() => this.cancelFileStream(streamId), 60_000);
     timer.unref?.();
-    this.fileResources.set(resourceUrl, {
+    this.fileStreams.set(streamId, {
       fileId: entry.metadata.fileId,
+      cancel: resource.cancel,
       timer,
     });
     return {
-      resourceUrl,
+      streamPort: resource.streamPort,
       fileId: entry.metadata.fileId,
       size: entry.bytes.length,
       offset,
@@ -299,17 +301,23 @@ export class StudioRuntime {
     };
   }
 
-  revokeFileResource(resourceUrl) {
-    const resource = this.fileResources.get(resourceUrl);
+  cancelFileStream(streamId) {
+    const resource = this.fileStreams.get(streamId);
+    if (!resource) return;
+    this.releaseFileStream(streamId);
+    resource.cancel(new StudioBridgeError('FILE_NOT_FOUND', 'File read stream is no longer valid'));
+  }
+
+  releaseFileStream(streamId) {
+    const resource = this.fileStreams.get(streamId);
     if (resource?.timer) clearTimeout(resource.timer);
-    if (!this.fileResources.delete(resourceUrl)) return;
-    this.fileResourceRevoke(resourceUrl);
+    this.fileStreams.delete(streamId);
   }
 
   invalidateFileStreams(fileId) {
-    for (const [resourceUrl, resource] of [...this.fileResources.entries()]) {
+    for (const [streamId, resource] of [...this.fileStreams.entries()]) {
       if (fileId !== undefined && resource.fileId !== fileId) continue;
-      this.revokeFileResource(resourceUrl);
+      this.cancelFileStream(streamId);
     }
   }
 
@@ -569,15 +577,56 @@ function optionalInteger(values, key, fallback) {
   return requireInteger(values, key);
 }
 
-function createObjectUrlResource({ bytes }) {
-  if (!globalThis.URL?.createObjectURL || typeof globalThis.Blob !== 'function') {
+function createMessagePortResource({ bytes, onClose }) {
+  if (typeof globalThis.MessageChannel !== 'function') {
     throw new StudioBridgeError('CAPABILITY_UNAVAILABLE', 'Binary file streaming is unavailable');
   }
-  return globalThis.URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
-}
-
-function revokeObjectUrlResource(resourceUrl) {
-  globalThis.URL?.revokeObjectURL?.(resourceUrl);
+  const channel = new globalThis.MessageChannel();
+  let offset = 0;
+  let finished = false;
+  channel.port1.addEventListener('message', (event) => {
+    if (finished) return;
+    if (event.data?.type === 'cancel') {
+      finished = true;
+      channel.port1.close();
+      onClose?.();
+      return;
+    }
+    if (event.data?.type !== 'pull') return;
+    if (offset >= bytes.length) {
+      finished = true;
+      channel.port1.postMessage({ type: 'end' });
+      channel.port1.close();
+      onClose?.();
+      return;
+    }
+    const end = Math.min(offset + 256 * 1024, bytes.length);
+    const buffer = bytes.slice(offset, end).buffer;
+    offset = end;
+    channel.port1.postMessage({ type: 'chunk', buffer }, [buffer]);
+  });
+  channel.port1.addEventListener('messageerror', () => {
+    if (!finished) {
+      finished = true;
+      channel.port1.close();
+      onClose?.();
+    }
+  });
+  channel.port1.start();
+  return {
+    streamPort: channel.port2,
+    cancel(reason) {
+      if (finished) return;
+      finished = true;
+      channel.port1.postMessage({
+        type: 'error',
+        code: reason?.code ?? 'INTERNAL_ERROR',
+        message: reason?.message ?? 'File read stream was cancelled',
+      });
+      channel.port1.close();
+      onClose?.();
+    },
+  };
 }
 
 function requireUint32(values, key) {

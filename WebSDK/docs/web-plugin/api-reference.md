@@ -60,15 +60,18 @@ console.log(files, usage.totalBytes, usage.maxTotalBytes);
 stable metadata: `fileId`, `name`, `size`, `importedAt`, and optional
 `extension`. A cancelled picker returns `{ files: [] }`. `files.openRead`
 returns a `ReadableStream<Uint8Array>` backed by a short-lived, runtime-bound
-Host resource. Pass optional `offset` and `length` values for random-access
+Host resource. Browser Studio transfers a Host-controlled stream port directly;
+native Hosts may use an authenticated resource URL internally. Pass optional
+`offset` and `length` values for random-access
 ranges. Both must be JavaScript safe integers; `length` must be positive when
 provided, and the Host clamps a range that extends past EOF. The SDK consumes
 the private resource ticket internally; plugins must
 not retain resource URLs or temporary platform content URIs.
 
 File bytes do not pass through Bridge JSON and are never Base64 encoded. A
-runtime replacement, plugin reload, suspension, or close invalidates unopened
-stream tickets. Use an `AbortSignal` to cancel a read that is no longer needed.
+file deletion, runtime replacement, plugin reload, suspension, or close cancels
+both unopened tickets and reads already in progress. Use an `AbortSignal` to
+cancel a read that is no longer needed.
 
 The current file capability advertises a 400 MiB total private quota, a 400 MiB
 maximum selected file size, binary streaming with range support, and up to 20

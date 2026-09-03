@@ -278,7 +278,8 @@ a file-count limit; query capabilities rather than adding plugin-specific
 limits. `gm.files.openRead(fileId, { offset, length, signal })` can open a
 bounded range and returns raw binary data without Base64 or Bridge JSON copies.
 Stream large content incrementally and cancel obsolete reads with the supplied
-`AbortSignal`. `offset` and `length` must be JavaScript safe integers, `length`
+`AbortSignal`. Deleting a file or stopping its runtime also terminates reads
+already in progress. `offset` and `length` must be JavaScript safe integers, `length`
 must be positive when supplied, and the Host clamps a requested range at EOF.
 
 ## 7. Display API

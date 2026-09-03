@@ -124,6 +124,54 @@ test('SDK exposes persistent user-file helpers with the formal request shapes', 
   ]);
 });
 
+test('SDK accepts a Host-controlled transferable binary stream', async () => {
+  const transport = new FakeTransport();
+  const bytes = Uint8Array.of(4, 3, 2, 1);
+  let hostPort;
+  transport.send = async (request) => {
+    const channel = new MessageChannel();
+    hostPort = channel.port1;
+    let sent = false;
+    channel.port1.onmessage = (event) => {
+      if (event.data?.type !== 'pull') return;
+      if (!sent) {
+        sent = true;
+        const buffer = bytes.slice().buffer;
+        channel.port1.postMessage({ type: 'chunk', buffer }, [buffer]);
+      } else {
+        channel.port1.postMessage({ type: 'end' });
+      }
+    };
+    return {
+      streamPort: channel.port2,
+      fileId: request.params.fileId,
+      size: bytes.length,
+      offset: 0,
+      length: bytes.length,
+    };
+  };
+  const gm = createGMPlugin({
+    transport,
+    fetchImpl: () => {
+      throw new Error('direct Host streams must not use fetch');
+    },
+  });
+
+  const opened = await gm.files.openRead('a'.repeat(32));
+  const reader = opened.stream.getReader();
+  assert.deepEqual((await reader.read()).value, bytes);
+  hostPort.postMessage({
+    type: 'error',
+    code: 'FILE_NOT_FOUND',
+    message: 'File read stream is no longer valid',
+  });
+
+  await assert.rejects(
+    () => reader.read(),
+    (error) => error instanceof GMPluginError && error.code === 'FILE_NOT_FOUND',
+  );
+});
+
 test('SDK rejects malformed or unauthorized binary stream tickets', async () => {
   const transport = new FakeTransport();
   transport.send = async () => ({
