@@ -1,8 +1,8 @@
-# Momo Talking Pet
+# Memo Talking Pet
 
-An original talking-pet game built as a static GM Web Plugin example. Momo can
+An original talking-pet game built as a static GM Web Plugin example. Memo can
 be petted, fed, played with, and put to sleep. Hold the microphone button to
-record a short phrase; Momo repeats it with a playful voice effect. In the App,
+record a short phrase; Memo repeats it with a playful voice effect. In the App,
 the example uses the glasses microphone through `gm.audio`, including native
 noise reduction, Opus streaming, bounded recording, decoding, and playback.
 The phone scene combines character motion, props, particles, lighting, and
@@ -36,17 +36,17 @@ completed recording with the allowlisted `cute` voice effect.
 
 - Use the phone buttons for feeding, playing, sleeping, and talking. The
   glasses plugin does not subscribe to IMU gestures.
-- Single button press: pet Momo.
-- Double button press: feed Momo.
-- **Sync to glasses** renders Momo's current stats on the device display.
+- Single button press: pet Memo.
+- Double button press: feed Memo.
+- **Sync to glasses** renders Memo's current stats on the device display.
 
-The pet state is persisted through `gm.storage`. Momo is an original 3D-style
+The pet state is persisted through `gm.storage`. Memo is an original 3D-style
 character asset stored locally under `assets/`, with no external network dependency.
 Happiness, fullness, and energy each decay by one point every three seconds while
 the plugin is open; interactions raise or lower them and immediately sync the
 new state to the glasses.
 
-The dedicated `talking_pet` glasses example renders Momo through its
+The dedicated `talking_pet` glasses example renders Memo through its
 native GRAY4 framebuffer and overlays its text using native LVGL labels. The
 Web plugin sends only a seven-byte state packet; it never sends a bitmap. Eight
 embedded poses let the glasses animate idle

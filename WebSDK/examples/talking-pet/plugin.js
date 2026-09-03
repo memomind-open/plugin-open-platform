@@ -16,13 +16,13 @@ const deviceContext = deviceCanvas.getContext('2d', { willReadFrequently: true }
 const DEVICE_WIDTH = 600;
 const DEVICE_HEIGHT = 350;
 const petVisuals = {
-  idle: './assets/momo-idle-v2.png',
-  blink: './assets/momo-blink-v2.webp',
-  eating: './assets/momo-eating-v2.png',
-  playing: './assets/momo-playing-v2.png',
-  sleeping: './assets/momo-sleeping-v2.png',
-  listening: './assets/momo-listening-v2.png',
-  talking: './assets/momo-talking-v2.png',
+  idle: './assets/memo-idle-v2.png',
+  blink: './assets/memo-blink-v2.webp',
+  eating: './assets/memo-eating-v2.png',
+  playing: './assets/memo-playing-v2.png',
+  sleeping: './assets/memo-sleeping-v2.png',
+  listening: './assets/memo-listening-v2.png',
+  talking: './assets/memo-talking-v2.png',
 };
 function preloadActionVisuals() {
   Object.entries(petVisuals).forEach(([state, source]) => {
@@ -51,7 +51,7 @@ const state = {
 };
 
 const lines = {
-  pet: ['Hehe, that tickles!', 'One more pat, please!', 'Momo likes you best!', 'Purr, purr…'],
+  pet: ['Hehe, that tickles!', 'One more pat, please!', 'Memo likes you best!', 'Purr, purr…'],
   feed: ['That cookie smells amazing!', 'Nom! Can I have another?', 'Thanks for the treat!'],
   play: ['Caught it!', 'One more round!', 'Watch my super jump!'],
   sleep: ['Good night and sweet dreams…', 'Zzz… the clouds are cotton candy.'],
@@ -124,7 +124,7 @@ gm.audio.onPlaybackState((playback) => {
     showProcessingState();
   } else if (playback.state === 'playing') {
     resetTalkButton();
-    say('Momo heard you through the glasses and says:');
+    say('Memo heard you through the glasses and says:');
     startMouthAnimation();
     // Playback completion is authoritative. Keep a generous timeout only as
     // a fallback in case the native host cannot deliver the terminal event.
@@ -164,7 +164,7 @@ function showProcessingState() {
   stopMouthAnimation('idle');
   animate('processing');
   resetDeviceMood();
-  say('Momo is making your voice extra cute…');
+  say('Memo is making your voice extra cute…');
 }
 
 function showNativeAudioError(error) {
@@ -447,7 +447,7 @@ function deviceStar(cx, cy, outerRadius, innerRadius, level = 15) {
   deviceContext.fill();
 }
 
-function drawDeviceMomo() {
+function drawDeviceMemo() {
   const ctx = deviceContext;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
@@ -536,15 +536,15 @@ function drawDeviceBar(label, value, y, level) {
 function renderDeviceFrame() {
   deviceContext.fillStyle = gray(0);
   deviceContext.fillRect(0, 0, DEVICE_WIDTH, DEVICE_HEIGHT);
-  deviceText('MOMO TALKING PET', 20, 22, 16, 13, 750);
+  deviceText('MEMO TALKING PET', 20, 22, 16, 13, 750);
   deviceText(`LV.${Math.floor(state.xp / 100) + 1}`, 578, 22, 16, 15, 750, 'right');
   deviceContext.strokeStyle = gray(4);
   deviceContext.lineWidth = 1;
   deviceContext.beginPath(); deviceContext.moveTo(18, 40); deviceContext.lineTo(582, 40); deviceContext.stroke();
-  drawDeviceMomo();
-  deviceText(deviceMood === 'idle' ? 'Momo is waiting' : {
-    happy: 'That feels great!', eating: 'Eating a cookie', playing: 'Let us play!', sleeping: 'Sweet dreams', talking: 'Momo repeats you', listening: 'Momo is listening…'
-  }[deviceMood] ?? 'Momo is happy', 448, 78, 21, 15, 700, 'center');
+  drawDeviceMemo();
+  deviceText(deviceMood === 'idle' ? 'Memo is waiting' : {
+    happy: 'That feels great!', eating: 'Eating a cookie', playing: 'Let us play!', sleeping: 'Sweet dreams', talking: 'Memo repeats you', listening: 'Memo is listening…'
+  }[deviceMood] ?? 'Memo is happy', 448, 78, 21, 15, 700, 'center');
   drawDeviceBar('HAPPY', state.happy, 130, 15);
   drawDeviceBar('FULL', state.food, 180, 11);
   drawDeviceBar('ENERGY', state.energy, 230, 8);
@@ -587,7 +587,7 @@ function deviceBytesToBase64(bytes) {
 
 async function syncToGlasses(announce = false) {
   if (!glassesConnected) {
-    if (announce) say('Connect the glasses and run the native Momo plugin first.');
+    if (announce) say('Connect the glasses and run the native Memo plugin first.');
     return;
   }
   if (glassesSyncInFlight) {
@@ -598,7 +598,7 @@ async function syncToGlasses(announce = false) {
   syncButton.disabled = true;
   try {
     await gm.plugin.sendMessage(PET_STATE_CHANNEL, encodePetState(deviceMood, state));
-    if (announce) say("Momo's status is now synced to the glasses!");
+    if (announce) say("Memo's status is now synced to the glasses!");
   } catch (error) {
     status.textContent = `Glasses sync failed · ${error.message}`;
     if (announce) say(`Sync failed: ${error.message}`);
@@ -715,7 +715,7 @@ function repeatRecording() {
   audio.preservesPitch = false;
   audio.addEventListener('play', () => {
     resetTalkButton();
-    say('Momo repeats:');
+    say('Memo repeats:');
     startMouthAnimation();
     animate('talking', Math.max(800, (audio.duration || 2) * 770));
     setDeviceMood('talking', Math.max(800, (audio.duration || 2) * 770));
@@ -774,7 +774,7 @@ async function initialize() {
     gm.device.onConnection((event) => {
       glassesConnected = event.connected;
       connectionDot.classList.toggle('connected', event.connected);
-      status.textContent = event.connected ? 'Glasses connected · Native Momo animation ready' : 'Glasses disconnected · Phone play remains available';
+      status.textContent = event.connected ? 'Glasses connected · Native Memo animation ready' : 'Glasses disconnected · Phone play remains available';
       if (event.connected) scheduleGlassesSync();
     });
     await gm.device.subscribeEvents(['button', 'connection']);
@@ -783,8 +783,8 @@ async function initialize() {
     connectionDot.classList.toggle('connected', glassesConnected);
     const audioMode = nativeAudioAvailable ? 'Glasses microphone ready' : 'Using phone microphone';
     status.textContent = glassesConnected
-      ? `Native Momo plugin ready · ${audioMode}`
-      : `Native Momo plugin ready · ${audioMode} · Waiting for glasses`;
+      ? `Native Memo plugin ready · ${audioMode}`
+      : `Native Memo plugin ready · ${audioMode} · Waiting for glasses`;
     if (glassesConnected) await syncToGlasses();
   } catch (error) {
     status.textContent = `Standalone demo mode · ${error.code ?? 'Bridge disconnected'}`;
