@@ -121,7 +121,7 @@ export class StudioRuntime {
           maxTotalBytes: FILE_PROFILE.maxTotalBytes,
         };
       case 'files.delete':
-        return { deleted: this.fileStore.delete(requireFileId(params.fileId)) };
+        return this.deleteFile(params.fileId);
       case 'display.createPage':
         this.requireConnection();
         return { created: true };
@@ -286,7 +286,10 @@ export class StudioRuntime {
     }
     const timer = setTimeout(() => this.revokeFileResource(resourceUrl), 60_000);
     timer.unref?.();
-    this.fileResources.set(resourceUrl, timer);
+    this.fileResources.set(resourceUrl, {
+      fileId: entry.metadata.fileId,
+      timer,
+    });
     return {
       resourceUrl,
       fileId: entry.metadata.fileId,
@@ -297,16 +300,24 @@ export class StudioRuntime {
   }
 
   revokeFileResource(resourceUrl) {
-    const timer = this.fileResources.get(resourceUrl);
-    if (timer) clearTimeout(timer);
+    const resource = this.fileResources.get(resourceUrl);
+    if (resource?.timer) clearTimeout(resource.timer);
     if (!this.fileResources.delete(resourceUrl)) return;
     this.fileResourceRevoke(resourceUrl);
   }
 
-  invalidateFileStreams() {
-    for (const resourceUrl of [...this.fileResources.keys()]) {
+  invalidateFileStreams(fileId) {
+    for (const [resourceUrl, resource] of [...this.fileResources.entries()]) {
+      if (fileId !== undefined && resource.fileId !== fileId) continue;
       this.revokeFileResource(resourceUrl);
     }
+  }
+
+  deleteFile(fileId) {
+    const normalized = requireFileId(fileId);
+    const deleted = this.fileStore.delete(normalized);
+    if (deleted) this.invalidateFileStreams(normalized);
+    return { deleted };
   }
 
   subscribeEvents(types) {

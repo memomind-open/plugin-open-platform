@@ -93,17 +93,18 @@ test('Studio runtime preserves picked files and opens binary range streams', asy
     { offset: 4096, length: 65_536 },
     { offset: source.length - 4, length: 4 },
   ]);
-  restarted.setLifecycle('suspended');
-  assert.deepEqual(revoked, [
-    'blob:https://studio.invalid/read-token-1',
-    'blob:https://studio.invalid/read-token-2',
-  ]);
   assert.deepEqual((await request(restarted, 'files.getUsage')).result, {
     fileCount: 1,
     totalBytes: source.length,
     maxTotalBytes: 400 * 1024 * 1024,
   });
   assert.equal((await request(restarted, 'files.delete', { fileId: file.fileId })).result.deleted, true);
+  assert.deepEqual(revoked, [
+    'blob:https://studio.invalid/read-token-1',
+    'blob:https://studio.invalid/read-token-2',
+  ]);
+  restarted.setLifecycle('suspended');
+  assert.equal(revoked.length, 2);
   assert.equal((await request(restarted, 'files.list')).result.files.length, 0);
 });
 
