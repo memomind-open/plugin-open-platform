@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build, inspect, or serve GM glasses plugins."""
+"""Build or inspect GM glasses plugins."""
 
 import sys
 from pathlib import Path

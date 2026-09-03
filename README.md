@@ -16,8 +16,6 @@ Studio source to build, preview, package, or test plugins.
   DevKit ZIP tools, and `.mmpkg` packager for Web plugins.
 - [`Studio/`](Studio/) contains prebuilt Desktop Studio applications and their
   platform runtime files.
-- [`APP_BUNDLE.md`](APP_BUNDLE.md) defines the single ZIP used for App import,
-  sharing, and QR installation of phone/glasses plugin combinations.
 
 ## Desktop Studio platforms
 
@@ -38,9 +36,32 @@ startup, and platform requirements.
 
 1. Download or clone this complete repository. Keep the `Studio`, `WebSDK`, and
    `GlassSDK` directories together so Desktop Studio can discover both SDKs.
-2. Start the Desktop Studio application for your platform.
-3. Follow the [Web Plugin quick start](WebSDK/docs/web-plugin/quick-start.md) or
+2. Run the workspace build from this directory. It discovers Web and glasses
+   plugins recursively and only rebuilds inputs that changed:
+
+   ```sh
+   # Ubuntu/macOS
+   ./tools/build
+
+   # Windows PowerShell
+   .\tools\build
+   ```
+
+   Both launchers call the same `build.py`. Add `--watch` to keep scanning, or
+   append `web` or `glass` to select only one side, for example
+   `./tools/build --watch`, `./tools/build web`, or `.\tools\build glass`.
+3. Start the Desktop Studio application for your platform.
+4. Follow the [Web Plugin quick start](WebSDK/docs/web-plugin/quick-start.md) or
    the [Glass Plugin SDK guide](GlassSDK/README.md).
+
+The two short launchers delegate to the same cross-platform Python entry point,
+which then uses the existing build backends: Node.js packages Web plugins,
+while CMake/Ninja incrementally builds RISC-V glasses plugins. Build state is
+local to `.build/`; distributable
+`.mmpkg` and `.gmp` files remain in their SDK output directories. The generated
+plugin packages can be consumed by the iOS App, but an iPhone or iPad is not a
+build host. Any future native iOS target must run on macOS with Xcode; the same
+Python entry point can dispatch that platform-only step.
 
 Web-only development can also use the public, Node.js-based WebSDK Browser
 Studio included in `WebSDK` and in the WebSDK DevKit ZIP. Browser Studio is a

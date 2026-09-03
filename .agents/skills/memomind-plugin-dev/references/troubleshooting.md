@@ -69,8 +69,8 @@ the narrowest failing layer before changing dependencies or cleaning caches.
 - Preserve the packager or App's exact validation error; do not bypass size,
   checksum, ABI, CSP, or memory checks.
 - For QR installation, confirm the phone and development computer are on the
-  same trusted LAN and that the selected host address is reachable.
-- Avoid running two development servers on the same fixed port.
+  same trusted LAN and that Desktop Studio's displayed address is reachable.
+- Keep only one Desktop Studio package server active on the selected port.
 
 When reporting a blocker, include the failing command, exit status, first
 actionable error, detected platform and versions, relevant artifact path, and

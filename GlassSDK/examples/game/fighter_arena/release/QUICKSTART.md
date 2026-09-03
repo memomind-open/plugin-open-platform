@@ -30,11 +30,11 @@ Desktop Studio runs both packages in one process and routes their custom
 
 ## Run on physical glasses
 
-1. Serve `GlassSDK/build-host/.build/game/fighter_arena/fighter_arena.gmp`
-   with the GlassSDK QR installation workflow and scan it from the official
-   App's device-plugin debug page.
-2. Import or launch `fighter-controller.mmpkg` in an official App version that
-   supports Web plugins.
+1. Select `fighter-controller.mmpkg` and
+   `GlassSDK/build-host/.build/game/fighter_arena/fighter_arena.gmp` in Desktop
+   Studio.
+2. Scan Studio's combined developer-app QR code from the official App's
+   Developer Workbench.
 3. Connect the App to the glasses and start both plugins.
 4. Keep the Fighter Controller Web plugin active while playing.
 

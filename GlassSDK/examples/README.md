@@ -3,17 +3,16 @@
 Examples progress from focused Host modules to complete applications. Edit one
 example, then run `python3 build.py` from the SDK root. CMake and
 Ninja rebuild the affected source files, create
-`build-host/.build/<relative-path>/<example>.gmp`, and start the QR installation
-server. A copied example may use any nesting depth but must remain below the
+`build-host/.build/<relative-path>/<example>.gmp`, then exit. A copied example
+may use any nesting depth but must remain below the
 SDK's `examples/` directory so the build driver and Desktop Studio can discover
 it. Source files can use any descriptive `.c` name; `plugin.c` is not a required
 convention. Do not add an example-local `CMakeLists.txt`: the internal build
 definition discovers every `manifest.json` and compiles all `.c` files in its
 example directory.
 
-After the build completes, the QR server selects the valid example `.gmp` with
-the newest modification time. The same rule applies after a full build, when
-nothing changed, or when a shared input rebuilt several examples.
+After the build completes, refresh Desktop Studio to select, simulate, package,
+share, or generate a QR code for the resulting `.gmp`.
 
 Display geometry is a runtime capability. Examples that size or position a
 screen-level layout call `host->display_get_info()` instead of assuming a fixed
@@ -52,8 +51,7 @@ Build every maintained example:
 python3 build.py all
 ```
 
-Build only one example and start its QR installation server by passing its path
-from this table:
+Build only one example by passing its path from this table:
 
 ```sh
 python3 build.py build --example game/2048
