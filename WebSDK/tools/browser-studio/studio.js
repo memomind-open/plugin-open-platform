@@ -3,7 +3,7 @@ import { StudioRuntime } from '@memomind/gm-plugin-studio-runtime';
 
 const frame = document.querySelector('#plugin-frame');
 const renderer = new CanvasDeviceRenderer(document.querySelector('#device-canvas'));
-const runtime = new StudioRuntime({ renderer });
+const runtime = new StudioRuntime({ renderer, filePicker: pickLocalFiles });
 const logs = document.querySelector('#logs');
 const transportStatus = document.querySelector('#transport-status');
 
@@ -40,7 +40,10 @@ frame.addEventListener('load', postBootstrap);
 // The iframe can finish loading before this module installs its load listener.
 // Sending once immediately makes bootstrap delivery independent of load order.
 postBootstrap();
-document.querySelector('#reload').addEventListener('click', () => frame.contentWindow.location.reload());
+document.querySelector('#reload').addEventListener('click', () => {
+  runtime.invalidateFileStreams();
+  frame.contentWindow.location.reload();
+});
 document.querySelector('#clear').addEventListener('click', () => renderer.clear());
 document.querySelector('#clear-log').addEventListener('click', () => logs.replaceChildren());
 
@@ -107,4 +110,36 @@ function updateTransportStatus(response) {
 
 function formatBytes(value) {
   return Number.isInteger(value) ? `${value.toLocaleString()} B` : '-';
+}
+
+function pickLocalFiles({ extensions, allowMultiple }) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = allowMultiple;
+  input.accept = extensions.map((extension) => `.${extension}`).join(',');
+  input.hidden = true;
+  document.body.append(input);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (value, error) => {
+      if (settled) return;
+      settled = true;
+      input.remove();
+      if (error) reject(error);
+      else resolve(value);
+    };
+    input.addEventListener('cancel', () => finish([]), { once: true });
+    input.addEventListener('change', async () => {
+      try {
+        const selected = await Promise.all([...input.files].map(async (file) => ({
+          name: file.name,
+          bytes: new Uint8Array(await file.arrayBuffer()),
+        })));
+        finish(selected);
+      } catch (error) {
+        finish(undefined, error);
+      }
+    }, { once: true });
+    input.click();
+  });
 }

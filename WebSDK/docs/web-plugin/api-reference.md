@@ -15,6 +15,67 @@
 - `storage.remove`
 - `storage.clear`
 
+Storage is private to the plugin ID. Use it for small JSON-serializable state,
+not source file content.
+
+## User-selected files
+
+Plugins declaring `files.user-selected` can import and reopen user-selected
+files from App-managed private storage:
+
+- `files.pick`
+- `files.list`
+- `files.stat`
+- `files.openRead`
+- `files.getUsage`
+- `files.delete`
+
+```js
+const picked = await gm.files.pick({
+  extensions: ['txt'],
+  allowMultiple: false,
+});
+const file = picked.files[0];
+
+if (file) {
+  const opened = await gm.files.openRead(file.fileId);
+  const reader = opened.stream.getReader();
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      console.log('received binary bytes', value.length);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+const { files } = await gm.files.list();
+const usage = await gm.files.getUsage();
+console.log(files, usage.totalBytes, usage.maxTotalBytes);
+```
+
+`files.pick` copies accepted files into the App's private directory and returns
+stable metadata: `fileId`, `name`, `size`, `importedAt`, and optional
+`extension`. A cancelled picker returns `{ files: [] }`. `files.openRead`
+returns a `ReadableStream<Uint8Array>` backed by a short-lived, runtime-bound
+Host resource. Pass optional `offset` and `length` values for random-access
+ranges. Both must be JavaScript safe integers; `length` must be positive when
+provided, and the Host clamps a range that extends past EOF. The SDK consumes
+the private resource ticket internally; plugins must
+not retain resource URLs or temporary platform content URIs.
+
+File bytes do not pass through Bridge JSON and are never Base64 encoded. A
+runtime replacement, plugin reload, suspension, or close invalidates unopened
+stream tickets. Use an `AbortSignal` to cancel a read that is no longer needed.
+
+The current file capability advertises a 400 MiB total private quota, a 400 MiB
+maximum selected file size, binary streaming with range support, and up to 20
+files in one multi-select operation. There is no library item-count limit.
+Query `runtime.getCapabilities()` and `files.getUsage()` instead of hard-coding
+these limits.
+
 ## Display
 
 - `display.createPage`

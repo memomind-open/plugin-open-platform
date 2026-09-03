@@ -19,7 +19,7 @@ test('builds an App-compatible mmpkg with a complete SHA-256 file table', async 
     version: '1.2.3',
     entry: 'index.html',
     bridgeVersion: '1.0',
-    permissions: ['display', 'storage'],
+    permissions: ['display', 'storage', 'files.user-selected'],
     deviceRequirements: {
       preferredPluginId: 'com.gm.example.web-bridge',
       protocols: [{ id: 'gm.scene', minVersion: '1.0' }],

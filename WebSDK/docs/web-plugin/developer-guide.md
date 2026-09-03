@@ -191,12 +191,14 @@ Supported permissions:
 | `display` | Create, update, and close glasses display pages |
 | `device.events` | Subscribe to button, head-motion, connection, and IMU events |
 | `storage` | Use App key-value storage isolated to the current plugin |
+| `files.user-selected` | Import user-selected files into App-managed private storage and access them through `files.*` |
 | `network` | Declare that the plugin needs network access |
 | `audio.capture` | Capture bounded Opus audio from the glasses and play an allowlisted local voice effect |
 
-The App checks `display`, `device.events`, `storage`, and `audio.capture` at the corresponding
-Bridge calls. `device.getInfo()` and `plugin.sendMessage()` require no manifest
-permission. Do not declare unused permissions.
+The App checks `display`, `device.events`, `storage`, `files.user-selected`, and
+`audio.capture` at the corresponding Bridge calls. `device.getInfo()` and
+`plugin.sendMessage()` require no manifest permission. Do not declare unused
+permissions.
 
 In the current Debug App, `network` is informational and does not mean that the
 App enforces domain isolation. Networked plugins must still use a strict CSP and
@@ -241,6 +243,43 @@ await gm.storage.clear();
 
 Store only JSON-serializable values, not DOM objects, functions, or cyclic
 references.
+
+For larger user-selected content, declare `files.user-selected` and keep the
+source file in App-managed private storage:
+
+```js
+const { files: selected } = await gm.files.pick({
+  extensions: ['txt'],
+  allowMultiple: false,
+});
+const file = selected[0];
+
+if (file) {
+  const opened = await gm.files.openRead(file.fileId);
+  const reader = opened.stream.getReader();
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      // Process Uint8Array chunks incrementally. Do not concatenate a large file.
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+```
+
+Use `gm.files.list()` at startup to restore the private file library, and key
+matching metadata in `gm.storage` by `fileId`. `gm.files.stat(fileId)` refreshes
+metadata, `gm.files.getUsage()` reports the Host quota, and
+`gm.files.delete(fileId)` removes a file. Do not retain a temporary platform
+picker URI. The current Host controls a 400 MiB total quota and does not impose
+a file-count limit; query capabilities rather than adding plugin-specific
+limits. `gm.files.openRead(fileId, { offset, length, signal })` can open a
+bounded range and returns raw binary data without Base64 or Bridge JSON copies.
+Stream large content incrementally and cancel obsolete reads with the supplied
+`AbortSignal`. `offset` and `length` must be JavaScript safe integers, `length`
+must be positive when supplied, and the Host clamps a requested range at EOF.
 
 ## 7. Display API
 
@@ -560,7 +599,9 @@ try {
 | --- | --- |
 | `INVALID_REQUEST` | Invalid parameters or request structure |
 | `PAYLOAD_TOO_LARGE` | Payload exceeds a transport limit |
-| `UNAUTHORIZED` | Session or permission check failed |
+| `UNAUTHORIZED` | Session authentication failed |
+| `PERMISSION_DENIED` | Plugin manifest does not grant the requested capability |
+| `FILE_NOT_FOUND` | The App-managed file no longer exists |
 | `STALE_RUNTIME` | Request belongs to an old runtime |
 | `METHOD_NOT_FOUND` | Method is unknown or unsupported by the Host |
 | `RATE_LIMITED` | Request rate exceeds a limit |
@@ -572,6 +613,7 @@ try {
 | `DEVICE_DISCONNECTED` | Device is not connected |
 | `CAPABILITY_UNAVAILABLE` | Current Host lacks the requested capability |
 | `RUNTIME_CLOSED` | Runtime has closed |
+| `RUNTIME_REPLACED` | SDK work belonged to a runtime that has been replaced |
 | `INTERNAL_ERROR` | Internal App or Studio error |
 
 Use bounded retry for disconnection, busy, or rate-limit errors. Never retry in

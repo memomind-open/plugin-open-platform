@@ -45,6 +45,15 @@ export const AUDIO_PROFILE = Object.freeze({
   voices: Object.freeze(['original', 'cute', 'deep', 'overlord']),
 });
 
+export const FILE_PROFILE = Object.freeze({
+  persistent: true,
+  maxFileBytes: 400 * 1024 * 1024,
+  maxTotalBytes: 400 * 1024 * 1024,
+  maxPickFiles: 20,
+  readTransport: 'binary-stream',
+  supportsRanges: true,
+});
+
 export const METHOD_NAMES = Object.freeze([
   'runtime.ready',
   'runtime.ping',
@@ -55,6 +64,12 @@ export const METHOD_NAMES = Object.freeze([
   'storage.set',
   'storage.remove',
   'storage.clear',
+  'files.pick',
+  'files.list',
+  'files.stat',
+  'files.openRead',
+  'files.getUsage',
+  'files.delete',
   'display.createPage',
   'display.rebuildPage',
   'display.updateText',
@@ -90,6 +105,8 @@ export const ERROR_CODES = Object.freeze([
   'INVALID_REQUEST',
   'PAYLOAD_TOO_LARGE',
   'UNAUTHORIZED',
+  'PERMISSION_DENIED',
+  'FILE_NOT_FOUND',
   'STALE_RUNTIME',
   'METHOD_NOT_FOUND',
   'RATE_LIMITED',
@@ -101,6 +118,7 @@ export const ERROR_CODES = Object.freeze([
   'DEVICE_DISCONNECTED',
   'CAPABILITY_UNAVAILABLE',
   'RUNTIME_CLOSED',
+  'RUNTIME_REPLACED',
   'INTERNAL_ERROR',
 ]);
 
@@ -109,6 +127,7 @@ export const CAPABILITIES = Object.freeze({
   events: Object.freeze(['button', 'imuGesture', 'rawImu', 'connection']),
   rawImuDefaultEnabled: false,
   pluginMessaging: PLUGIN_MESSAGE_PROFILE,
+  files: FILE_PROFILE,
 });
 
 export function isMethodName(value) {

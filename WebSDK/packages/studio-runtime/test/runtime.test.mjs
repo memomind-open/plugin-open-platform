@@ -35,6 +35,78 @@ test('Studio runtime handles every public runtime and storage method', async () 
   assert.deepEqual((await request(runtime, 'storage.clear')).result, { cleared: true });
 });
 
+test('Studio runtime preserves picked files and opens binary range streams', async () => {
+  const storage = new Map();
+  const fileStore = new Map();
+  const source = Uint8Array.from({ length: 70_000 }, (_, index) => index % 251);
+  const firstRun = new StudioRuntime({
+    renderer: new FakeRenderer(),
+    sessionToken: 'first',
+    storage,
+    fileStore,
+    filePicker: async () => [{ name: 'book.txt', bytes: source }],
+  });
+  const picked = await request(firstRun, 'files.pick', {
+    extensions: ['txt'],
+    allowMultiple: false,
+  });
+  assert.equal(picked.ok, true);
+  const [file] = picked.result.files;
+  assert.match(file.fileId, /^[0-9a-f]{32}$/u);
+  assert.equal(file.size, source.length);
+
+  const revoked = [];
+  const openedRanges = [];
+  const restarted = new StudioRuntime({
+    renderer: new FakeRenderer(),
+    sessionToken: 'second',
+    storage,
+    fileStore,
+    fileResourceFactory: ({ bytes, offset, length }) => {
+      assert.deepEqual(bytes, source.subarray(offset, offset + length));
+      openedRanges.push({ offset, length });
+      return `blob:https://studio.invalid/read-token-${openedRanges.length}`;
+    },
+    fileResourceRevoke: (resourceUrl) => revoked.push(resourceUrl),
+  });
+  assert.deepEqual((await request(restarted, 'files.list')).result.files, [file]);
+  assert.deepEqual((await request(restarted, 'files.stat', { fileId: file.fileId })).result, { file });
+  const opened = await request(restarted, 'files.openRead', {
+    fileId: file.fileId,
+    offset: 4096,
+    length: 65_536,
+  });
+  assert.deepEqual(opened.result, {
+    resourceUrl: 'blob:https://studio.invalid/read-token-1',
+    fileId: file.fileId,
+    size: source.length,
+    offset: 4096,
+    length: 65_536,
+  });
+  const tail = await request(restarted, 'files.openRead', {
+    fileId: file.fileId,
+    offset: source.length - 4,
+    length: 100,
+  });
+  assert.equal(tail.result.length, 4);
+  assert.deepEqual(openedRanges, [
+    { offset: 4096, length: 65_536 },
+    { offset: source.length - 4, length: 4 },
+  ]);
+  restarted.setLifecycle('suspended');
+  assert.deepEqual(revoked, [
+    'blob:https://studio.invalid/read-token-1',
+    'blob:https://studio.invalid/read-token-2',
+  ]);
+  assert.deepEqual((await request(restarted, 'files.getUsage')).result, {
+    fileCount: 1,
+    totalBytes: source.length,
+    maxTotalBytes: 400 * 1024 * 1024,
+  });
+  assert.equal((await request(restarted, 'files.delete', { fileId: file.fileId })).result.deleted, true);
+  assert.equal((await request(restarted, 'files.list')).result.files.length, 0);
+});
+
 test('Studio runtime renders text and rejects drawing while disconnected', async () => {
   const renderer = new FakeRenderer();
   const runtime = new StudioRuntime({ renderer, sessionToken: 'token' });

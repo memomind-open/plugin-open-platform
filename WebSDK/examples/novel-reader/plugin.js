@@ -1,15 +1,9 @@
 import { createGMPlugin } from './vendor/gm-plugin-web-sdk.esm.js';
 import {
   DEFAULT_SCROLL_SPEED,
-  MAX_FILE_BYTES,
   SCROLL_SPEED_PROFILE_VERSION,
-  chapterByteOffsets,
   chapterIndexAt,
-  createBookId,
-  decodeNovel,
-  findChapters,
   migrateScrollSpeed,
-  safeBookTitle,
   trimWindowEnd,
 } from './reader-core.js';
 import {
@@ -25,9 +19,15 @@ import {
   readerControl,
 } from './reader-protocol.js';
 import { ReaderStorage } from './reader-storage.js';
+import {
+  NOVEL_INDEX_VERSION,
+  indexPersistentNovel,
+  readNovelWindow,
+} from './reader-file.js';
 
 const element = (selector) => document.querySelector(selector);
-const fileInput = element('#novel-file');
+const importButton = element('#import-button');
+const fileImportHint = element('#file-import-hint');
 const encodingSelect = element('#encoding');
 const bridgeState = element('#bridge-state');
 const bookList = element('#book-list');
@@ -48,23 +48,21 @@ const dialog = element('#list-dialog');
 const dialogTitle = element('#dialog-title');
 const dialogList = element('#dialog-list');
 
-const database = new ReaderStorage();
-const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-const PROGRESS_SAVE_INTERVAL_MS = 5000;
-const bundledBook = Object.freeze({
-  id: 'bundled-wanming-keshanmeng-v1',
-  title: '晚明_柯山梦',
-  source: './assets/wanming-keshanmeng.txt',
-});
+const PROGRESS_SAVE_INTERVAL_MS = 1000;
+const GLASSES_WINDOW_BYTES = 12_288;
+const WINDOW_CACHE_LIMIT = 6;
+const MAX_BOOKMARKS = 500;
 let gm;
+let database;
 let bridgeReady = false;
 let connected = false;
 let subscriptionId;
 let books = [];
 let current;
-let currentBytes;
+let currentFile;
 let currentChapters = [];
+let windowCache = [];
 let currentOffset = 0;
 let currentSession = 0;
 let glassesChapterTitle = '';
@@ -72,7 +70,6 @@ let playing = true;
 let saveTimer;
 let savePromise = Promise.resolve();
 let lastSaveAt = 0;
-let pickerFeedbackTimer;
 
 async function waitWithTimeout(promise, timeoutMs, message) {
   let timer;
@@ -95,7 +92,7 @@ function setStatus(message, isError = false) {
 
 function formatSize(bytes) {
   return bytes < 1024 * 1024
-    ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+    ? `${Math.round(bytes / 1024)} KB`
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
@@ -106,27 +103,31 @@ function renderLibrary() {
     const title = document.createElement('strong');
     const detail = document.createElement('small');
     button.type = 'button';
-    button.className = `book-card${book.id === current?.id ? ' active' : ''}`;
+    button.className = `book-card${book.fileId === current?.fileId ? ' active' : ''}`;
     title.textContent = book.title;
     detail.textContent = `${Math.round((book.progressOffset ?? 0) / Math.max(1, book.textBytes) * 100)}% · ${formatSize(book.sourceBytes)}`;
     button.append(title, detail);
-    button.addEventListener('click', () => void openBook(book.id));
+    button.addEventListener('click', () => void openBook(book.fileId));
     return button;
   }));
 }
 
 function renderReader() {
-  const available = Boolean(current && currentBytes);
+  const activeWindow = findCachedWindow(currentOffset);
+  const available = Boolean(current && currentFile && activeWindow);
   emptyState.hidden = available;
   readerView.hidden = !available;
   if (!available) return;
-  const percent = Math.min(100, currentOffset / Math.max(1, currentBytes.length) * 100);
+  const percent = Math.min(100, currentOffset / Math.max(1, current.textBytes) * 100);
   const chapter = currentChapters[chapterIndexAt(currentChapters, currentOffset)];
-  const previewEnd = trimWindowEnd(currentBytes, currentOffset, 720);
-  const previewText = decoder.decode(currentBytes.subarray(currentOffset, previewEnd)).trimStart();
+  const localOffset = Math.max(0, currentOffset - activeWindow.byteOffset);
+  const previewEnd = trimWindowEnd(activeWindow.bytes, localOffset, 720);
+  const previewText = decoder.decode(activeWindow.bytes.subarray(localOffset, previewEnd)).trimStart();
   bookTitle.textContent = current.title;
   chapterName.textContent = chapter?.title ?? 'Full Text';
-  phonePreview.textContent = previewEnd < currentBytes.length ? `${previewText}\n…` : previewText;
+  phonePreview.textContent = previewEnd < activeWindow.bytes.length || !activeWindow.final
+    ? `${previewText}\n…`
+    : previewText;
   progress.value = percent;
   progressText.textContent = `${percent.toFixed(1)}%`;
   playToggle.textContent = playing ? 'Pause Auto-scroll' : 'Resume Auto-scroll';
@@ -138,102 +139,78 @@ function renderReader() {
 async function reloadBooks() {
   books = (await database.listBooks()).sort((left, right) => right.updatedAt - left.updatedAt);
   renderLibrary();
+  const usage = await database.getUsage();
+  fileImportHint.textContent = `${formatSize(usage.totalBytes)} of ${formatSize(usage.maxTotalBytes)} used. Book count is not limited.`;
 }
 
-async function installBundledBook() {
-  const existing = await database.getMetadata(bundledBook.id);
-  if (existing) return bundledBook.id;
-  setStatus('Preparing the bundled novel…');
-  const response = await fetch(bundledBook.source);
-  if (!response.ok) throw new Error(`Bundled novel request failed: HTTP ${response.status}`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  const decoded = decodeNovel(bytes, 'utf-8');
-  const now = Date.now();
-  await database.putBook({
-    id: bundledBook.id,
-    title: bundledBook.title,
-    encoding: decoded.encoding,
-    sourceBytes: bytes.length,
-    textBytes: encoder.encode(decoded.text).length,
-    addedAt: now,
-    updatedAt: now,
-    progressOffset: 0,
-    bookmarks: [],
-    fontMode: 0,
-    speed: DEFAULT_SCROLL_SPEED,
-    speedProfileVersion: SCROLL_SPEED_PROFILE_VERSION,
-    playing: true,
-    bundled: true,
-  }, decoded.text);
-  return bundledBook.id;
-}
-
-async function openBook(id, push = true) {
-  const loaded = await database.getBook(id);
+async function openBook(fileId, push = true, requestedEncoding) {
+  const loaded = await database.getBook(fileId);
   if (!loaded) return;
+  let novelIndex = loaded.meta;
+  const selectedEncoding = requestedEncoding ?? loaded.meta.encoding ?? 'auto';
+  const needsIndex = requestedEncoding !== undefined ||
+    novelIndex.indexVersion !== NOVEL_INDEX_VERSION || novelIndex.encoding === 'auto' ||
+    !Number.isSafeInteger(novelIndex.textBytes) || novelIndex.textBytes <= 0 ||
+    !Array.isArray(novelIndex.chapters) || novelIndex.chapters.length === 0;
+  if (needsIndex) {
+    setStatus(`Indexing "${loaded.meta.title}" from the binary stream…`);
+    let shownProgress = -1;
+    const result = await indexPersistentNovel(database, loaded.file, selectedEncoding,
+      (loadedBytes, totalBytes) => {
+        const percent = Math.floor(loadedBytes / Math.max(1, totalBytes) * 100);
+        if (percent >= shownProgress + 10) {
+          shownProgress = percent;
+          setStatus(`Indexing "${loaded.meta.title}": ${percent}%`);
+        }
+      });
+    novelIndex = { ...novelIndex, ...result };
+  }
   const migratedSpeed = migrateScrollSpeed(
     loaded.meta.speed ?? 8,
     loaded.meta.speedProfileVersion ?? 1,
   );
   current = {
     ...loaded.meta,
+    ...novelIndex,
+    fileId,
+    sourceBytes: loaded.file.size,
     speed: migratedSpeed,
     speedProfileVersion: SCROLL_SPEED_PROFILE_VERSION,
+    updatedAt: Date.now(),
   };
-  if (loaded.meta.speed !== migratedSpeed ||
-      loaded.meta.speedProfileVersion !== SCROLL_SPEED_PROFILE_VERSION) {
-    await database.putMetadata({ ...current, updatedAt: Date.now() });
-  }
-  currentBytes = encoder.encode(loaded.text);
-  const chapters = findChapters(loaded.text);
-  currentChapters = chapterByteOffsets(loaded.text, chapters);
-  currentOffset = Math.min(current.progressOffset ?? 0, Math.max(0, currentBytes.length - 1));
+  await database.putMetadata(current, { writeIndex: needsIndex });
+  currentFile = loaded.file;
+  currentChapters = current.chapters;
+  windowCache = [];
+  const cursor = savedCursor(current);
+  currentOffset = cursor.offset;
+  await loadWindow(cursor.sourceOffset, cursor.windowOffset);
   playing = current.playing !== false;
+  const index = books.findIndex((book) => book.fileId === fileId);
+  if (index >= 0) books[index] = current;
   renderReader();
   renderLibrary();
   setStatus(`Opened "${current.title}" with ${currentChapters.length} contents entries.`);
-  if (push) await openOnGlasses(currentOffset);
+  if (push) await openOnGlasses(cursor);
 }
 
-async function importNovel(file) {
-  if (!file) return;
-  if (file.size > MAX_FILE_BYTES) {
-    setStatus('Import failed: TXT files cannot exceed 20 MB.', true);
-    return;
-  }
-  setStatus('Reading and parsing TXT…');
+async function importNovel() {
+  if (!database) return;
+  let file;
   try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const decoded = decodeNovel(bytes, encodingSelect.value);
-    if (!decoded.text) throw new Error('TXT file has no readable text');
-    const id = await createBookId(bytes);
-    const existing = await database.getMetadata(id);
-    const now = Date.now();
-    const metadata = {
-      id,
-      title: safeBookTitle(file.name),
-      encoding: decoded.encoding,
-      sourceBytes: file.size,
-      textBytes: encoder.encode(decoded.text).length,
-      addedAt: existing?.addedAt ?? now,
-      updatedAt: now,
-      progressOffset: existing?.progressOffset ?? 0,
-      bookmarks: existing?.bookmarks ?? [],
-      fontMode: existing?.fontMode ?? 0,
-      speed: existing
-        ? migrateScrollSpeed(existing.speed ?? 8, existing.speedProfileVersion ?? 1)
-        : DEFAULT_SCROLL_SPEED,
-      speedProfileVersion: SCROLL_SPEED_PROFILE_VERSION,
-      playing: existing?.playing ?? true,
-    };
-    await database.putBook(metadata, decoded.text);
+    setStatus('Opening the app file picker…');
+    file = await database.pickBook();
+    if (!file) {
+      setStatus('Import cancelled.');
+      return;
+    }
     await reloadBooks();
-    await openBook(id);
-    setStatus(`TXT imported successfully. Detected encoding: ${decoded.encoding}.`);
+    await openBook(file.fileId, true, encodingSelect.value);
+    setStatus(`TXT imported successfully. Detected encoding: ${current.encoding}.`);
   } catch (error) {
+    if (file?.fileId) await database.deleteBook(file.fileId).catch(() => undefined);
+    await reloadBooks().catch(() => undefined);
     setStatus(`Import failed: ${error.message}`, true);
-  } finally {
-    fileInput.value = '';
   }
 }
 
@@ -243,18 +220,72 @@ function newSession() {
   return values[0] || (Date.now() >>> 0) || 1;
 }
 
-async function openOnGlasses(offset) {
-  if (!currentBytes || !bridgeReady) {
+function savedCursor(book) {
+  const offset = Number.isSafeInteger(book.progressOffset) ? book.progressOffset : 0;
+  if (Number.isSafeInteger(book.progressSourceOffset) &&
+      Number.isSafeInteger(book.progressWindowOffset) &&
+      book.progressWindowOffset <= offset) {
+    return {
+      offset: Math.min(offset, Math.max(0, book.textBytes - 1)),
+      sourceOffset: book.progressSourceOffset,
+      windowOffset: book.progressWindowOffset,
+    };
+  }
+  const chapter = book.chapters?.[chapterIndexAt(book.chapters, offset)] ??
+    { byteOffset: 0, sourceOffset: 0 };
+  return { offset: chapter.byteOffset, sourceOffset: chapter.sourceOffset, windowOffset: chapter.byteOffset };
+}
+
+function findCachedWindow(offset) {
+  return windowCache.find((entry) => offset >= entry.byteOffset &&
+    (offset < entry.byteOffset + entry.bytes.length ||
+      (entry.final && offset === entry.byteOffset + entry.bytes.length)));
+}
+
+function cursorAt(offset) {
+  const activeWindow = findCachedWindow(offset);
+  if (activeWindow) {
+    return { offset, sourceOffset: activeWindow.sourceOffset, windowOffset: activeWindow.byteOffset };
+  }
+  const bookmark = current?.bookmarks?.find((entry) => entry?.offset === offset);
+  if (bookmark) return bookmark;
+  const chapter = currentChapters[chapterIndexAt(currentChapters, offset)] ??
+    { byteOffset: 0, sourceOffset: 0 };
+  return { offset: chapter.byteOffset, sourceOffset: chapter.sourceOffset, windowOffset: chapter.byteOffset };
+}
+
+async function loadWindow(sourceOffset, byteOffset, maxBytes = GLASSES_WINDOW_BYTES) {
+  const loaded = await readNovelWindow(
+    database,
+    currentFile,
+    current.encoding,
+    sourceOffset,
+    maxBytes,
+  );
+  const entry = { ...loaded, byteOffset };
+  windowCache = [
+    ...windowCache.filter((window) => window.byteOffset !== byteOffset),
+    entry,
+  ].slice(-WINDOW_CACHE_LIMIT);
+  return entry;
+}
+
+async function openOnGlasses(cursorOrOffset) {
+  if (!currentFile || !bridgeReady) {
     setStatus('The novel is open on the phone, but the glasses plugin is unavailable.', true);
     return;
   }
+  const cursor = typeof cursorOrOffset === 'number' ? cursorAt(cursorOrOffset) : cursorOrOffset;
+  if (!findCachedWindow(cursor.offset)) {
+    await loadWindow(cursor.sourceOffset, cursor.windowOffset);
+  }
   currentSession = newSession();
   glassesChapterTitle = '';
-  currentOffset = Math.min(offset, Math.max(0, currentBytes.length - 1));
+  currentOffset = Math.min(cursor.offset, Math.max(0, current.textBytes - 1));
   try {
     await gm.plugin.sendMessage(READER_CHANNEL, encodeOpen({
       session: currentSession,
-      totalBytes: currentBytes.length,
+      totalBytes: current.textBytes,
       offset: currentOffset,
       fontMode: current.fontMode ?? 0,
       speed: current.speed ?? DEFAULT_SCROLL_SPEED,
@@ -267,31 +298,46 @@ async function openOnGlasses(offset) {
 }
 
 async function sendTextWindow(request) {
-  if (!currentBytes || request.session !== currentSession) return;
-  const start = Math.min(request.offset, currentBytes.length);
-  const requested = Math.min(request.maxBytes, 12_288);
-  const end = trimWindowEnd(currentBytes, start, requested);
-  if (end <= start) return;
+  if (!currentFile || request.session !== currentSession) return;
+  const start = Math.min(request.offset, current.textBytes);
+  const requested = Math.min(request.maxBytes, GLASSES_WINDOW_BYTES);
+  let activeWindow = findCachedWindow(start);
+  if (!activeWindow) {
+    const previous = windowCache.find((entry) => !entry.final &&
+      entry.byteOffset + entry.bytes.length === start);
+    if (!previous) throw new Error('The requested reading cursor is no longer available');
+    activeWindow = await loadWindow(
+      previous.sourceOffset + previous.sourceLength,
+      previous.byteOffset + previous.bytes.length,
+      requested,
+    );
+  }
+  const localStart = start - activeWindow.byteOffset;
+  const localEnd = trimWindowEnd(activeWindow.bytes, localStart, requested);
+  if (localEnd <= localStart) return;
   await gm.plugin.sendMessage(READER_CHANNEL, encodeWindow({
     session: currentSession,
     offset: start,
-    final: end === currentBytes.length,
-    bytes: currentBytes.subarray(start, end),
+    final: activeWindow.final && localEnd === activeWindow.bytes.length,
+    bytes: activeWindow.bytes.subarray(localStart, localEnd),
   }));
   setStatus('The glasses received a temporary text window for local layout and scrolling.');
 }
 
 function persistReadingState() {
   if (!current) return savePromise;
+  const cursor = cursorAt(currentOffset);
   const metadata = {
     ...current,
     progressOffset: currentOffset,
+    progressSourceOffset: cursor.sourceOffset,
+    progressWindowOffset: cursor.windowOffset,
     playing,
     updatedAt: Date.now(),
   };
   current = metadata;
   lastSaveAt = metadata.updatedAt;
-  const index = books.findIndex((book) => book.id === metadata.id);
+  const index = books.findIndex((book) => book.fileId === metadata.fileId);
   if (index >= 0) books[index] = metadata;
   renderLibrary();
   savePromise = savePromise
@@ -327,7 +373,7 @@ async function handleReaderEvent(message) {
     return;
   }
   if (event.type === 'progress') {
-    currentOffset = Math.min(event.offset, Math.max(0, currentBytes.length - 1));
+    currentOffset = Math.min(event.offset, Math.max(0, current.textBytes - 1));
     playing = event.playing;
     current.fontMode = event.fontMode;
     renderReader();
@@ -338,7 +384,11 @@ async function handleReaderEvent(message) {
   if (event.type !== 'action') return;
   currentOffset = event.offset;
   if (event.action === readerAction.bookmark) {
-    const bookmarks = [...new Set([...(current.bookmarks ?? []), currentOffset])].sort((a, b) => a - b);
+    const added = { ...cursorAt(currentOffset), savedAt: Date.now() };
+    const bookmarks = [...(current.bookmarks ?? []).filter((entry) => entry.offset !== added.offset), added]
+      .sort((left, right) => (right.savedAt ?? 0) - (left.savedAt ?? 0))
+      .slice(0, MAX_BOOKMARKS)
+      .sort((left, right) => left.offset - right.offset);
     current = { ...current, bookmarks, updatedAt: Date.now() };
     await database.putMetadata(current);
     setStatus('Bookmark saved on the phone.');
@@ -348,7 +398,12 @@ async function handleReaderEvent(message) {
   const targetIndex = event.action === readerAction.previousChapter
     ? Math.max(0, index - 1)
     : Math.min(currentChapters.length - 1, index + 1);
-  await openOnGlasses(currentChapters[targetIndex].byteOffset);
+  const chapter = currentChapters[targetIndex];
+  await openOnGlasses({
+    offset: chapter.byteOffset,
+    sourceOffset: chapter.sourceOffset,
+    windowOffset: chapter.byteOffset,
+  });
 }
 
 async function sendControl(control, value = 0) {
@@ -403,13 +458,13 @@ function showList(kind) {
       note.textContent = 'No bookmarks yet. Double-click the primary glasses button to add one.';
       dialogList.append(note);
     }
-    for (const offset of bookmarks) {
+    for (const bookmark of bookmarks) {
       const button = document.createElement('button');
       button.type = 'button';
-      button.textContent = `${(offset / Math.max(1, currentBytes.length) * 100).toFixed(1)}% · ${currentChapters[chapterIndexAt(currentChapters, offset)]?.title ?? 'Full Text'}`;
+      button.textContent = `${(bookmark.offset / Math.max(1, current.textBytes) * 100).toFixed(1)}% · ${currentChapters[chapterIndexAt(currentChapters, bookmark.offset)]?.title ?? 'Full Text'}`;
       button.addEventListener('click', () => {
         dialog.close();
-        void openOnGlasses(offset);
+        void openOnGlasses(bookmark);
       });
       dialogList.append(button);
     }
@@ -417,19 +472,7 @@ function showList(kind) {
   dialog.showModal();
 }
 
-fileInput.addEventListener('click', () => {
-  clearTimeout(pickerFeedbackTimer);
-  setStatus('Opening the system file picker…');
-  pickerFeedbackTimer = setTimeout(() => {
-    if (!document.hidden && !fileInput.files?.length) {
-      setStatus('The host app did not open the file picker. Its WebView must support file upload callbacks.', true);
-    }
-  }, 1200);
-});
-fileInput.addEventListener('change', () => {
-  clearTimeout(pickerFeedbackTimer);
-  void importNovel(fileInput.files?.[0]);
-});
+importButton.addEventListener('click', () => void importNovel());
 
 document.querySelectorAll('[data-control]').forEach((button) => {
   button.addEventListener('click', () => {
@@ -444,10 +487,11 @@ document.querySelectorAll('[data-action]').forEach((button) => {
     if (action === 'directory' || action === 'bookmark') showList(action);
     if (action === 'delete' && current && confirm(`Remove "${current.title}" from the phone library?`)) {
       if (gm && currentSession) await gm.plugin.sendMessage(READER_CHANNEL, encodeClose(currentSession)).catch(() => undefined);
-      await database.deleteBook(current.id);
+      await database.deleteBook(current.fileId);
       current = undefined;
-      currentBytes = undefined;
+      currentFile = undefined;
       currentChapters = [];
+      windowCache = [];
       currentSession = 0;
       glassesChapterTitle = '';
       await reloadBooks();
@@ -496,37 +540,43 @@ async function initializeBridge() {
     bridgeState.textContent = connected ? 'Glasses Connected' : 'Bridge Ready';
     bridgeState.classList.toggle('connected', connected);
     setStatus('Bridge ready. You can now import a TXT file.');
+    return true;
   } catch (error) {
     bridgeState.textContent = 'Connection Timed Out · Retry';
     setStatus(`Glasses Bridge unavailable: ${error.message}. Tap the top-right button to retry.`, true);
+    return false;
   }
 }
 
 async function initialize() {
-  const bridgeInitialization = initializeBridge();
-  let bundledBookId;
+  importButton.disabled = true;
+  const initialized = await initializeBridge();
+  if (!initialized) return;
   try {
+    database = new ReaderStorage(gm);
     await database.open();
-    bundledBookId = await installBundledBook();
     await reloadBooks();
-    setStatus('The bundled novel was added to the phone library.');
+    importButton.disabled = false;
+    if (books.length > 0) {
+      await openBook(books[0].fileId);
+    } else {
+      setStatus('Library ready. Import a TXT file to start reading.');
+    }
   } catch (error) {
     setStatus(`Local library unavailable: ${error.message}`, true);
   }
-  await bridgeInitialization;
-  if (bundledBookId) await openBook(bundledBookId);
 }
 
 window.addEventListener('pagehide', () => eyeballCleanup());
 
 function eyeballCleanup() {
   clearTimeout(saveTimer);
-  clearTimeout(pickerFeedbackTimer);
-  void persistReadingState();
+  const pendingSave = persistReadingState();
   if (gm && currentSession) void gm.plugin.sendMessage(READER_CHANNEL, encodeClose(currentSession)).catch(() => undefined);
   if (gm && subscriptionId) void gm.device.unsubscribeEvents(subscriptionId).catch(() => undefined);
-  gm?.close();
-  currentBytes = undefined;
+  void pendingSave.finally(() => gm?.close());
+  currentFile = undefined;
+  windowCache = [];
   currentSession = 0;
   glassesChapterTitle = '';
 }

@@ -7,6 +7,7 @@ import {
   DEVICE_PROFILE,
   ERROR_CODES,
   EVENT_NAMES,
+  FILE_PROFILE,
   METHOD_NAMES,
   PLUGIN_MESSAGE_PROFILE,
   SCENE_TRANSPORT_PROFILE,
@@ -18,6 +19,9 @@ test('Bridge v1 contract contains unique methods and events', () => {
   assert.equal(new Set(METHOD_NAMES).size, METHOD_NAMES.length);
   assert.equal(new Set(EVENT_NAMES).size, EVENT_NAMES.length);
   assert.equal(new Set(ERROR_CODES).size, ERROR_CODES.length);
+  assert.equal(ERROR_CODES.includes('PERMISSION_DENIED'), true);
+  assert.equal(ERROR_CODES.includes('FILE_NOT_FOUND'), true);
+  assert.equal(ERROR_CODES.includes('RUNTIME_REPLACED'), true);
   assert.equal(isMethodName('display.updateText'), true);
   assert.equal(isMethodName('plugin.sendMessage'), true);
   assert.equal(isMethodName('display.beginFrame'), true);
@@ -32,6 +36,22 @@ test('Plugin message transport exposes the firmware payload limit', () => {
     uplinkEvent: 'plugin.message',
   });
   assert.equal(CAPABILITIES.pluginMessaging, PLUGIN_MESSAGE_PROFILE);
+});
+
+test('persistent user-file capabilities expose App-owned limits', () => {
+  assert.deepEqual(FILE_PROFILE, {
+    persistent: true,
+    maxFileBytes: 400 * 1024 * 1024,
+    maxTotalBytes: 400 * 1024 * 1024,
+    maxPickFiles: 20,
+    readTransport: 'binary-stream',
+    supportsRanges: true,
+  });
+  assert.equal(CAPABILITIES.files, FILE_PROFILE);
+  for (const method of [
+    'files.pick', 'files.list', 'files.stat', 'files.openRead',
+    'files.getUsage', 'files.delete',
+  ]) assert.equal(isMethodName(method), true);
 });
 
 test('reference device profile matches the public glasses geometry', () => {

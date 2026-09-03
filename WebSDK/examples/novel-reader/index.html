@@ -22,10 +22,7 @@
           <h2>My Library</h2>
           <span id="book-count">0 books</span>
         </div>
-        <div class="import-button">
-          <span aria-hidden="true">Import TXT</span>
-          <input id="novel-file" type="file" accept=".txt,text/plain" aria-label="Import TXT" aria-describedby="file-import-hint">
-        </div>
+        <button id="import-button" class="import-button" type="button" aria-describedby="file-import-hint" disabled>Import TXT</button>
         <label class="field-label" for="encoding">Text Encoding</label>
         <select id="encoding">
           <option value="auto">Auto Detect</option>
@@ -34,7 +31,7 @@
           <option value="utf-16le">UTF-16 LE</option>
           <option value="utf-16be">UTF-16 BE</option>
         </select>
-        <p id="file-import-hint" class="hint">Up to 20 MB per book. Text stays on your phone.</p>
+        <p id="file-import-hint" class="hint">Files are stored by the app. Storage usage will appear here.</p>
         <div id="book-list" class="book-list"></div>
       </aside>
 

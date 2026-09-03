@@ -1,5 +1,6 @@
 export type BridgeErrorCode =
-  | 'INVALID_REQUEST' | 'PAYLOAD_TOO_LARGE' | 'UNAUTHORIZED'
+  | 'INVALID_REQUEST' | 'PAYLOAD_TOO_LARGE' | 'UNAUTHORIZED' | 'PERMISSION_DENIED'
+  | 'FILE_NOT_FOUND'
   | 'STALE_RUNTIME' | 'METHOD_NOT_FOUND' | 'RATE_LIMITED' | 'BUSY' | 'QUOTA_EXCEEDED'
   | 'AUDIO_BUSY' | 'NO_AUDIO'
   | 'TIMEOUT' | 'DEVICE_DISCONNECTED' | 'CAPABILITY_UNAVAILABLE'
@@ -40,6 +41,34 @@ export interface PluginMessageResult {
 export interface PluginMessage {
   channel: number;
   data: Uint8Array;
+}
+
+export interface UserFile {
+  fileId: string;
+  name: string;
+  size: number;
+  importedAt: string;
+  extension?: string;
+}
+
+export interface FileReadOptions {
+  offset?: number;
+  length?: number;
+  signal?: AbortSignal;
+}
+
+export interface FileReadStream {
+  fileId: string;
+  size: number;
+  offset: number;
+  length: number;
+  stream: ReadableStream<Uint8Array>;
+}
+
+export interface FileUsage {
+  fileCount: number;
+  totalBytes: number;
+  maxTotalBytes: number;
 }
 
 export type AudioPickupMode =
@@ -107,12 +136,24 @@ export class AppWebViewTransport implements BridgeTransport {
   subscribe(listener: (event: PluginEvent) => void): () => void;
 }
 
-export function createGMPlugin(options?: { transport?: BridgeTransport; timeoutMs?: number }): {
+export function createGMPlugin(options?: {
+  transport?: BridgeTransport;
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
+}): {
   ready(): Promise<unknown>;
   call(method: string, params?: Record<string, unknown>): Promise<unknown>;
   on(eventName: string, listener: (data: Record<string, unknown>, event: PluginEvent) => void): () => void;
   runtime: Record<string, (...args: never[]) => Promise<unknown>>;
   storage: Record<string, (...args: any[]) => Promise<unknown>>;
+  files: {
+    pick(options?: { extensions?: string[]; allowMultiple?: boolean }): Promise<{ files: UserFile[] }>;
+    list(): Promise<{ files: UserFile[] }>;
+    stat(fileId: string): Promise<{ file: UserFile }>;
+    openRead(fileId: string, options?: FileReadOptions): Promise<FileReadStream>;
+    getUsage(): Promise<FileUsage>;
+    delete(fileId: string): Promise<{ deleted: boolean }>;
+  };
   display: Record<string, (...args: any[]) => Promise<unknown>>;
   device: Record<string, (...args: any[]) => Promise<unknown> | (() => void)>;
   plugin: {

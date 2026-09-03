@@ -44,7 +44,8 @@ Field constraints:
   contain empty path segments, `.`, `..`, backslashes, or an absolute path.
 - `bridgeVersion`: currently fixed at `1.0`.
 - `permissions`: at most 16 unique entries. The allowed values are `display`,
-  `device.events`, `storage`, `network`, and `audio.capture`.
+  `device.events`, `storage`, `files.user-selected`, `network`, and
+  `audio.capture`.
 
 Permission meanings:
 
@@ -53,13 +54,15 @@ Permission meanings:
 | `display` | Create, update, and close glasses display pages |
 | `device.events` | Subscribe to button, head-motion, connection, and IMU events; read-only `device.getInfo` does not require this permission |
 | `storage` | Use App key-value storage isolated to the current plugin |
+| `files.user-selected` | Import user-selected files into App-managed private storage and access them through `files.*` |
 | `network` | Declare that the plugin needs network access; the current Debug App does not yet enforce a domain sandbox |
 | `audio.capture` | Capture bounded Opus audio from the glasses after native user consent and use local playback effects |
 
-The App checks `display`, `device.events`, `storage`, and `audio.capture` permissions for the
-corresponding Bridge calls. Do not declare unused permissions. A networked
-plugin must still configure a strict CSP; the `network` declaration does not
-mean that the App has completed network isolation.
+The App checks `display`, `device.events`, `storage`, `files.user-selected`, and
+`audio.capture` permissions for the corresponding Bridge calls. Do not declare
+unused permissions. A networked plugin must still configure a strict CSP; the
+`network` declaration does not mean that the App has completed network
+isolation.
 
 `plugin.sendMessage` uses the device plugin currently installed and running by
 the App. It requires no manifest permission by default. It does not install or

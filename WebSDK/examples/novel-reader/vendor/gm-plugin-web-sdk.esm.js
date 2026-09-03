@@ -48,6 +48,15 @@ const AUDIO_PROFILE = Object.freeze({
   voices: Object.freeze(['original', 'cute', 'deep', 'overlord']),
 });
 
+const FILE_PROFILE = Object.freeze({
+  persistent: true,
+  maxFileBytes: 400 * 1024 * 1024,
+  maxTotalBytes: 400 * 1024 * 1024,
+  maxPickFiles: 20,
+  readTransport: 'binary-stream',
+  supportsRanges: true,
+});
+
 const METHOD_NAMES = Object.freeze([
   'runtime.ready',
   'runtime.ping',
@@ -58,6 +67,12 @@ const METHOD_NAMES = Object.freeze([
   'storage.set',
   'storage.remove',
   'storage.clear',
+  'files.pick',
+  'files.list',
+  'files.stat',
+  'files.openRead',
+  'files.getUsage',
+  'files.delete',
   'display.createPage',
   'display.rebuildPage',
   'display.updateText',
@@ -93,6 +108,8 @@ const ERROR_CODES = Object.freeze([
   'INVALID_REQUEST',
   'PAYLOAD_TOO_LARGE',
   'UNAUTHORIZED',
+  'PERMISSION_DENIED',
+  'FILE_NOT_FOUND',
   'STALE_RUNTIME',
   'METHOD_NOT_FOUND',
   'RATE_LIMITED',
@@ -104,6 +121,7 @@ const ERROR_CODES = Object.freeze([
   'DEVICE_DISCONNECTED',
   'CAPABILITY_UNAVAILABLE',
   'RUNTIME_CLOSED',
+  'RUNTIME_REPLACED',
   'INTERNAL_ERROR',
 ]);
 
@@ -112,6 +130,7 @@ const CAPABILITIES = Object.freeze({
   events: Object.freeze(['button', 'imuGesture', 'rawImu', 'connection']),
   rawImuDefaultEnabled: false,
   pluginMessaging: PLUGIN_MESSAGE_PROFILE,
+  files: FILE_PROFILE,
 });
 
 function isMethodName(value) {
@@ -120,6 +139,13 @@ function isMethodName(value) {
 
 const MAX_PLUGIN_MESSAGE_BASE64_CHARACTERS =
   Math.ceil(PLUGIN_MESSAGE_PROFILE.maxPayloadBytes / 3) * 4;
+const USER_FILE_PICK_TIMEOUT_MS = 10 * 60 * 1000;
+
+function requestTimeoutMs(method, defaultTimeoutMs) {
+  return method === 'files.pick'
+    ? Math.max(defaultTimeoutMs, USER_FILE_PICK_TIMEOUT_MS)
+    : defaultTimeoutMs;
+}
 
 export class GMPluginError extends Error {
   constructor(code, message) {
@@ -152,7 +178,7 @@ export class ParentFrameTransport {
       const timer = setTimeout(() => {
         this.pending.delete(request.requestId);
         reject(new GMPluginError('TIMEOUT', `Bridge request timed out: ${request.method}`));
-      }, this.timeoutMs);
+      }, requestTimeoutMs(request.method, this.timeoutMs));
       this.pending.set(request.requestId, { resolve, reject, timer });
       this.window.parent.postMessage({ type: 'gm-plugin:request', request }, this.parentOrigin);
     });
@@ -280,7 +306,7 @@ export class AppWebViewTransport {
       const timer = setTimeout(() => {
         this.pending.delete(request.requestId);
         reject(new GMPluginError('TIMEOUT', `Bridge request timed out: ${request.method}`));
-      }, this.timeoutMs);
+      }, requestTimeoutMs(request.method, this.timeoutMs));
       this.pending.set(request.requestId, { resolve, reject, timer });
       this.channel.postMessage(JSON.stringify(request));
     });
@@ -301,7 +327,11 @@ export class AppWebViewTransport {
   }
 }
 
-export function createGMPlugin({ transport = detectTransport(), timeoutMs = 5000 } = {}) {
+export function createGMPlugin({
+  transport = detectTransport(),
+  timeoutMs = 5000,
+  fetchImpl = globalThis.fetch?.bind(globalThis),
+} = {}) {
   let sequence = 0;
   let bootstrapData;
   const eventListeners = new Map(EVENT_NAMES.map((name) => [name, new Set()]));
@@ -329,7 +359,7 @@ export function createGMPlugin({ transport = detectTransport(), timeoutMs = 5000
     return new Promise((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new GMPluginError('TIMEOUT', `SDK request timed out: ${method}`)),
-        timeoutMs,
+        requestTimeoutMs(method, timeoutMs),
       );
       transport.send(request).then(
         (result) => {
@@ -377,6 +407,31 @@ export function createGMPlugin({ transport = detectTransport(), timeoutMs = 5000
       set: (key, value) => call('storage.set', { key, value }),
       remove: (key) => call('storage.remove', { key }),
       clear: () => call('storage.clear'),
+    },
+    files: {
+      pick: ({ extensions, allowMultiple } = {}) =>
+        call('files.pick', {
+          ...(extensions === undefined ? {} : { extensions }),
+          ...(allowMultiple === undefined ? {} : { allowMultiple }),
+        }),
+      list: () => call('files.list'),
+      stat: (fileId) => call('files.stat', { fileId }),
+      openRead: async (fileId, { offset, length, signal } = {}) => {
+        if (offset !== undefined && (!Number.isSafeInteger(offset) || offset < 0)) {
+          throw new GMPluginError('INVALID_REQUEST', 'offset must be a non-negative safe integer');
+        }
+        if (length !== undefined && (!Number.isSafeInteger(length) || length < 1)) {
+          throw new GMPluginError('INVALID_REQUEST', 'length must be a positive safe integer');
+        }
+        const ticket = await call('files.openRead', {
+          fileId,
+          ...(offset === undefined ? {} : { offset }),
+          ...(length === undefined ? {} : { length }),
+        });
+        return openUserFileStream(ticket, fileId, fetchImpl, signal);
+      },
+      getUsage: () => call('files.getUsage'),
+      delete: (fileId) => call('files.delete', { fileId }),
     },
     display: {
       createPage: () => call('display.createPage'),
@@ -456,6 +511,39 @@ export function createGMPlugin({ transport = detectTransport(), timeoutMs = 5000
       }
     });
   }
+}
+
+async function openUserFileStream(ticket, requestedFileId, fetchImpl, signal) {
+  if (typeof fetchImpl !== 'function') {
+    throw new GMPluginError('CAPABILITY_UNAVAILABLE', 'Binary file streaming is unavailable');
+  }
+  const resourceUrl = ticket?.resourceUrl;
+  const values = [ticket?.size, ticket?.offset, ticket?.length];
+  if (ticket?.fileId !== requestedFileId || typeof resourceUrl !== 'string' ||
+      resourceUrl.length === 0 || values.some((value) => !Number.isSafeInteger(value) || value < 0) ||
+      ticket.offset > ticket.size || ticket.length > ticket.size - ticket.offset) {
+    throw new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid file stream ticket');
+  }
+  let response;
+  try {
+    response = await fetchImpl(resourceUrl, { method: 'GET', cache: 'no-store', signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    throw new GMPluginError('INTERNAL_ERROR', `Could not open file stream: ${error?.message ?? error}`);
+  }
+  if (!response?.ok || !response.body?.getReader) {
+    throw new GMPluginError(
+      response?.status === 401 || response?.status === 403 ? 'UNAUTHORIZED' : 'INTERNAL_ERROR',
+      `Host file stream failed${Number.isInteger(response?.status) ? `: HTTP ${response.status}` : ''}`,
+    );
+  }
+  return {
+    fileId: ticket.fileId,
+    size: ticket.size,
+    offset: ticket.offset,
+    length: ticket.length,
+    stream: response.body,
+  };
 }
 
 function decodeAudioFrames(value) {

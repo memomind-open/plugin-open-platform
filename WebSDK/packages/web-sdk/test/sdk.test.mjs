@@ -61,6 +61,116 @@ test('SDK adds the Bridge v1 runtime envelope', async () => {
   assert.deepEqual(transport.requests[1].params, { key: 'score', value: 42 });
 });
 
+test('SDK exposes persistent user-file helpers with the formal request shapes', async () => {
+  const transport = new FakeTransport();
+  transport.send = async function send(request) {
+    this.requests.push(request);
+    if (request.method === 'files.openRead') {
+      return {
+        resourceUrl: 'https://plugin-files.invalid/read-token',
+        fileId: request.params.fileId,
+        size: 100_000,
+        offset: request.params.offset,
+        length: request.params.length,
+      };
+    }
+    return { echoed: request.params };
+  };
+  const body = Uint8Array.of(1, 2, 3, 4);
+  const fetchCalls = [];
+  const gm = createGMPlugin({
+    transport,
+    fetchImpl: async (url, options) => {
+      fetchCalls.push({ url, options });
+      return new Response(body, { status: 200 });
+    },
+  });
+  await gm.files.pick({ extensions: ['txt'], allowMultiple: false });
+  await gm.files.list();
+  await gm.files.stat('a'.repeat(32));
+  const opened = await gm.files.openRead('a'.repeat(32), { offset: 65_536, length: 4096 });
+  const received = new Uint8Array(await new Response(opened.stream).arrayBuffer());
+  await gm.files.getUsage();
+  await gm.files.delete('a'.repeat(32));
+
+  await assert.rejects(
+    () => gm.files.openRead('a'.repeat(32), { offset: -1 }),
+    (error) => error instanceof GMPluginError && error.code === 'INVALID_REQUEST',
+  );
+  await assert.rejects(
+    () => gm.files.openRead('a'.repeat(32), { length: 0 }),
+    (error) => error instanceof GMPluginError && error.code === 'INVALID_REQUEST',
+  );
+
+  assert.deepEqual(received, body);
+  assert.equal(opened.size, 100_000);
+  assert.deepEqual(fetchCalls.map(({ url, options }) => ({
+    url,
+    method: options.method,
+    cache: options.cache,
+  })), [{
+    url: 'https://plugin-files.invalid/read-token',
+    method: 'GET',
+    cache: 'no-store',
+  }]);
+
+  assert.deepEqual(transport.requests.map(({ method, params }) => ({ method, params })), [
+    { method: 'files.pick', params: { extensions: ['txt'], allowMultiple: false } },
+    { method: 'files.list', params: {} },
+    { method: 'files.stat', params: { fileId: 'a'.repeat(32) } },
+    { method: 'files.openRead', params: { fileId: 'a'.repeat(32), offset: 65_536, length: 4096 } },
+    { method: 'files.getUsage', params: {} },
+    { method: 'files.delete', params: { fileId: 'a'.repeat(32) } },
+  ]);
+});
+
+test('SDK rejects malformed or unauthorized binary stream tickets', async () => {
+  const transport = new FakeTransport();
+  transport.send = async () => ({
+    resourceUrl: 'https://plugin-files.invalid/read-token',
+    fileId: 'b'.repeat(32),
+    size: 10,
+    offset: 0,
+    length: 10,
+  });
+  let fetchCalled = false;
+  const gm = createGMPlugin({
+    transport,
+    fetchImpl: async () => {
+      fetchCalled = true;
+      return new Response(null, { status: 403 });
+    },
+  });
+  await assert.rejects(
+    () => gm.files.openRead('a'.repeat(32)),
+    (error) => error instanceof GMPluginError && error.code === 'INTERNAL_ERROR',
+  );
+  assert.equal(fetchCalled, false);
+
+  transport.send = async (request) => ({
+    resourceUrl: 'https://plugin-files.invalid/read-token',
+    fileId: request.params.fileId,
+    size: 10,
+    offset: 0,
+    length: 10,
+  });
+  await assert.rejects(
+    () => gm.files.openRead('a'.repeat(32)),
+    (error) => error instanceof GMPluginError && error.code === 'UNAUTHORIZED',
+  );
+});
+
+test('SDK does not apply the ordinary short timeout to the interactive file picker', async () => {
+  const transport = new FakeTransport();
+  transport.send = async function send(request) {
+    this.requests.push(request);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return { files: [] };
+  };
+  const gm = createGMPlugin({ transport, timeoutMs: 5 });
+  await assert.doesNotReject(() => gm.files.pick());
+});
+
 test('SDK filters stale events and exposes typed helpers', async () => {
   const transport = new FakeTransport();
   const gm = createGMPlugin({ transport });
