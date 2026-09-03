@@ -151,7 +151,8 @@ underlying transport contract.
 ## Examples
 
 Maintained examples cover individual Host modules, product integration, and
-complete games including Breakout, Tetris, Jet Runner, Snake, 2048, and Fighter Arena. See
+complete games including Breakout, Tetris, Jet Runner, Snake, Sokoban, 2048,
+and Fighter Arena. See
 [examples/README.md](examples/README.md) for the complete list.
 
 Build every maintained example:

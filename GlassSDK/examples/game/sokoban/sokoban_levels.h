@@ -1,0 +1,276 @@
+#ifndef SOKOBAN_LEVELS_H
+#define SOKOBAN_LEVELS_H
+
+#include <stdint.h>
+
+#define SOKOBAN_LEVEL_COUNT 36U
+#define SOKOBAN_LEVEL_ROWS 8U
+
+typedef struct {
+    uint16_t walls[SOKOBAN_LEVEL_ROWS];
+    uint16_t goals[SOKOBAN_LEVEL_ROWS];
+    uint16_t boxes[SOKOBAN_LEVEL_ROWS];
+    uint8_t player_x;
+    uint8_t player_y;
+} sokoban_level_t;
+
+/* Position-only level data. Each row is a 10-bit mask; visual resources and
+ * game logic are shared by every level. Level 1 is an open-field tutorial;
+ * the remaining levels are ordered by solver-proven minimum pushes, then by
+ * forward-search expansion count. */
+static const sokoban_level_t sokoban_levels[SOKOBAN_LEVEL_COUNT] = {
+    /* Level 1: billiards-style alignment with four-way access around the box. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x201), UINT16_C(0x201), UINT16_C(0x201), UINT16_C(0x201), UINT16_C(0x201), UINT16_C(0x201), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x100), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x020), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        2, 4
+    },
+    /* Level 2: minimum 17 pushes; 782 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x309), UINT16_C(0x245), UINT16_C(0x281), UINT16_C(0x295), UINT16_C(0x203), UINT16_C(0x263), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x104), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x030), UINT16_C(0x004), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        1, 1
+    },
+    /* Level 3: minimum 18 pushes; 132 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x351), UINT16_C(0x301), UINT16_C(0x3B5), UINT16_C(0x205), UINT16_C(0x36F), UINT16_C(0x201), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x080), UINT16_C(0x000), UINT16_C(0x080), UINT16_C(0x000), UINT16_C(0x110), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x020), UINT16_C(0x000), UINT16_C(0x010), UINT16_C(0x010), UINT16_C(0x004), UINT16_C(0x000)},
+        1, 6
+    },
+    /* Level 4: minimum 18 pushes; 3607 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x20F), UINT16_C(0x241), UINT16_C(0x281), UINT16_C(0x213), UINT16_C(0x2A3), UINT16_C(0x201), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x100), UINT16_C(0x008), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x048), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x088), UINT16_C(0x00C), UINT16_C(0x000), UINT16_C(0x000)},
+        4, 1
+    },
+    /* Level 5: minimum 18 pushes; 5931 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x301), UINT16_C(0x245), UINT16_C(0x219), UINT16_C(0x221), UINT16_C(0x20F), UINT16_C(0x203), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x040), UINT16_C(0x000), UINT16_C(0x0A0), UINT16_C(0x000), UINT16_C(0x040), UINT16_C(0x010), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x020), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x060), UINT16_C(0x008), UINT16_C(0x000)},
+        2, 6
+    },
+    /* Level 6: minimum 19 pushes; 1205 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x241), UINT16_C(0x285), UINT16_C(0x205), UINT16_C(0x20D), UINT16_C(0x241), UINT16_C(0x241), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x008), UINT16_C(0x0C0), UINT16_C(0x100), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x018), UINT16_C(0x010), UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x000), UINT16_C(0x000)},
+        1, 1
+    },
+    /* Level 7: minimum 19 pushes; 3953 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x341), UINT16_C(0x201), UINT16_C(0x281), UINT16_C(0x2C1), UINT16_C(0x2A7), UINT16_C(0x301), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x010), UINT16_C(0x004), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x008), UINT16_C(0x040), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x080), UINT16_C(0x000), UINT16_C(0x010), UINT16_C(0x008), UINT16_C(0x000), UINT16_C(0x000)},
+        8, 2
+    },
+    /* Level 8: minimum 19 pushes; 62172 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x209), UINT16_C(0x211), UINT16_C(0x211), UINT16_C(0x30B), UINT16_C(0x241), UINT16_C(0x241), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x102), UINT16_C(0x004), UINT16_C(0x180), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x040), UINT16_C(0x040), UINT16_C(0x000), UINT16_C(0x094), UINT16_C(0x000), UINT16_C(0x000)},
+        8, 5
+    },
+    /* Level 9: minimum 20 pushes; 187 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x259), UINT16_C(0x289), UINT16_C(0x203), UINT16_C(0x311), UINT16_C(0x323), UINT16_C(0x343), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x014), UINT16_C(0x100), UINT16_C(0x082), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x024), UINT16_C(0x108), UINT16_C(0x008), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        1, 1
+    },
+    /* Level 10: minimum 20 pushes; 19381 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x301), UINT16_C(0x301), UINT16_C(0x24B), UINT16_C(0x201), UINT16_C(0x311), UINT16_C(0x211), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x080), UINT16_C(0x010), UINT16_C(0x000), UINT16_C(0x020), UINT16_C(0x000), UINT16_C(0x020), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x004), UINT16_C(0x00C), UINT16_C(0x000), UINT16_C(0x000)},
+        1, 4
+    },
+    /* Level 11: minimum 21 pushes; 22867 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x231), UINT16_C(0x203), UINT16_C(0x381), UINT16_C(0x213), UINT16_C(0x203), UINT16_C(0x201), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x008), UINT16_C(0x080), UINT16_C(0x088), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x0A8), UINT16_C(0x004), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        1, 3
+    },
+    /* Level 12: minimum 21 pushes; 28409 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x301), UINT16_C(0x283), UINT16_C(0x201), UINT16_C(0x22D), UINT16_C(0x201), UINT16_C(0x245), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x00A), UINT16_C(0x142), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x040), UINT16_C(0x030), UINT16_C(0x042), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        1, 1
+    },
+    /* Level 13: minimum 22 pushes; 2342 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x247), UINT16_C(0x2A1), UINT16_C(0x201), UINT16_C(0x261), UINT16_C(0x205), UINT16_C(0x207), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x080), UINT16_C(0x002), UINT16_C(0x020), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x0A0), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        6, 2
+    },
+    /* Level 14: minimum 22 pushes; 4770 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x215), UINT16_C(0x311), UINT16_C(0x20B), UINT16_C(0x301), UINT16_C(0x241), UINT16_C(0x201), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x100), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x008), UINT16_C(0x024), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x060), UINT16_C(0x0A0), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        5, 1
+    },
+    /* Level 15: minimum 22 pushes; 7295 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x223), UINT16_C(0x281), UINT16_C(0x281), UINT16_C(0x211), UINT16_C(0x301), UINT16_C(0x355), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x010), UINT16_C(0x000), UINT16_C(0x002), UINT16_C(0x0A0), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x040), UINT16_C(0x020), UINT16_C(0x0C0), UINT16_C(0x000), UINT16_C(0x000)},
+        7, 6
+    },
+    /* Level 16: minimum 22 pushes; 9315 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x301), UINT16_C(0x383), UINT16_C(0x309), UINT16_C(0x247), UINT16_C(0x303), UINT16_C(0x313), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x014), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x080), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x048), UINT16_C(0x030), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        6, 3
+    },
+    /* Level 17: minimum 22 pushes; 38613 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x2E1), UINT16_C(0x213), UINT16_C(0x203), UINT16_C(0x201), UINT16_C(0x307), UINT16_C(0x221), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x080), UINT16_C(0x080), UINT16_C(0x0C0), UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x008), UINT16_C(0x030), UINT16_C(0x010), UINT16_C(0x020), UINT16_C(0x000), UINT16_C(0x000)},
+        8, 1
+    },
+    /* Level 18: minimum 23 pushes; 706 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x283), UINT16_C(0x2B1), UINT16_C(0x2B3), UINT16_C(0x241), UINT16_C(0x203), UINT16_C(0x2D1), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x102), UINT16_C(0x004), UINT16_C(0x008), UINT16_C(0x100), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x104), UINT16_C(0x010), UINT16_C(0x010), UINT16_C(0x000), UINT16_C(0x000)},
+        1, 2
+    },
+    /* Level 19: minimum 23 pushes; 803 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x201), UINT16_C(0x347), UINT16_C(0x229), UINT16_C(0x245), UINT16_C(0x201), UINT16_C(0x249), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x010), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x010), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x080), UINT16_C(0x000), UINT16_C(0x0C0), UINT16_C(0x000), UINT16_C(0x000)},
+        8, 3
+    },
+    /* Level 20: minimum 23 pushes; 2112 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x229), UINT16_C(0x245), UINT16_C(0x281), UINT16_C(0x281), UINT16_C(0x20D), UINT16_C(0x20D), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x010), UINT16_C(0x008), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x010), UINT16_C(0x080), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x030), UINT16_C(0x040), UINT16_C(0x020), UINT16_C(0x000)},
+        1, 1
+    },
+    /* Level 21: minimum 23 pushes; 14031 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x209), UINT16_C(0x221), UINT16_C(0x205), UINT16_C(0x289), UINT16_C(0x221), UINT16_C(0x36F), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x0A0), UINT16_C(0x100), UINT16_C(0x002), UINT16_C(0x000), UINT16_C(0x040), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x088), UINT16_C(0x000), UINT16_C(0x120), UINT16_C(0x010), UINT16_C(0x000), UINT16_C(0x000)},
+        4, 6
+    },
+    /* Level 22: minimum 23 pushes; 14589 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x301), UINT16_C(0x203), UINT16_C(0x225), UINT16_C(0x231), UINT16_C(0x305), UINT16_C(0x201), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x088), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x002), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x080), UINT16_C(0x0C0), UINT16_C(0x080), UINT16_C(0x000)},
+        8, 6
+    },
+    /* Level 23: minimum 23 pushes; 18342 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x241), UINT16_C(0x229), UINT16_C(0x203), UINT16_C(0x361), UINT16_C(0x201), UINT16_C(0x211), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x020), UINT16_C(0x000), UINT16_C(0x040), UINT16_C(0x000), UINT16_C(0x0A2), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x010), UINT16_C(0x0C4), UINT16_C(0x010), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        3, 3
+    },
+    /* Level 24: minimum 23 pushes; 19407 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x285), UINT16_C(0x201), UINT16_C(0x345), UINT16_C(0x281), UINT16_C(0x251), UINT16_C(0x305), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x020), UINT16_C(0x030), UINT16_C(0x002), UINT16_C(0x020), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x008), UINT16_C(0x000), UINT16_C(0x00C), UINT16_C(0x024), UINT16_C(0x000), UINT16_C(0x000)},
+        8, 4
+    },
+    /* Level 25: minimum 24 pushes; 11250 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x237), UINT16_C(0x221), UINT16_C(0x211), UINT16_C(0x201), UINT16_C(0x20B), UINT16_C(0x283), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x100), UINT16_C(0x100), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x014), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x008), UINT16_C(0x004), UINT16_C(0x004), UINT16_C(0x004), UINT16_C(0x000), UINT16_C(0x000)},
+        3, 1
+    },
+    /* Level 26: minimum 25 pushes; 3536 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x20F), UINT16_C(0x201), UINT16_C(0x331), UINT16_C(0x235), UINT16_C(0x2CF), UINT16_C(0x201), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x110), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x108), UINT16_C(0x000), UINT16_C(0x020), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x020), UINT16_C(0x004), UINT16_C(0x044), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x080), UINT16_C(0x000)},
+        1, 2
+    },
+    /* Level 27: minimum 25 pushes; 5089 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x281), UINT16_C(0x201), UINT16_C(0x381), UINT16_C(0x31B), UINT16_C(0x311), UINT16_C(0x253), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x008), UINT16_C(0x002), UINT16_C(0x004), UINT16_C(0x002), UINT16_C(0x004), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x050), UINT16_C(0x040), UINT16_C(0x022), UINT16_C(0x000), UINT16_C(0x000)},
+        5, 6
+    },
+    /* Level 28: minimum 25 pushes; 19952 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x221), UINT16_C(0x251), UINT16_C(0x289), UINT16_C(0x201), UINT16_C(0x203), UINT16_C(0x321), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x020), UINT16_C(0x000), UINT16_C(0x10A), UINT16_C(0x000), UINT16_C(0x040), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x000), UINT16_C(0x018), UINT16_C(0x024), UINT16_C(0x000), UINT16_C(0x000)},
+        6, 1
+    },
+    /* Level 29: minimum 26 pushes; 4692 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x203), UINT16_C(0x297), UINT16_C(0x221), UINT16_C(0x201), UINT16_C(0x211), UINT16_C(0x211), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x008), UINT16_C(0x040), UINT16_C(0x180), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x008), UINT16_C(0x008), UINT16_C(0x020), UINT16_C(0x004), UINT16_C(0x000), UINT16_C(0x000)},
+        2, 1
+    },
+    /* Level 30: minimum 26 pushes; 10558 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x205), UINT16_C(0x235), UINT16_C(0x205), UINT16_C(0x341), UINT16_C(0x201), UINT16_C(0x277), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x100), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x042), UINT16_C(0x008), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x0C0), UINT16_C(0x080), UINT16_C(0x080), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        1, 1
+    },
+    /* Level 31: minimum 26 pushes; 23808 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x203), UINT16_C(0x219), UINT16_C(0x30F), UINT16_C(0x215), UINT16_C(0x201), UINT16_C(0x209), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x048), UINT16_C(0x080), UINT16_C(0x040), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x100), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x040), UINT16_C(0x020), UINT16_C(0x000), UINT16_C(0x020), UINT16_C(0x044), UINT16_C(0x000), UINT16_C(0x000)},
+        1, 4
+    },
+    /* Level 32: minimum 26 pushes; 101794 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x341), UINT16_C(0x203), UINT16_C(0x2A3), UINT16_C(0x205), UINT16_C(0x201), UINT16_C(0x211), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x010), UINT16_C(0x020), UINT16_C(0x100), UINT16_C(0x000), UINT16_C(0x020), UINT16_C(0x040), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x030), UINT16_C(0x008), UINT16_C(0x008), UINT16_C(0x010), UINT16_C(0x000), UINT16_C(0x000)},
+        1, 1
+    },
+    /* Level 33: minimum 27 pushes; 2588 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x211), UINT16_C(0x209), UINT16_C(0x223), UINT16_C(0x201), UINT16_C(0x201), UINT16_C(0x365), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x080), UINT16_C(0x020), UINT16_C(0x000), UINT16_C(0x100), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x088), UINT16_C(0x000), UINT16_C(0x000)},
+        1, 1
+    },
+    /* Level 34: minimum 27 pushes; 4959 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x343), UINT16_C(0x309), UINT16_C(0x2C3), UINT16_C(0x201), UINT16_C(0x241), UINT16_C(0x2E1), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x038), UINT16_C(0x040), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x000), UINT16_C(0x080), UINT16_C(0x00C), UINT16_C(0x000), UINT16_C(0x000)},
+        8, 3
+    },
+    /* Level 35: minimum 30 pushes; 17811 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x363), UINT16_C(0x247), UINT16_C(0x209), UINT16_C(0x321), UINT16_C(0x201), UINT16_C(0x231), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x0C2), UINT16_C(0x000), UINT16_C(0x010), UINT16_C(0x004), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x05C), UINT16_C(0x040), UINT16_C(0x000), UINT16_C(0x000)},
+        2, 1
+    },
+    /* Level 36: minimum 30 pushes; 58329 forward-search expansions. */
+    {
+        {UINT16_C(0x3FF), UINT16_C(0x209), UINT16_C(0x283), UINT16_C(0x207), UINT16_C(0x201), UINT16_C(0x2A1), UINT16_C(0x301), UINT16_C(0x3FF)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x100), UINT16_C(0x080), UINT16_C(0x100), UINT16_C(0x000), UINT16_C(0x060), UINT16_C(0x000)},
+        {UINT16_C(0x000), UINT16_C(0x000), UINT16_C(0x010), UINT16_C(0x000), UINT16_C(0x004), UINT16_C(0x018), UINT16_C(0x040), UINT16_C(0x000)},
+        7, 6
+    }
+};
+
+#endif
