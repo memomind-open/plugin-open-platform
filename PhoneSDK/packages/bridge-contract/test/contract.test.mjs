@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  AUDIO_STREAM_ENVELOPE,
+  AUDIO_STREAM_PORT_KIND,
+  AUDIO_PROFILE,
   BRIDGE_VERSION,
   CAPABILITIES,
   DEVICE_PROFILE,
@@ -11,6 +14,7 @@ import {
   METHOD_NAMES,
   PLUGIN_MESSAGE_PROFILE,
   SCENE_TRANSPORT_PROFILE,
+  STREAM_PORT_MESSAGE_TYPE,
   isMethodName,
 } from '../src/index.js';
 
@@ -28,6 +32,37 @@ test('Bridge v1 contract contains unique methods and events', () => {
   assert.equal(isMethodName('display.updateFrameImageLz4'), true);
   assert.equal(isMethodName('private.method'), false);
   assert.equal(EVENT_NAMES.includes('plugin.message'), true);
+});
+
+test('audio uses one capture session API and never exposes Base64 frame events', () => {
+  assert.equal(METHOD_NAMES.includes('audio.openCapture'), true);
+  assert.equal(METHOD_NAMES.includes('audio.stopCapture'), true);
+  assert.equal(METHOD_NAMES.includes('audio.configure'), false);
+  assert.equal(METHOD_NAMES.includes('audio.startRecording'), false);
+  assert.equal(METHOD_NAMES.includes('audio.stopRecording'), false);
+  assert.equal(EVENT_NAMES.includes('audio.frames'), false);
+  assert.equal(EVENT_NAMES.includes('audio.captureState'), true);
+  assert.equal(ERROR_CODES.includes('BUFFER_OVERFLOW'), true);
+  assert.equal(AUDIO_PROFILE.modes.recording.exposesAudioToWeb, false);
+  assert.equal(AUDIO_PROFILE.modes.stream.payload, 'binary-envelope-v1');
+  assert.equal(AUDIO_PROFILE.modes.stream.envelope, AUDIO_STREAM_ENVELOPE);
+  assert.equal(STREAM_PORT_MESSAGE_TYPE, 'gm-plugin:stream-port');
+  assert.equal(AUDIO_STREAM_PORT_KIND, 'audio.capture');
+  assert.deepEqual(AUDIO_STREAM_ENVELOPE, {
+    magic: 0x474d4155,
+    version: 1,
+    chunkType: 1,
+    discontinuityFlag: 0x0001,
+    baseHeaderBytes: 40,
+    frameLengthBytes: 2,
+    maxFramesPerChunk: 10,
+    byteOrder: 'big-endian',
+  });
+  assert.deepEqual(AUDIO_PROFILE.modes.stream.profiles.interactive, {
+    chunkDurationMs: 40,
+    maxQueueMs: 200,
+    overflowStrategy: 'drop-oldest',
+  });
 });
 
 test('Plugin message transport exposes the firmware payload limit', () => {

@@ -32,20 +32,65 @@ const PLUGIN_MESSAGE_PROFILE = Object.freeze({
   uplinkEvent: 'plugin.message',
 });
 
+const STREAM_PORT_MESSAGE_TYPE = 'gm-plugin:stream-port';
+const AUDIO_STREAM_PORT_KIND = 'audio.capture';
+const AUDIO_STREAM_ENVELOPE = Object.freeze({
+  magic: 0x474d4155,
+  version: 1,
+  chunkType: 1,
+  discontinuityFlag: 0x0001,
+  baseHeaderBytes: 40,
+  frameLengthBytes: 2,
+  maxFramesPerChunk: 10,
+  byteOrder: 'big-endian',
+});
+
 const AUDIO_PROFILE = Object.freeze({
   codec: 'opus',
   sampleRate: 16000,
   channels: 1,
-  maxDurationMs: 15000,
-  maxFrames: 750,
-  maxOpusBytes: 64 * 1024,
-  streamEvent: 'audio.frames',
-  streamIsLossyObservation: true,
+  noiseReduction: true,
   pickupModes: Object.freeze([
     'unchanged', 'frontFixed', 'meetingAuto', 'nonWearerFocus',
     'frontBalanced', 'frontFocus',
   ]),
   voices: Object.freeze(['original', 'cute', 'deep', 'overlord']),
+  modes: Object.freeze({
+    recording: Object.freeze({
+      maxDurationMs: 15000,
+      maxFrames: 750,
+      maxOpusBytes: 64 * 1024,
+      retention: 'host-memory',
+      exposesAudioToWeb: false,
+    }),
+    stream: Object.freeze({
+      transport: 'message-port',
+      payload: 'binary-envelope-v1',
+      envelope: AUDIO_STREAM_ENVELOPE,
+      frameDurationMs: 20,
+      chunkDurationMs: Object.freeze({ min: 20, max: 200 }),
+      maxQueueMs: Object.freeze({ min: 100, max: 5000 }),
+      maxDurationMs: Object.freeze({ min: 1000, max: 60 * 60 * 1000, unlimited: true }),
+      profiles: Object.freeze({
+        interactive: Object.freeze({
+          chunkDurationMs: 40,
+          maxQueueMs: 200,
+          overflowStrategy: 'drop-oldest',
+        }),
+        balanced: Object.freeze({
+          chunkDurationMs: 100,
+          maxQueueMs: 500,
+          overflowStrategy: 'drop-oldest',
+        }),
+        reliable: Object.freeze({
+          chunkDurationMs: 100,
+          maxQueueMs: 3000,
+          overflowStrategy: 'error',
+        }),
+      }),
+      overflowStrategies: Object.freeze(['drop-oldest', 'drop-newest', 'error']),
+    }),
+  }),
 });
 
 const FILE_PROFILE = Object.freeze({
@@ -85,9 +130,8 @@ const METHOD_NAMES = Object.freeze([
   'device.subscribeEvents',
   'device.unsubscribeEvents',
   'plugin.sendMessage',
-  'audio.configure',
-  'audio.startRecording',
-  'audio.stopRecording',
+  'audio.openCapture',
+  'audio.stopCapture',
   'audio.playRecording',
   'audio.stopPlayback',
 ]);
@@ -98,8 +142,7 @@ const EVENT_NAMES = Object.freeze([
   'device.rawImu',
   'device.connection',
   'plugin.message',
-  'audio.frames',
-  'audio.state',
+  'audio.captureState',
   'audio.playbackState',
   'runtime.lifecycleChanged',
 ]);
@@ -116,6 +159,7 @@ const ERROR_CODES = Object.freeze([
   'BUSY',
   'AUDIO_BUSY',
   'NO_AUDIO',
+  'BUFFER_OVERFLOW',
   'QUOTA_EXCEEDED',
   'TIMEOUT',
   'DEVICE_DISCONNECTED',
@@ -265,6 +309,10 @@ export class AppWebViewTransport {
     this.listeners = new Set();
     this.bootstrapListeners = new Set();
     this.bootstrapWaiters = [];
+    this.streamPorts = new Map();
+    this.pendingStreamResponses = new Map();
+    this.onWindowMessage = this.onWindowMessage.bind(this);
+    globalObject.addEventListener?.('message', this.onWindowMessage);
     globalObject.__memoPluginBootstrap = (sessionToken, runtimeGeneration) => {
       this.replaceBootstrap({ sessionToken, runtimeGeneration });
     };
@@ -288,6 +336,8 @@ export class AppWebViewTransport {
         reject(new GMPluginError('RUNTIME_REPLACED', 'Bridge runtime was replaced'));
       }
       this.pending.clear();
+      this.pendingStreamResponses.clear();
+      this.#closeStreamPorts();
     }
     this.bootstrapData = value;
     for (const resolve of this.bootstrapWaiters.splice(0)) resolve(value);
@@ -304,10 +354,10 @@ export class AppWebViewTransport {
   send(request) {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.pending.delete(request.requestId);
+        this.#deletePending(request.requestId);
         reject(new GMPluginError('TIMEOUT', `Bridge request timed out: ${request.method}`));
       }, requestTimeoutMs(request.method, this.timeoutMs));
-      this.pending.set(request.requestId, { resolve, reject, timer });
+      this.pending.set(request.requestId, { resolve, reject, timer, request });
       this.channel.postMessage(JSON.stringify(request));
     });
   }
@@ -315,16 +365,129 @@ export class AppWebViewTransport {
   resolve(response) {
     const pending = this.pending.get(response?.requestId);
     if (!pending) return;
-    clearTimeout(pending.timer);
-    this.pending.delete(response.requestId);
-    if (response.ok) pending.resolve(response.result);
-    else pending.reject(toPluginError(response.error));
+    if (!response.ok) {
+      this.#complete(response.requestId, pending, undefined, toPluginError(response.error));
+      return;
+    }
+    const result = response.result;
+    if (pending.request.method !== 'audio.openCapture' || result?.mode !== 'stream') {
+      this.#complete(response.requestId, pending, result);
+      return;
+    }
+    const descriptor = result.streamDescriptor;
+    if (!isAudioStreamDescriptor(descriptor, result.sessionId, pending.request.runtimeGeneration)) {
+      this.#complete(response.requestId, pending, undefined, new GMPluginError(
+        'INTERNAL_ERROR', 'Host returned an invalid audio stream descriptor',
+      ));
+      return;
+    }
+    pending.streamDescriptor = descriptor;
+    pending.responseResult = result;
+    this.pendingStreamResponses.set(descriptor.id, response.requestId);
+    this.#completeStreamResponse(descriptor.id);
   }
 
   subscribe(listener) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
+
+  onWindowMessage(event) {
+    const envelope = parseWindowMessage(event?.data);
+    if (envelope?.type !== STREAM_PORT_MESSAGE_TYPE) return;
+    const descriptor = envelope.descriptor;
+    const port = event?.ports?.[0];
+    if (!isAudioStreamDescriptor(descriptor) || typeof port?.postMessage !== 'function' ||
+        descriptor.runtimeGeneration !== this.bootstrapData?.runtimeGeneration) {
+      port?.close?.();
+      return;
+    }
+    const existing = this.streamPorts.get(descriptor.id);
+    if (existing) {
+      port.close?.();
+      return;
+    }
+    this.streamPorts.set(descriptor.id, { descriptor, port });
+    while (this.streamPorts.size > 8) {
+      const [oldestId, oldest] = this.streamPorts.entries().next().value;
+      oldest.port.close?.();
+      this.streamPorts.delete(oldestId);
+    }
+    this.#completeStreamResponse(descriptor.id);
+  }
+
+  close() {
+    this.globalObject.removeEventListener?.('message', this.onWindowMessage);
+    for (const { reject, timer } of this.pending.values()) {
+      clearTimeout(timer);
+      reject(new GMPluginError('RUNTIME_CLOSED', 'Bridge transport closed'));
+    }
+    this.pending.clear();
+    this.pendingStreamResponses.clear();
+    this.#closeStreamPorts();
+    this.listeners.clear();
+    this.bootstrapListeners.clear();
+    this.bootstrapWaiters = [];
+  }
+
+  #completeStreamResponse(streamId) {
+    const requestId = this.pendingStreamResponses.get(streamId);
+    const pending = requestId ? this.pending.get(requestId) : undefined;
+    const entry = this.streamPorts.get(streamId);
+    if (!pending || !entry || !sameAudioStreamDescriptor(pending.streamDescriptor, entry.descriptor)) return;
+    this.streamPorts.delete(streamId);
+    const result = { ...pending.responseResult, streamPort: entry.port };
+    // responseResult is assigned below for hosts whose JSON response and port
+    // arrive in either order.
+    this.#complete(requestId, pending, result);
+  }
+
+  #complete(requestId, pending, result, error) {
+    clearTimeout(pending.timer);
+    this.#deletePending(requestId);
+    if (error) pending.reject(error);
+    else pending.resolve(result);
+  }
+
+  #deletePending(requestId) {
+    const pending = this.pending.get(requestId);
+    this.pending.delete(requestId);
+    const streamId = pending?.streamDescriptor?.id;
+    if (streamId) {
+      this.pendingStreamResponses.delete(streamId);
+      const entry = this.streamPorts.get(streamId);
+      entry?.port?.close?.();
+      this.streamPorts.delete(streamId);
+    }
+  }
+
+  #closeStreamPorts() {
+    for (const { port } of this.streamPorts.values()) port.close?.();
+    this.streamPorts.clear();
+  }
+}
+
+function parseWindowMessage(value) {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function isAudioStreamDescriptor(value, sessionId = value?.sessionId, runtimeGeneration = value?.runtimeGeneration) {
+  return value && typeof value === 'object' && value.kind === AUDIO_STREAM_PORT_KIND &&
+    typeof value.id === 'string' && value.id.length >= 16 && value.id.length <= 256 &&
+    typeof value.sessionId === 'string' && value.sessionId.length > 0 && value.sessionId === sessionId &&
+    Number.isSafeInteger(value.runtimeGeneration) && value.runtimeGeneration >= 0 &&
+    value.runtimeGeneration === runtimeGeneration;
+}
+
+function sameAudioStreamDescriptor(left, right) {
+  return isAudioStreamDescriptor(left) && isAudioStreamDescriptor(right) &&
+    left.id === right.id && left.kind === right.kind && left.sessionId === right.sessionId &&
+    left.runtimeGeneration === right.runtimeGeneration;
 }
 
 export function createGMPlugin({
@@ -482,18 +645,32 @@ export function createGMPlugin({
       },
     },
     audio: {
-      configure: ({ noiseReduction = true, pickupMode = 'unchanged' } = {}) =>
-        call('audio.configure', { noiseReduction, pickupMode }),
-      startRecording: () => call('audio.startRecording'),
-      stopRecording: () => call('audio.stopRecording'),
+      openCapture: async ({ signal, ...options } = {}) => {
+        if (signal !== undefined && !isAbortSignal(signal)) {
+          throw new GMPluginError('INVALID_REQUEST', 'signal must be an AbortSignal');
+        }
+        if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+        const ticket = await call('audio.openCapture', options);
+        if (signal?.aborted) {
+          try {
+            ticket?.streamPort?.postMessage?.(JSON.stringify({
+              type: 'cancel', reason: 'capture aborted while opening',
+            }));
+            ticket?.streamPort?.close?.();
+          } finally {
+            void call('audio.stopCapture', { sessionId: ticket?.sessionId }).catch(() => {});
+          }
+          throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+        }
+        return openAudioCapture(ticket, call, signal);
+      },
+      stopCapture: async (sessionId) => validateAudioCaptureResult(
+        await call('audio.stopCapture', { sessionId }), sessionId,
+      ),
       playRecording: ({ recordingId, voice = 'original' }) =>
         call('audio.playRecording', { recordingId, voice }),
       stopPlayback: () => call('audio.stopPlayback'),
-      onFrames: (listener) => typedListener(listener, 'audio.frames', (data) => ({
-        ...data,
-        frames: decodeAudioFrames(data),
-      })),
-      onState: (listener) => typedListener(listener, 'audio.state'),
+      onCaptureState: (listener) => typedListener(listener, 'audio.captureState'),
       onPlaybackState: (listener) => typedListener(listener, 'audio.playbackState'),
     },
     close: () => transport.close?.(),
@@ -511,6 +688,241 @@ export function createGMPlugin({
       }
     });
   }
+}
+
+function openAudioCapture(ticket, call, signal) {
+  const sessionId = ticket?.sessionId;
+  const mode = ticket?.mode;
+  const resolvedOptions = ticket?.resolvedOptions;
+  const port = ticket?.streamPort;
+  const validTicket = typeof sessionId === 'string' && sessionId.length > 0 &&
+    isResolvedAudioCaptureOptions(resolvedOptions, mode) &&
+    (mode === 'recording' ? port === undefined : typeof port?.postMessage === 'function');
+  if (!validTicket) {
+    throw new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid audio capture ticket');
+  }
+  const localCapture = mode === 'stream'
+    ? createAudioCaptureStream(port, sessionId, signal)
+    : null;
+  let stopPromise;
+  const session = {
+    mode,
+    sessionId,
+    resolvedOptions,
+    stream: localCapture?.stream ?? null,
+    stop() {
+      if (!stopPromise) {
+        stopPromise = call('audio.stopCapture', { sessionId }).then(
+          (result) => validateAudioCaptureResult(result, sessionId, mode),
+        ).catch((error) => {
+          localCapture?.close(false);
+          throw error;
+        }).finally(() => {
+          if (mode === 'recording') signal?.removeEventListener('abort', abortRecording);
+        });
+      }
+      return stopPromise;
+    },
+  };
+  if (mode === 'recording') signal?.addEventListener('abort', abortRecording, { once: true });
+  return session;
+
+  function abortRecording() {
+    void session.stop().catch(() => {});
+  }
+}
+
+function createAudioCaptureStream(port, sessionId, signal) {
+  let controller;
+  let pullPending = false;
+  let finished = false;
+  const closePort = () => {
+    port.onmessage = null;
+    port.onmessageerror = null;
+    port.close?.();
+  };
+  const fail = (reason, notifyHost = true) => {
+    if (finished) return;
+    finished = true;
+    signal?.removeEventListener('abort', abort);
+    try {
+      if (notifyHost) port.postMessage(JSON.stringify({ type: 'cancel' }));
+    } finally {
+      closePort();
+      controller.error(reason);
+    }
+  };
+  const stream = new ReadableStream({
+    start(value) {
+      controller = value;
+      port.onmessage = (event) => {
+        if (finished) return;
+        pullPending = false;
+        const payload = event.data;
+        if (payload instanceof ArrayBuffer) {
+          try {
+            controller.enqueue(decodeAudioChunk(payload, sessionId));
+          } catch (error) {
+            fail(error);
+          }
+          return;
+        }
+        const message = parseAudioPortControl(payload);
+        if (message?.type === 'end') {
+          finished = true;
+          signal?.removeEventListener('abort', abort);
+          closePort();
+          controller.close();
+        } else if (message?.type === 'error') {
+          finished = true;
+          signal?.removeEventListener('abort', abort);
+          closePort();
+          controller.error(new GMPluginError(
+            typeof message.code === 'string' ? message.code : 'INTERNAL_ERROR',
+            typeof message.message === 'string' ? message.message : 'Host audio capture failed',
+          ));
+        } else {
+          fail(new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid audio stream message'));
+        }
+      };
+      port.onmessageerror = () => fail(new GMPluginError('INTERNAL_ERROR', 'Host audio stream failed'));
+      port.start?.();
+      if (signal?.aborted) fail(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+      else signal?.addEventListener('abort', abort, { once: true });
+    },
+    pull() {
+      if (finished || pullPending) return;
+      pullPending = true;
+      port.postMessage(JSON.stringify({ type: 'pull' }));
+    },
+    cancel(reason) {
+      if (finished) return;
+      finished = true;
+      signal?.removeEventListener('abort', abort);
+      try {
+        port.postMessage(JSON.stringify({ type: 'cancel', reason: String(reason ?? '') }));
+      } finally {
+        closePort();
+      }
+    },
+  }, { highWaterMark: 0 });
+
+  function abort() {
+    fail(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+  }
+
+  return {
+    stream,
+    close(notifyHost = true) {
+      if (finished) return;
+      finished = true;
+      signal?.removeEventListener('abort', abort);
+      try {
+        if (notifyHost) port.postMessage(JSON.stringify({ type: 'cancel' }));
+      } finally {
+        closePort();
+        controller.close();
+      }
+    },
+  };
+}
+
+function decodeAudioChunk(buffer, sessionId) {
+  const profile = AUDIO_STREAM_ENVELOPE;
+  if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < profile.baseHeaderBytes) {
+    throw new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid audio chunk');
+  }
+  const view = new DataView(buffer);
+  const magic = view.getUint32(0, false);
+  const version = view.getUint8(4);
+  const messageType = view.getUint8(5);
+  const flags = view.getUint16(6, false);
+  const headerBytes = view.getUint16(8, false);
+  const frameCount = view.getUint16(10, false);
+  const sequence = view.getUint32(12, false);
+  const timestampUs = view.getUint32(16, false) * 0x100000000 + view.getUint32(20, false);
+  const durationMs = view.getUint32(24, false);
+  const droppedFrameCount = view.getUint32(28, false);
+  const queueLatencyMs = view.getUint32(32, false);
+  const payloadBytes = view.getUint32(36, false);
+  const expectedHeaderBytes = profile.baseHeaderBytes + frameCount * profile.frameLengthBytes;
+  if (magic !== profile.magic || version !== profile.version || messageType !== profile.chunkType ||
+      (flags & ~profile.discontinuityFlag) !== 0 || frameCount < 1 ||
+      frameCount > profile.maxFramesPerChunk || headerBytes !== expectedHeaderBytes ||
+      !Number.isSafeInteger(timestampUs) || durationMs !== frameCount * 20 || payloadBytes < 1 ||
+      buffer.byteLength !== headerBytes + payloadBytes) {
+    throw new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid audio chunk');
+  }
+  const frameLengths = [];
+  let totalFrameBytes = 0;
+  for (let index = 0; index < frameCount; index += 1) {
+    const length = view.getUint16(profile.baseHeaderBytes + index * profile.frameLengthBytes, false);
+    if (length < 1) throw new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid audio chunk');
+    frameLengths.push(length);
+    totalFrameBytes += length;
+  }
+  if (totalFrameBytes !== payloadBytes) {
+    throw new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid audio chunk');
+  }
+  return {
+    sessionId,
+    sequence,
+    timestampUs,
+    durationMs,
+    frameCount,
+    frameLengths,
+    droppedFrameCount,
+    discontinuity: (flags & profile.discontinuityFlag) !== 0,
+    queueLatencyMs,
+    data: new Uint8Array(buffer, headerBytes, payloadBytes),
+  };
+}
+
+function parseAudioPortControl(value) {
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function validateAudioCaptureResult(value, sessionId, expectedMode) {
+  const validBase = value && typeof value === 'object' && value.sessionId === sessionId &&
+    ['recording', 'stream'].includes(value.mode) && (!expectedMode || value.mode === expectedMode) &&
+    Number.isSafeInteger(value.durationMs) && value.durationMs >= 0;
+  const validRecording = value?.mode === 'recording' && typeof value.recordingId === 'string' &&
+    value.recordingId.length > 0 && Number.isSafeInteger(value.frameCount) && value.frameCount > 0 &&
+    Number.isSafeInteger(value.opusBytes) && value.opusBytes > 0;
+  const validStream = value?.mode === 'stream' && Number.isSafeInteger(value.deliveredFrameCount) &&
+    value.deliveredFrameCount >= 0 && Number.isSafeInteger(value.droppedFrameCount) && value.droppedFrameCount >= 0;
+  if (!validBase || (!validRecording && !validStream)) {
+    throw new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid audio capture result');
+  }
+  return value;
+}
+
+function isResolvedAudioCaptureOptions(value, mode) {
+  if (!value || typeof value !== 'object' || value.mode !== mode ||
+      value.codec !== 'opus' || value.sampleRate !== 16000 || value.channels !== 1 ||
+      !AUDIO_PROFILE.pickupModes.includes(value.pickupMode) || typeof value.noiseReduction !== 'boolean') return false;
+  if (mode === 'recording') {
+    return Number.isInteger(value.maxDurationMs) && value.maxDurationMs >= 1000 &&
+      value.maxDurationMs <= AUDIO_PROFILE.modes.recording.maxDurationMs;
+  }
+  return mode === 'stream' && ['interactive', 'balanced', 'reliable', 'custom'].includes(value.profile) &&
+    Number.isInteger(value.chunkDurationMs) && value.chunkDurationMs >= 20 && value.chunkDurationMs <= 200 &&
+    value.chunkDurationMs % 20 === 0 && Number.isInteger(value.maxQueueMs) && value.maxQueueMs >= 100 &&
+    value.maxQueueMs <= 5000 && value.maxQueueMs >= value.chunkDurationMs &&
+    ['drop-oldest', 'drop-newest', 'error'].includes(value.overflowStrategy) &&
+    (value.maxDurationMs === null || (Number.isInteger(value.maxDurationMs) &&
+      value.maxDurationMs >= 1000 && value.maxDurationMs <= 60 * 60 * 1000));
+}
+
+function isAbortSignal(value) {
+  return value && typeof value === 'object' && typeof value.aborted === 'boolean' &&
+    typeof value.addEventListener === 'function' && typeof value.removeEventListener === 'function';
 }
 
 async function openUserFileStream(ticket, requestedFileId, fetchImpl, signal) {
@@ -628,28 +1040,6 @@ function createPortReadableStream(port, signal) {
   function abort() {
     fail(signal.reason ?? new DOMException('Aborted', 'AbortError'));
   }
-}
-
-function decodeAudioFrames(value) {
-  const encodedFrames = value?.framesBase64;
-  if (!Array.isArray(encodedFrames) || encodedFrames.length > AUDIO_PROFILE.maxFrames) {
-    throw new GMPluginError('INVALID_REQUEST', 'audio frame event is invalid');
-  }
-  let totalBytes = 0;
-  return encodedFrames.map((encoded) => {
-    if (typeof encoded !== 'string' || encoded.length === 0 ||
-        encoded.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) {
-      throw new GMPluginError('INVALID_REQUEST', 'audio frame payload is invalid');
-    }
-    const frame = typeof Buffer !== 'undefined'
-      ? Uint8Array.from(Buffer.from(encoded, 'base64'))
-      : Uint8Array.from(globalThis.atob(encoded), (character) => character.charCodeAt(0));
-    totalBytes += frame.length;
-    if (frame.length === 0 || totalBytes > AUDIO_PROFILE.maxOpusBytes) {
-      throw new GMPluginError('PAYLOAD_TOO_LARGE', 'audio frame event exceeds the limit');
-    }
-    return frame;
-  });
 }
 
 function encodeBytes(value) {

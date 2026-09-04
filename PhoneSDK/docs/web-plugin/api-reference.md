@@ -174,35 +174,167 @@ window.__memoPluginEmit({
 Plugins declaring `audio.capture` can use the glasses microphone when
 `(await gm.runtime.getCapabilities()).audio` is present:
 
-```js
-const offFrames = gm.audio.onFrames(({ frames, droppedFrameCount }) => {
-  // frames contains Opus packets as Uint8Array values. This event is a lossy
-  // observation stream; native recording and playback retain every packet.
-});
-const offState = gm.audio.onState(async (state) => {
-  if (state.state === 'stopped') {
-    await gm.audio.playRecording({
-      recordingId: state.latestRecordingId,
-      voice: 'cute',
-    });
-  }
-});
-const offPlayback = gm.audio.onPlaybackState(console.log);
+### Short recording retained by the Host
 
-await gm.audio.configure({ noiseReduction: true, pickupMode: 'frontFocus' });
-await gm.audio.startRecording();
-// Later, after an explicit user action:
-await gm.audio.stopRecording();
+```js
+const capture = await gm.audio.openCapture({
+  mode: 'recording',
+  pickupMode: 'frontFocus',
+  noiseReduction: true,
+  maxDurationMs: 5000,
+});
+
+// Later, after an explicit user action or when maxDurationMs is reached:
+const result = await capture.stop();
+await gm.audio.playRecording({ recordingId: result.recordingId, voice: 'cute' });
 ```
 
-Available methods are `audio.configure`, `audio.startRecording`,
-`audio.stopRecording`, `audio.playRecording`, and `audio.stopPlayback`. Start,
-stop, and playback requests return an operation ID immediately; completion is
-reported through `audio.state` and `audio.playbackState`. The Host limits one
-recording to 15 seconds, 750 Opus frames, and 64 KiB. Supported pickup modes
-and voice effects are advertised in the audio capability object.
+In `recording` mode, encoded audio stays in Host memory. The Web plugin receives
+only metadata and a short-lived `recordingId`; it never receives audio bytes.
+The Host limits a recording to 15 seconds, 750 Opus frames, and 64 KiB. A
+recording is released when the runtime is hidden, suspended, reloaded, closed,
+or replaced.
+
+### Real-time binary stream
+
+```js
+const capture = await gm.audio.openCapture({
+  mode: 'stream',
+  profile: 'interactive',
+  pickupMode: 'frontFocus',
+  noiseReduction: true,
+});
+
+const consume = (async () => {
+  for await (const chunk of capture.stream) {
+    // chunk.data is a Uint8Array containing consecutive Opus frames.
+    // chunk.frameLengths identifies every frame boundary without parsing Opus.
+    // Send the binary bytes to your own real-time service without Base64.
+    await uploadAudio(chunk.data, {
+      frameLengths: chunk.frameLengths,
+      timestampUs: chunk.timestampUs,
+      discontinuity: chunk.discontinuity,
+    });
+  }
+})();
+
+// Later, from an independent UI or lifecycle event:
+await capture.stop();
+await consume; // drains the bounded final queue before completing
+```
+
+The SDK exposes `ReadableStream<AudioChunk>`. Audio moves over a dedicated
+`MessagePort` as a single transferable binary envelope per chunk, never through
+Bridge JSON and never as Base64. The SDK parses that envelope before exposing
+the chunk. Every public chunk includes `sequence`, `timestampUs`,
+`durationMs`, `frameCount`, `frameLengths`, `droppedFrameCount`,
+`discontinuity`, and `queueLatencyMs`. A discontinuity means audio was dropped
+under backpressure and the remote decoder or protocol should be informed.
+On a normal stop, the Host flushes the already bounded queue before ending the
+stream; it does not discard the final audio tail.
+
+#### Android WebView MessagePort handoff
+
+This is a Host integration detail; plugin code receives only the normalized
+`capture.stream`. Because `__memoPluginResolve(response)` carries JSON and
+cannot carry a native `MessagePort`, an Android Host returns this additional
+field in the successful `audio.openCapture` stream result:
+
+```json
+{
+  "streamDescriptor": {
+    "id": "opaque-random-value-at-least-128-bits",
+    "kind": "audio.capture",
+    "sessionId": "capture-123",
+    "runtimeGeneration": 7
+  }
+}
+```
+
+The Host independently posts a window message to the plugin document. Its data
+is the following JSON object (or its JSON string representation), and the
+native port is transferred as `event.ports[0]`:
+
+```json
+{
+  "type": "gm-plugin:stream-port",
+  "descriptor": {
+    "id": "opaque-random-value-at-least-128-bits",
+    "kind": "audio.capture",
+    "sessionId": "capture-123",
+    "runtimeGeneration": 7
+  }
+}
+```
+
+The two descriptors must match exactly. Delivery order does not matter: the SDK
+waits until it has both the Bridge response and the port. A stale runtime,
+invalid descriptor, duplicate port, or request timeout closes the port. Desktop
+Studio transfers `response.result.streamPort` directly with its existing
+`gm-plugin:response` window message; the SDK normalizes both transports to the
+same capture session.
+
+Port control messages are JSON strings, not structured-clone objects. Web sends
+`{"type":"pull"}` for demand and `{"type":"cancel","reason":"..."}`
+for cancellation. Host sends each audio chunk as one complete `ArrayBuffer`,
+then the JSON string `{"type":"end"}`, or
+`{"type":"error","code":"...","message":"..."}`.
+
+The V1 audio chunk envelope uses unsigned big-endian integers:
+
+| Offset | Type | Field |
+| ---: | --- | --- |
+| 0 | `u32` | magic `0x474D4155` (`GMAU`) |
+| 4 | `u8` | version `1` |
+| 5 | `u8` | message type `1` (`CHUNK`) |
+| 6 | `u16` | flags; bit 0 is `discontinuity`, all other bits are zero |
+| 8 | `u16` | `headerBytes = 40 + frameCount × 2` |
+| 10 | `u16` | `frameCount` (1-10) |
+| 12 | `u32` | `sequence` |
+| 16 | `u64` | `timestampUs` |
+| 24 | `u32` | `durationMs` (`frameCount × 20`) |
+| 28 | `u32` | `droppedFrameCount` |
+| 32 | `u32` | `queueLatencyMs` |
+| 36 | `u32` | `payloadBytes` |
+| 40 | `u16[]` | one Opus byte length per frame |
+| `headerBytes` | bytes | consecutive Opus frame payload |
+
+The buffer length must equal `headerBytes + payloadBytes`, and the frame lengths
+must sum to `payloadBytes`. `sessionId` is taken from the already authenticated
+capture session and is not duplicated in every audio envelope. Any malformed
+envelope terminates the stream with `INTERNAL_ERROR`.
+
+Use one of these stream profiles:
+
+| Profile | Chunk | Host queue | Overflow | Intended use |
+| --- | ---: | ---: | --- | --- |
+| `interactive` | 40 ms | 200 ms | drop oldest | live translation and assistants |
+| `balanced` | 100 ms | 500 ms | drop oldest | ordinary streaming |
+| `reliable` | 100 ms | 3000 ms | error | loss-intolerant processing |
+
+Use `profile: 'custom'` to set `chunkDurationMs` (20-200 ms in 20 ms steps),
+`maxQueueMs` (100-5000 ms), and `overflowStrategy` (`drop-oldest`,
+`drop-newest`, or `error`). A stream is unlimited by default; set
+`maxDurationMs` to a value from 1000 through 3600000 when a hard stop is needed.
+
+Capture is always Opus, 16 kHz, mono, with 20 ms frames. Only one capture or
+playback operation can own the glasses audio channel at a time.
+
+### State and lifecycle
+
+```js
+const offCapture = gm.audio.onCaptureState(console.log);
+const offPlayback = gm.audio.onPlaybackState(console.log);
+```
+
+The control methods are `audio.openCapture`, `audio.stopCapture`,
+`audio.playRecording`, and `audio.stopPlayback`. Prefer the capture session's
+`stop()` method over calling `stopCapture(sessionId)` directly. Capture state is
+reported through `audio.captureState`; playback uses `audio.playbackState`.
+Supported pickup modes, voice effects, limits, and stream profiles are
+advertised in the audio capability object.
 
 The App shows native consent and a recording indicator outside the WebView.
-Hiding, suspending, reloading, or closing the plugin stops audio. Desktop Studio
-does not advertise this capability; a plugin may use browser audio only when
-the capability is absent, not as a fallback after a native operation fails.
+Hiding, suspending, reloading, or closing the plugin stops audio and closes any
+active stream. A plugin may use browser audio only when the Host audio
+capability is absent, not as a fallback after a native operation fails.

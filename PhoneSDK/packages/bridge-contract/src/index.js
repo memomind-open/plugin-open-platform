@@ -29,20 +29,65 @@ export const PLUGIN_MESSAGE_PROFILE = Object.freeze({
   uplinkEvent: 'plugin.message',
 });
 
+export const STREAM_PORT_MESSAGE_TYPE = 'gm-plugin:stream-port';
+export const AUDIO_STREAM_PORT_KIND = 'audio.capture';
+export const AUDIO_STREAM_ENVELOPE = Object.freeze({
+  magic: 0x474d4155,
+  version: 1,
+  chunkType: 1,
+  discontinuityFlag: 0x0001,
+  baseHeaderBytes: 40,
+  frameLengthBytes: 2,
+  maxFramesPerChunk: 10,
+  byteOrder: 'big-endian',
+});
+
 export const AUDIO_PROFILE = Object.freeze({
   codec: 'opus',
   sampleRate: 16000,
   channels: 1,
-  maxDurationMs: 15000,
-  maxFrames: 750,
-  maxOpusBytes: 64 * 1024,
-  streamEvent: 'audio.frames',
-  streamIsLossyObservation: true,
+  noiseReduction: true,
   pickupModes: Object.freeze([
     'unchanged', 'frontFixed', 'meetingAuto', 'nonWearerFocus',
     'frontBalanced', 'frontFocus',
   ]),
   voices: Object.freeze(['original', 'cute', 'deep', 'overlord']),
+  modes: Object.freeze({
+    recording: Object.freeze({
+      maxDurationMs: 15000,
+      maxFrames: 750,
+      maxOpusBytes: 64 * 1024,
+      retention: 'host-memory',
+      exposesAudioToWeb: false,
+    }),
+    stream: Object.freeze({
+      transport: 'message-port',
+      payload: 'binary-envelope-v1',
+      envelope: AUDIO_STREAM_ENVELOPE,
+      frameDurationMs: 20,
+      chunkDurationMs: Object.freeze({ min: 20, max: 200 }),
+      maxQueueMs: Object.freeze({ min: 100, max: 5000 }),
+      maxDurationMs: Object.freeze({ min: 1000, max: 60 * 60 * 1000, unlimited: true }),
+      profiles: Object.freeze({
+        interactive: Object.freeze({
+          chunkDurationMs: 40,
+          maxQueueMs: 200,
+          overflowStrategy: 'drop-oldest',
+        }),
+        balanced: Object.freeze({
+          chunkDurationMs: 100,
+          maxQueueMs: 500,
+          overflowStrategy: 'drop-oldest',
+        }),
+        reliable: Object.freeze({
+          chunkDurationMs: 100,
+          maxQueueMs: 3000,
+          overflowStrategy: 'error',
+        }),
+      }),
+      overflowStrategies: Object.freeze(['drop-oldest', 'drop-newest', 'error']),
+    }),
+  }),
 });
 
 export const FILE_PROFILE = Object.freeze({
@@ -82,9 +127,8 @@ export const METHOD_NAMES = Object.freeze([
   'device.subscribeEvents',
   'device.unsubscribeEvents',
   'plugin.sendMessage',
-  'audio.configure',
-  'audio.startRecording',
-  'audio.stopRecording',
+  'audio.openCapture',
+  'audio.stopCapture',
   'audio.playRecording',
   'audio.stopPlayback',
 ]);
@@ -95,8 +139,7 @@ export const EVENT_NAMES = Object.freeze([
   'device.rawImu',
   'device.connection',
   'plugin.message',
-  'audio.frames',
-  'audio.state',
+  'audio.captureState',
   'audio.playbackState',
   'runtime.lifecycleChanged',
 ]);
@@ -113,6 +156,7 @@ export const ERROR_CODES = Object.freeze([
   'BUSY',
   'AUDIO_BUSY',
   'NO_AUDIO',
+  'BUFFER_OVERFLOW',
   'QUOTA_EXCEEDED',
   'TIMEOUT',
   'DEVICE_DISCONNECTED',

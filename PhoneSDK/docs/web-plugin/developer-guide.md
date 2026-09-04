@@ -193,7 +193,7 @@ Supported permissions:
 | `storage` | Use App key-value storage isolated to the current plugin |
 | `files.user-selected` | Import user-selected files into App-managed private storage and access them through `files.*` |
 | `network` | Declare that the plugin needs network access |
-| `audio.capture` | Capture bounded Opus audio from the glasses and play an allowlisted local voice effect |
+| `audio.capture` | Capture Opus audio from the glasses in Host-retained recording or real-time binary stream mode, and play an allowlisted local voice effect |
 
 The App checks `display`, `device.events`, `storage`, `files.user-selected`, and
 `audio.capture` at the corresponding Bridge calls. `device.getInfo()` and
@@ -609,6 +609,7 @@ try {
 | `BUSY` | Device or runtime is busy |
 | `AUDIO_BUSY` | Another App audio business owns the glasses recording channel |
 | `NO_AUDIO` | Recording stopped without receiving an audio frame |
+| `BUFFER_OVERFLOW` | A loss-intolerant audio stream exceeded its configured Host queue |
 | `QUOTA_EXCEEDED` | Storage, subscription, or another quota was exceeded |
 | `TIMEOUT` | SDK or Bridge request timed out |
 | `DEVICE_DISCONNECTED` | Device is not connected |
