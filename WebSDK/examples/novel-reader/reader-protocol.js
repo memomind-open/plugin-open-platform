@@ -88,6 +88,38 @@ export function encodeChapter(session, title) {
   return data;
 }
 
+export function encodeImageBegin({ session, imageId, width, height, tileCount }) {
+  const data = new Uint8Array(16);
+  const view = new DataView(data.buffer);
+  data[0] = PROTOCOL_VERSION;
+  data[1] = 6;
+  view.setUint32(2, session);
+  view.setUint32(6, imageId);
+  view.setUint16(10, width);
+  view.setUint16(12, height);
+  view.setUint16(14, tileCount);
+  return data;
+}
+
+export function encodeImageTile({ session, imageId, tileIndex, y, height, stride, final, bytes }) {
+  if (!(bytes instanceof Uint8Array) || bytes.length !== height * stride) {
+    throw new TypeError('Image tile bytes do not match its geometry');
+  }
+  const data = new Uint8Array(19 + bytes.length);
+  const view = new DataView(data.buffer);
+  data[0] = PROTOCOL_VERSION;
+  data[1] = 7;
+  view.setUint32(2, session);
+  view.setUint32(6, imageId);
+  view.setUint16(10, tileIndex);
+  view.setUint16(12, y);
+  view.setUint16(14, height);
+  view.setUint16(16, stride);
+  data[18] = final ? 1 : 0;
+  data.set(bytes, 19);
+  return data;
+}
+
 export function encodeClose(session) {
   const data = new Uint8Array(6);
   const view = new DataView(data.buffer);
@@ -115,6 +147,18 @@ export function decodeReaderEvent(bytes) {
   }
   if (event === 3 && bytes.length === 11) {
     return { type: 'action', session, action: bytes[6], offset: view.getUint32(7) };
+  }
+  if (event === 4 && bytes.length === 14) {
+    return {
+      type: 'needImage', session, imageId: view.getUint32(6),
+      width: view.getUint16(10), height: view.getUint16(12),
+    };
+  }
+  if (event === 5 && bytes.length === 14) {
+    return {
+      type: 'imageStatus', session, imageId: view.getUint32(6),
+      tileIndex: view.getUint16(10), status: bytes[12], complete: bytes[13] !== 0,
+    };
   }
   throw new Error('Unsupported novel reader event');
 }

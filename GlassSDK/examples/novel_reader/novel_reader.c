@@ -10,10 +10,14 @@
 #define COMMAND_CONTROL 3U
 #define COMMAND_CLOSE 4U
 #define COMMAND_CHAPTER 5U
+#define COMMAND_IMAGE_BEGIN 6U
+#define COMMAND_IMAGE_TILE 7U
 
 #define EVENT_NEED_WINDOW 1U
 #define EVENT_PROGRESS 2U
 #define EVENT_ACTION 3U
+#define EVENT_NEED_IMAGE 4U
+#define EVENT_IMAGE_STATUS 5U
 
 #define CONTROL_PLAY 1U
 #define CONTROL_PAUSE 2U
@@ -46,6 +50,13 @@
 #define VISIBLE_LINES 5
 #define HISTORY_PAGES 32U
 #define WINDOW_GUARD_BYTES 512U
+#define IMAGE_MARKER_BYTES 17U
+#define MAX_IMAGE_TILES 64U
+#define PAGE_TEXT 0U
+#define PAGE_IMAGE 1U
+#define IMAGE_STATUS_OK 0U
+#define IMAGE_STATUS_INVALID 1U
+#define IMAGE_STATUS_DRAW_FAILED 2U
 #define CHAPTER_TITLE_BYTES 320U
 #define EXIT_HOLD_MS 3000U
 #define NOTICE_DURATION_MS 1400U
@@ -78,6 +89,8 @@ typedef struct {
     uint32_t window_length;
     uint32_t page_start[2];
     uint32_t page_end[2];
+    uint32_t page_image_id[2];
+    uint32_t image_id;
     uint32_t total_bytes;
     uint32_t session;
     uint32_t requested_offset;
@@ -90,11 +103,17 @@ typedef struct {
     uint32_t exit_elapsed;
     int16_t viewport_width;
     int16_t viewport_height;
+    uint16_t display_width;
+    uint16_t display_height;
+    uint16_t image_tile_count;
+    uint16_t image_next_tile;
+    uint16_t image_next_y;
     int16_t line_height;
     int16_t page_height;
     int16_t scroll_y;
     uint16_t page_lines[2];
     uint8_t current_page;
+    uint8_t page_type[2];
     uint8_t history_count;
     uint8_t font_mode;
     uint8_t speed;
@@ -104,6 +123,10 @@ typedef struct {
     uint8_t next_ready;
     uint8_t final_window;
     uint8_t waiting;
+    uint8_t waiting_image;
+    uint8_t image_receiving;
+    uint8_t image_ready;
+    uint8_t displaying_image;
     uint8_t playing;
     uint8_t connected;
     uint8_t shown_percent;
@@ -160,6 +183,8 @@ static uint32_t visible_offset(const novel_reader_t *self)
     uint16_t line;
     if (self->active == 0U || self->page_lines[slot] == 0U)
         return self->resume_offset;
+    if (self->page_type[slot] == PAGE_IMAGE)
+        return self->page_start[slot];
     line = (uint16_t)(self->scroll_y / self->line_height);
     if (line >= self->page_lines[slot]) line = self->page_lines[slot] - 1U;
     return self->page_line_offset[slot][line];
@@ -168,7 +193,11 @@ static uint32_t visible_offset(const novel_reader_t *self)
 static void update_footer(novel_reader_t *self)
 {
     char text[16];
-    uint32_t percent = self->total_bytes == 0U ? 0U :
+    uint32_t percent;
+    if (self->active != 0U &&
+        self->page_type[self->current_page] == PAGE_IMAGE)
+        return;
+    percent = self->total_bytes == 0U ? 0U :
         (visible_offset(self) * 100U) / self->total_bytes;
     if (percent > 100U) percent = 100U;
     if (self->shown_percent == (uint8_t)percent) return;
@@ -221,9 +250,121 @@ static bool send_action(novel_reader_t *self, uint8_t action)
         GM_PLUGIN_OK;
 }
 
+static uint8_t hex_value(uint8_t value)
+{
+    if (value >= (uint8_t)'0' && value <= (uint8_t)'9')
+        return (uint8_t)(value - (uint8_t)'0');
+    if (value >= (uint8_t)'a' && value <= (uint8_t)'f')
+        return (uint8_t)(value - (uint8_t)'a' + 10U);
+    if (value >= (uint8_t)'A' && value <= (uint8_t)'F')
+        return (uint8_t)(value - (uint8_t)'A' + 10U);
+    return 0xffU;
+}
+
+static bool parse_image_marker(const novel_reader_t *self, uint32_t cursor,
+                               uint32_t *image_id)
+{
+    static const char prefix[] = "GMIMG:";
+    uint32_t value = 0U;
+    uint8_t index;
+    if (cursor + IMAGE_MARKER_BYTES > self->window_length ||
+        (uint8_t)self->window[cursor] != 0x1eU ||
+        self->libc->memcmp(self->window + cursor + 1U, prefix, 6U) != 0 ||
+        (uint8_t)self->window[cursor + 15U] != 0x1eU ||
+        self->window[cursor + 16U] != '\n')
+        return false;
+    for (index = 0U; index < 8U; ++index) {
+        uint8_t digit = hex_value((uint8_t)self->window[cursor + 7U + index]);
+        if (digit == 0xffU) return false;
+        value = (value << 4) | digit;
+    }
+    if (value == 0U) return false;
+    *image_id = value;
+    return true;
+}
+
+static void send_need_image(novel_reader_t *self, uint32_t image_id)
+{
+    uint8_t data[14];
+    if (self->connected == 0U || self->session == 0U ||
+        self->waiting_image != 0U)
+        return;
+    data[0] = PROTOCOL_VERSION;
+    data[1] = EVENT_NEED_IMAGE;
+    write_u32(data + 2, self->session);
+    write_u32(data + 6, image_id);
+    write_u16(data + 10, self->display_width);
+    write_u16(data + 12, self->display_height);
+    if (self->host->bt_send(READER_EVENT_CHANNEL, data, sizeof(data)) ==
+        GM_PLUGIN_OK)
+        self->waiting_image = 1U;
+}
+
+static void send_image_status(novel_reader_t *self, uint32_t image_id,
+                              uint16_t tile_index, uint8_t status,
+                              bool complete)
+{
+    uint8_t data[14];
+    if (self->connected == 0U || self->session == 0U) return;
+    data[0] = PROTOCOL_VERSION;
+    data[1] = EVENT_IMAGE_STATUS;
+    write_u32(data + 2, self->session);
+    write_u32(data + 6, image_id);
+    write_u16(data + 10, tile_index);
+    data[12] = status;
+    data[13] = complete ? 1U : 0U;
+    (void)self->host->bt_send(READER_EVENT_CHANNEL, data, sizeof(data));
+}
+
+static gm_plugin_result_t draw_image_tile(novel_reader_t *self,
+                                          const uint8_t *pixels,
+                                          uint16_t y, uint16_t height,
+                                          uint16_t stride, bool present)
+{
+    gm_plugin_framebuffer_surface_t surface;
+    uint16_t next_y = y;
+    uint16_t end_y = (uint16_t)(y + height);
+    while (next_y < end_y) {
+        uint32_t surface_end;
+        uint16_t part_end;
+        uint16_t row;
+        gm_plugin_result_t result =
+            self->host->graphics.framebuffer.lock(next_y, &surface);
+        if (result != GM_PLUGIN_OK) return result;
+        surface_end = (uint32_t)surface.y + surface.height;
+        part_end = surface_end > end_y ? end_y : (uint16_t)surface_end;
+        if (surface.pixels == 0 || surface.height == 0U ||
+            surface.width < self->display_width || surface.stride < stride ||
+            surface.y > next_y || surface_end <= next_y ||
+            surface_end > self->display_height || part_end <= next_y) {
+            (void)self->host->graphics.framebuffer.unlock(0, false);
+            return GM_PLUGIN_EINVAL;
+        }
+        for (row = next_y; row < part_end; ++row) {
+            const uint8_t *source = pixels + (uint32_t)(row - y) * stride;
+            uint8_t *target = surface.pixels +
+                (uint32_t)(row - surface.y) * surface.stride;
+            self->libc->memcpy(target, source, stride);
+        }
+        {
+            gm_plugin_rect_t dirty = {
+                .x = 0,
+                .y = (int16_t)next_y,
+                .width = self->display_width,
+                .height = (uint16_t)(part_end - next_y),
+            };
+            result = self->host->graphics.framebuffer.unlock(
+                &dirty, present && part_end == end_y);
+        }
+        if (result != GM_PLUGIN_OK) return result;
+        next_y = part_end;
+    }
+    return GM_PLUGIN_OK;
+}
+
 static void show_notice(novel_reader_t *self, const char *text)
 {
-    if (self->notice_label == 0) return;
+    if (self->notice_label == 0 || self->displaying_image != 0U) return;
     self->ui->label_set_text(self->notice_label, text);
     self->ui->obj_clear_flag(self->notice_label,
                              GM_PLUGIN_LVGL_FLAG_HIDDEN);
@@ -233,10 +374,23 @@ static void show_notice(novel_reader_t *self, const char *text)
 static void position_pages(novel_reader_t *self)
 {
     uint8_t next = (uint8_t)(1U - self->current_page);
-    self->ui->obj_set_pos(self->page[self->current_page], 0,
-                          (int16_t)-self->scroll_y);
-    self->ui->obj_set_pos(self->page[next], 0,
-                          (int16_t)(self->page_height - self->scroll_y));
+    if (self->page_type[self->current_page] == PAGE_TEXT) {
+        self->ui->obj_clear_flag(self->page[self->current_page],
+                                 GM_PLUGIN_LVGL_FLAG_HIDDEN);
+        self->ui->obj_set_pos(self->page[self->current_page], 0,
+                              (int16_t)-self->scroll_y);
+    } else {
+        self->ui->obj_add_flag(self->page[self->current_page],
+                               GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    }
+    if (self->next_ready != 0U && self->page_type[next] == PAGE_TEXT) {
+        self->ui->obj_clear_flag(self->page[next],
+                                 GM_PLUGIN_LVGL_FLAG_HIDDEN);
+        self->ui->obj_set_pos(self->page[next], 0,
+                              (int16_t)(self->page_height - self->scroll_y));
+    } else {
+        self->ui->obj_add_flag(self->page[next], GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    }
 }
 
 static void set_page_font(novel_reader_t *self, uint8_t slot)
@@ -300,6 +454,22 @@ static bool build_page(novel_reader_t *self, uint8_t slot,
     cursor = local;
     while (lines < maximum_lines && cursor < self->window_length) {
         uint32_t step;
+        uint32_t image_id;
+        if (parse_image_marker(self, cursor, &image_id)) {
+            if (lines != 0U) break;
+            self->page_text[slot][0] = '\0';
+            self->page_start[slot] = start_offset;
+            self->page_end[slot] = self->window_offset + cursor +
+                IMAGE_MARKER_BYTES;
+            self->page_line_offset[slot][0] = start_offset;
+            self->page_lines[slot] = 1U;
+            self->page_type[slot] = PAGE_IMAGE;
+            self->page_image_id[slot] = image_id;
+            self->ui->label_set_text(self->page[slot], "");
+            self->ui->obj_add_flag(self->page[slot],
+                                   GM_PLUGIN_LVGL_FLAG_HIDDEN);
+            return true;
+        }
         if (self->final_window == 0U &&
             self->window_length - cursor < WINDOW_GUARD_BYTES)
             return false;
@@ -321,6 +491,8 @@ static bool build_page(novel_reader_t *self, uint8_t slot,
     self->page_start[slot] = start_offset;
     self->page_end[slot] = self->window_offset + cursor;
     self->page_lines[slot] = lines;
+    self->page_type[slot] = PAGE_TEXT;
+    self->page_image_id[slot] = 0U;
     self->ui->label_set_text(self->page[slot], self->page_text[slot]);
     self->ui->obj_set_size(self->page[slot], self->viewport_width,
                            self->page_height);
@@ -330,6 +502,10 @@ static bool build_page(novel_reader_t *self, uint8_t slot,
 
 static void request_seek(novel_reader_t *self, uint32_t offset)
 {
+    if (self->displaying_image != 0U) {
+        self->displaying_image = 0U;
+        self->ui->obj_invalidate(self->root);
+    }
     self->active = 0U;
     self->next_ready = 0U;
     self->resume_offset = offset;
@@ -338,6 +514,9 @@ static void request_seek(novel_reader_t *self, uint32_t offset)
     self->scroll_elapsed = 0U;
     self->page_elapsed = 0U;
     self->waiting = 0U;
+    self->waiting_image = 0U;
+    self->image_receiving = 0U;
+    self->image_ready = 0U;
     self->ui->obj_add_flag(self->page[0], GM_PLUGIN_LVGL_FLAG_HIDDEN);
     self->ui->obj_add_flag(self->page[1], GM_PLUGIN_LVGL_FLAG_HIDDEN);
     send_need_window(self, offset);
@@ -365,6 +544,26 @@ static void prepare_following_page(novel_reader_t *self)
     send_need_window(self, offset);
 }
 
+static void activate_current_page(novel_reader_t *self)
+{
+    uint8_t slot = self->current_page;
+    if (self->page_type[slot] == PAGE_IMAGE) {
+        self->image_ready = 0U;
+        self->image_receiving = 0U;
+        self->waiting_image = 0U;
+        self->image_id = self->page_image_id[slot];
+        send_need_image(self, self->image_id);
+        return;
+    }
+    self->image_receiving = 0U;
+    self->waiting_image = 0U;
+    self->image_ready = 0U;
+    if (self->displaying_image != 0U) {
+        self->displaying_image = 0U;
+        self->ui->obj_invalidate(self->root);
+    }
+}
+
 static void promote_page(novel_reader_t *self)
 {
     if (self->next_ready == 0U) return;
@@ -384,14 +583,22 @@ static void promote_page(novel_reader_t *self)
     self->next_ready = 0U;
     prepare_following_page(self);
     position_pages(self);
+    activate_current_page(self);
     update_footer(self);
     send_progress(self);
 }
+
+static void previous_page(novel_reader_t *self);
 
 static void advance_pixels(novel_reader_t *self, int16_t pixels)
 {
     int32_t next;
     if (self->active == 0U) return;
+    if (self->page_type[self->current_page] == PAGE_IMAGE) {
+        if (pixels > 0 && self->next_ready != 0U) promote_page(self);
+        else if (pixels < 0) previous_page(self);
+        return;
+    }
     next = (int32_t)self->scroll_y + pixels;
     if (next < 0) next = 0;
     while (next >= self->page_height && self->next_ready != 0U) {
@@ -417,12 +624,17 @@ static void previous_page(novel_reader_t *self)
 
 static void reset_private_data(novel_reader_t *self)
 {
+    if (self->displaying_image != 0U && self->root != 0)
+        self->ui->obj_invalidate(self->root);
     self->libc->memset(self->window, 0, sizeof(self->window));
     self->libc->memset(self->page_text, 0, sizeof(self->page_text));
     self->libc->memset(self->chapter_title, 0,
                        sizeof(self->chapter_title));
     self->libc->memset(self->page_line_offset, 0,
                        sizeof(self->page_line_offset));
+    self->libc->memset(self->page_image_id, 0,
+                       sizeof(self->page_image_id));
+    self->libc->memset(self->page_type, 0, sizeof(self->page_type));
     self->libc->memset(self->history, 0, sizeof(self->history));
     self->window_offset = 0U;
     self->window_length = 0U;
@@ -434,6 +646,14 @@ static void reset_private_data(novel_reader_t *self)
     self->next_ready = 0U;
     self->final_window = 0U;
     self->waiting = 0U;
+    self->waiting_image = 0U;
+    self->image_receiving = 0U;
+    self->image_ready = 0U;
+    self->displaying_image = 0U;
+    self->image_id = 0U;
+    self->image_tile_count = 0U;
+    self->image_next_tile = 0U;
+    self->image_next_y = 0U;
     self->scroll_y = 0;
     self->scroll_fraction = 0U;
     self->scroll_elapsed = 0U;
@@ -542,6 +762,7 @@ static bool handle_window(novel_reader_t *self, const uint8_t *data,
         self->scroll_y = 0;
         prepare_following_page(self);
         position_pages(self);
+        activate_current_page(self);
         update_footer(self);
         send_progress(self);
         return true;
@@ -630,6 +851,83 @@ static bool handle_chapter(novel_reader_t *self, const uint8_t *data,
     return true;
 }
 
+static bool handle_image_begin(novel_reader_t *self, const uint8_t *data,
+                               uint32_t length)
+{
+    uint32_t image_id;
+    uint16_t width;
+    uint16_t height;
+    uint16_t tile_count;
+    if (length != 16U || read_u32(data + 2) != self->session ||
+        self->active == 0U ||
+        self->page_type[self->current_page] != PAGE_IMAGE)
+        return false;
+    image_id = read_u32(data + 6);
+    width = read_u16(data + 10);
+    height = read_u16(data + 12);
+    tile_count = read_u16(data + 14);
+    if (image_id == 0U || image_id != self->page_image_id[self->current_page] ||
+        width != self->display_width || height != self->display_height ||
+        tile_count == 0U || tile_count > MAX_IMAGE_TILES)
+        return false;
+    self->image_id = image_id;
+    self->image_tile_count = tile_count;
+    self->image_next_tile = 0U;
+    self->image_next_y = 0U;
+    self->image_receiving = 1U;
+    self->image_ready = 0U;
+    self->waiting_image = 0U;
+    return true;
+}
+
+static bool handle_image_tile(novel_reader_t *self, const uint8_t *data,
+                              uint32_t length)
+{
+    uint32_t image_id;
+    uint16_t tile_index;
+    uint16_t y;
+    uint16_t height;
+    uint16_t stride;
+    bool final;
+    uint8_t status = IMAGE_STATUS_INVALID;
+    gm_plugin_result_t result;
+    if (length < 19U || read_u32(data + 2) != self->session) return false;
+    image_id = read_u32(data + 6);
+    tile_index = read_u16(data + 10);
+    y = read_u16(data + 12);
+    height = read_u16(data + 14);
+    stride = read_u16(data + 16);
+    final = data[18] != 0U;
+    if (self->image_receiving == 0U || image_id != self->image_id ||
+        tile_index != self->image_next_tile || y != self->image_next_y ||
+        height == 0U || y + height > self->display_height ||
+        stride != (self->display_width + 1U) / 2U ||
+        length - 19U != (uint32_t)height * stride ||
+        final != (tile_index + 1U == self->image_tile_count) ||
+        (final && y + height != self->display_height)) {
+        send_image_status(self, image_id, tile_index, status, false);
+        return false;
+    }
+    result = draw_image_tile(self, data + 19U, y, height, stride, final);
+    if (result != GM_PLUGIN_OK) {
+        self->image_receiving = 0U;
+        send_image_status(self, image_id, tile_index,
+                          IMAGE_STATUS_DRAW_FAILED, false);
+        return false;
+    }
+    self->image_next_tile++;
+    self->image_next_y = (uint16_t)(y + height);
+    status = IMAGE_STATUS_OK;
+    if (final) {
+        self->image_receiving = 0U;
+        self->image_ready = 1U;
+        self->displaying_image = 1U;
+        self->page_elapsed = 0U;
+    }
+    send_image_status(self, image_id, tile_index, status, final);
+    return true;
+}
+
 static bool receive_message(novel_reader_t *self, const uint8_t *data,
                             uint32_t length)
 {
@@ -639,6 +937,8 @@ static bool receive_message(novel_reader_t *self, const uint8_t *data,
     case COMMAND_WINDOW: return handle_window(self, data, length);
     case COMMAND_CONTROL: return handle_control(self, data, length);
     case COMMAND_CHAPTER: return handle_chapter(self, data, length);
+    case COMMAND_IMAGE_BEGIN: return handle_image_begin(self, data, length);
+    case COMMAND_IMAGE_TILE: return handle_image_tile(self, data, length);
     case COMMAND_CLOSE:
         if (length != 6U || read_u32(data + 2) != self->session) return false;
         reset_private_data(self);
@@ -655,7 +955,11 @@ static gm_plugin_result_t create_ui(novel_reader_t *self)
     gm_plugin_display_info_t display;
     gm_plugin_result_t result = self->host->display_get_info(&display);
     if (result != GM_PLUGIN_OK) return result;
-    if (display.width < 500U || display.height < 300U) return GM_PLUGIN_ENOTSUP;
+    if (display.width < 500U || display.height < 300U ||
+        display.pixel_format != GM_PLUGIN_PIXEL_GRAY_4)
+        return GM_PLUGIN_ENOTSUP;
+    self->display_width = display.width;
+    self->display_height = display.height;
     self->viewport_width = (int16_t)(display.width - SIDE_MARGIN * 2);
     self->viewport_height = (int16_t)(display.height - TOP_MARGIN - BOTTOM_MARGIN);
     self->root = self->ui->root_get();
@@ -795,6 +1099,7 @@ static void on_loop(void *opaque, uint32_t elapsed_ms)
         return;
     }
     if (self->active != 0U && self->playing != 0U &&
+        self->page_type[self->current_page] == PAGE_TEXT &&
         self->reading_mode == MODE_SCROLL) {
         uint32_t pixels;
         self->page_elapsed = 0U;
@@ -808,7 +1113,9 @@ static void on_loop(void *opaque, uint32_t elapsed_ms)
             self->scroll_fraction %= 1000U;
             if (pixels != 0U) advance_pixels(self, (int16_t)pixels);
         }
-    } else if (self->active != 0U && self->playing != 0U) {
+    } else if (self->active != 0U && self->playing != 0U &&
+               (self->page_type[self->current_page] == PAGE_TEXT ||
+                self->image_ready != 0U)) {
         uint32_t interval = (uint32_t)self->page_interval_seconds * 1000U;
         self->scroll_elapsed = 0U;
         self->scroll_fraction = 0U;
@@ -935,13 +1242,15 @@ static void on_stop(void *opaque)
 gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
                                    gm_plugin_descriptor_t *plugin)
 {
-    const gm_plugin_capabilities_t required = GM_PLUGIN_CAP_BUTTON |
-        GM_PLUGIN_CAP_BLUETOOTH;
+    const gm_plugin_capabilities_t required = GM_PLUGIN_CAP_DISPLAY_BITMAP |
+        GM_PLUGIN_CAP_BUTTON | GM_PLUGIN_CAP_BLUETOOTH;
     if (host == 0 || plugin == 0 ||
         host->struct_size < GM_PLUGIN_HOST_API_MIN_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(host->abi_version,
                                       GM_PLUGIN_ABI_MIN_VERSION) ||
         host->display_get_info == 0 || host->graphics.lvgl == 0 ||
+        host->graphics.framebuffer.lock == 0 ||
+        host->graphics.framebuffer.unlock == 0 ||
         host->bt_send == 0 || host->app_exit == 0 ||
         (host->capabilities & required) != required ||
         plugin->struct_size < GM_PLUGIN_DESCRIPTOR_MIN_SIZE)

@@ -13,6 +13,8 @@ import {
   encodeChapter,
   encodeClose,
   encodeControl,
+  encodeImageBegin,
+  encodeImageTile,
   encodeOpen,
   encodeWindow,
   readerAction,
@@ -20,12 +22,20 @@ import {
   readerMode,
 } from './reader-protocol.js';
 import { ReaderStorage } from './reader-storage.js';
+import { rgbaToGray4 } from './reader-image.js';
 import {
   NOVEL_INDEX_VERSION,
   indexPersistentNovel,
   readNovelWindow,
   readNovelWindowSpan,
 } from './reader-file.js';
+import {
+  EPUB_INDEX_VERSION,
+  imageMarkerAt,
+  indexPersistentEpub,
+  readEpubImage,
+  readEpubWindow,
+} from './reader-epub.js';
 
 const element = (selector) => document.querySelector(selector);
 const importButton = element('#import-button');
@@ -39,6 +49,7 @@ const readerView = element('#reader');
 const bookTitle = element('#book-title');
 const chapterName = element('#chapter-name');
 const phonePreview = element('#phone-preview');
+const phoneIllustration = element('#phone-illustration');
 const progress = element('#progress');
 const progressText = element('#progress-text');
 const playToggle = element('#play-toggle');
@@ -60,6 +71,8 @@ const PROGRESS_SAVE_INTERVAL_MS = 1000;
 const GLASSES_WINDOW_BYTES = 12_288;
 const WINDOW_CACHE_LIMIT = 6;
 const MAX_BOOKMARKS = 500;
+const IMAGE_TILE_ROWS = 24;
+const IMAGE_ACK_TIMEOUT_MS = 6000;
 let gm;
 let database;
 let bridgeReady = false;
@@ -77,6 +90,11 @@ let playing = true;
 let saveTimer;
 let savePromise = Promise.resolve();
 let lastSaveAt = 0;
+let phoneImageUrl;
+let phoneImageId;
+let phoneImageRequest = 0;
+let imageStatusWaiter;
+let imageTransfer = Promise.resolve();
 
 async function waitWithTimeout(promise, timeoutMs, message) {
   let timer;
@@ -124,17 +142,24 @@ function renderReader() {
   const available = Boolean(current && currentFile && activeWindow);
   emptyState.hidden = available;
   readerView.hidden = !available;
-  if (!available) return;
+  if (!available) {
+    clearPhoneIllustration();
+    return;
+  }
   const percent = Math.min(100, currentOffset / Math.max(1, current.textBytes) * 100);
   const chapter = currentChapters[chapterIndexAt(currentChapters, currentOffset)];
   const localOffset = Math.max(0, currentOffset - activeWindow.byteOffset);
   const previewEnd = trimWindowEnd(activeWindow.bytes, localOffset, 720);
-  const previewText = decoder.decode(activeWindow.bytes.subarray(localOffset, previewEnd)).trimStart();
+  const marker = current.format === 'epub' ? imageMarkerAt(activeWindow.bytes, localOffset) : null;
+  const previewText = decoder.decode(activeWindow.bytes.subarray(localOffset, previewEnd)).trimStart()
+    .replace(/\x1eGMIMG:[0-9a-f]{8}\x1e/giu, '[Illustration]');
   bookTitle.textContent = current.title;
   chapterName.textContent = chapter?.title ?? 'Full Text';
   phonePreview.textContent = previewEnd < activeWindow.bytes.length || !activeWindow.final
     ? `${previewText}\n…`
     : previewText;
+  if (marker) void renderPhoneIllustration(marker.imageId);
+  else clearPhoneIllustration();
   progress.value = percent;
   progressText.textContent = `${percent.toFixed(1)}%`;
   const pageTurnMode = current.readingMode === 'page';
@@ -152,6 +177,32 @@ function renderReader() {
   pageIntervalSetting.hidden = !pageTurnMode;
 }
 
+async function renderPhoneIllustration(imageId) {
+  if (phoneImageId === imageId && !phoneIllustration.hidden) return;
+  const request = ++phoneImageRequest;
+  try {
+    const image = await readEpubImage(database, currentFile, current, imageId);
+    if (request !== phoneImageRequest) return;
+    clearPhoneIllustration(false);
+    phoneImageUrl = URL.createObjectURL(new Blob([image.bytes], { type: image.mediaType }));
+    phoneIllustration.src = phoneImageUrl;
+    phoneIllustration.alt = image.alt || 'EPUB illustration';
+    phoneIllustration.hidden = false;
+    phoneImageId = imageId;
+  } catch (error) {
+    if (request === phoneImageRequest) setStatus(`Illustration preview failed: ${error.message}`, true);
+  }
+}
+
+function clearPhoneIllustration(invalidate = true) {
+  if (invalidate) phoneImageRequest += 1;
+  phoneIllustration.hidden = true;
+  phoneIllustration.removeAttribute('src');
+  if (phoneImageUrl) URL.revokeObjectURL(phoneImageUrl);
+  phoneImageUrl = undefined;
+  phoneImageId = undefined;
+}
+
 async function reloadBooks() {
   books = (await database.listBooks()).sort((left, right) => right.updatedAt - left.updatedAt);
   renderLibrary();
@@ -163,22 +214,28 @@ async function openBook(fileId, push = true, requestedEncoding) {
   const loaded = await database.getBook(fileId);
   if (!loaded) return;
   let novelIndex = loaded.meta;
+  const format = loaded.meta.format === 'epub' ? 'epub' : 'txt';
   const selectedEncoding = requestedEncoding ?? loaded.meta.encoding ?? 'auto';
   const needsIndex = requestedEncoding !== undefined ||
-    novelIndex.indexVersion !== NOVEL_INDEX_VERSION || novelIndex.encoding === 'auto' ||
+    novelIndex.indexVersion !== (format === 'epub' ? EPUB_INDEX_VERSION : NOVEL_INDEX_VERSION) ||
+    novelIndex.encoding === 'auto' ||
     !Number.isSafeInteger(novelIndex.textBytes) || novelIndex.textBytes <= 0 ||
-    !Array.isArray(novelIndex.chapters) || novelIndex.chapters.length === 0;
+    !Array.isArray(novelIndex.chapters) || novelIndex.chapters.length === 0 ||
+    (format === 'epub' && (!Array.isArray(novelIndex.epubSections) ||
+      !Array.isArray(novelIndex.epubImages)));
   if (needsIndex) {
-    setStatus(`Indexing "${loaded.meta.title}" from the binary stream…`);
+    setStatus(`Indexing ${format.toUpperCase()} "${loaded.meta.title}" from the binary stream…`);
     let shownProgress = -1;
-    const result = await indexPersistentNovel(database, loaded.file, selectedEncoding,
-      (loadedBytes, totalBytes) => {
-        const percent = Math.floor(loadedBytes / Math.max(1, totalBytes) * 100);
-        if (percent >= shownProgress + 10) {
-          shownProgress = percent;
-          setStatus(`Indexing "${loaded.meta.title}": ${percent}%`);
-        }
-      });
+    const reportProgress = (loadedBytes, totalBytes) => {
+      const percent = Math.floor(loadedBytes / Math.max(1, totalBytes) * 100);
+      if (percent >= shownProgress + 10) {
+        shownProgress = percent;
+        setStatus(`Indexing "${loaded.meta.title}": ${percent}%`);
+      }
+    };
+    const result = format === 'epub'
+      ? await indexPersistentEpub(database, loaded.file, reportProgress)
+      : await indexPersistentNovel(database, loaded.file, selectedEncoding, reportProgress);
     novelIndex = { ...novelIndex, ...result };
   }
   const migratedSpeed = migrateScrollSpeed(
@@ -189,6 +246,8 @@ async function openBook(fileId, push = true, requestedEncoding) {
     ...loaded.meta,
     ...novelIndex,
     fileId,
+    format,
+    title: novelIndex.epubTitle || loaded.meta.title,
     sourceBytes: loaded.file.size,
     speed: migratedSpeed,
     speedProfileVersion: SCROLL_SPEED_PROFILE_VERSION,
@@ -206,7 +265,8 @@ async function openBook(fileId, push = true, requestedEncoding) {
   if (index >= 0) books[index] = current;
   renderReader();
   renderLibrary();
-  setStatus(`Opened "${current.title}" with ${currentChapters.length} contents entries.`);
+  const illustrationCount = current.format === 'epub' ? ` and ${current.epubImages.length} illustrations` : '';
+  setStatus(`Opened "${current.title}" with ${currentChapters.length} contents entries${illustrationCount}.`);
   if (push) await openOnGlasses(cursor);
 }
 
@@ -221,8 +281,11 @@ async function importNovel() {
       return;
     }
     await reloadBooks();
-    await openBook(file.fileId, true, encodingSelect.value);
-    setStatus(`TXT imported successfully. Detected encoding: ${current.encoding}.`);
+    await openBook(file.fileId, true,
+      file.extension === 'epub' || /\.epub$/iu.test(file.name) ? undefined : encodingSelect.value);
+    setStatus(current.format === 'epub'
+      ? `EPUB imported successfully with ${current.epubImages.length} supported illustrations.`
+      : `TXT imported successfully. Detected encoding: ${current.encoding}.`);
   } catch (error) {
     if (file?.fileId) await database.deleteBook(file.fileId).catch(() => undefined);
     await reloadBooks().catch(() => undefined);
@@ -271,13 +334,9 @@ function cursorAt(offset) {
 }
 
 async function loadWindow(sourceOffset, byteOffset, maxBytes = GLASSES_WINDOW_BYTES) {
-  const loaded = await readNovelWindow(
-    database,
-    currentFile,
-    current.encoding,
-    sourceOffset,
-    maxBytes,
-  );
+  const loaded = current.format === 'epub'
+    ? await readEpubWindow(database, currentFile, current, byteOffset, maxBytes)
+    : await readNovelWindow(database, currentFile, current.encoding, sourceOffset, maxBytes);
   const entry = { ...loaded, byteOffset };
   cacheWindow(entry);
   return entry;
@@ -299,6 +358,7 @@ async function openOnGlasses(cursorOrOffset) {
   if (!findCachedWindow(cursor.offset)) {
     await loadWindow(cursor.sourceOffset, cursor.windowOffset);
   }
+  cancelPendingImageStatus('Reading session changed');
   currentSession = newSession();
   glassesChapterTitle = '';
   currentOffset = Math.min(cursor.offset, Math.max(0, current.textBytes - 1));
@@ -324,6 +384,23 @@ async function sendTextWindow(request) {
   const start = Math.min(request.offset, current.textBytes);
   const requested = Math.min(request.maxBytes, GLASSES_WINDOW_BYTES);
   let activeWindow = findCachedWindow(start);
+  if (current.format === 'epub') {
+    if (!activeWindow || activeWindow.byteOffset !== start) {
+      activeWindow = {
+        ...(await readEpubWindow(database, currentFile, current, start, requested)),
+        byteOffset: start,
+      };
+      cacheWindow(activeWindow);
+    }
+    await gm.plugin.sendMessage(READER_CHANNEL, encodeWindow({
+      session: currentSession,
+      offset: start,
+      final: activeWindow.final,
+      bytes: activeWindow.bytes.subarray(0, requested),
+    }));
+    setStatus('The glasses received EPUB content for local layout.');
+    return;
+  }
   if (!activeWindow) {
     const previous = windowCache.find((entry) => !entry.final &&
       entry.byteOffset + entry.bytes.length === start);
@@ -351,6 +428,108 @@ async function sendTextWindow(request) {
     bytes: span.bytes,
   }));
   setStatus('The glasses received a temporary text window for local layout and scrolling.');
+}
+
+function queueImageTransfer(request) {
+  imageTransfer = imageTransfer.catch(() => undefined).then(async () => {
+    try {
+      await sendEpubImage(request);
+    } catch (error) {
+      setStatus(`Failed to send illustration: ${error.message}`, true);
+    }
+  });
+}
+
+async function sendEpubImage(request) {
+  if (current?.format !== 'epub' || !currentFile || request.session !== currentSession) return;
+  const session = currentSession;
+  const width = Math.max(1, Math.min(2048, request.width));
+  const height = Math.max(1, Math.min(2048, request.height));
+  setStatus('Preparing EPUB illustration for the glasses…');
+  const source = await readEpubImage(database, currentFile, current, request.imageId);
+  const frame = await renderGray4Frame(source, width, height);
+  if (session !== currentSession) return;
+  const stride = Math.ceil(width / 2);
+  const tileCount = Math.ceil(height / IMAGE_TILE_ROWS);
+  await gm.plugin.sendMessage(READER_CHANNEL, encodeImageBegin({
+    session, imageId: request.imageId, width, height, tileCount,
+  }));
+  for (let tileIndex = 0; tileIndex < tileCount; tileIndex += 1) {
+    const y = tileIndex * IMAGE_TILE_ROWS;
+    const rows = Math.min(IMAGE_TILE_ROWS, height - y);
+    const acknowledged = waitForImageStatus(session, request.imageId, tileIndex);
+    await gm.plugin.sendMessage(READER_CHANNEL, encodeImageTile({
+      session,
+      imageId: request.imageId,
+      tileIndex,
+      y,
+      height: rows,
+      stride,
+      final: tileIndex + 1 === tileCount,
+      bytes: frame.subarray(y * stride, (y + rows) * stride),
+    }));
+    await acknowledged;
+    if (session !== currentSession) return;
+  }
+  setStatus(`Illustration sent (${source.alt || `image ${request.imageId}`}).`);
+}
+
+function waitForImageStatus(session, imageId, tileIndex) {
+  if (imageStatusWaiter) imageStatusWaiter.reject(new Error('Image transfer was replaced'));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      if (imageStatusWaiter?.timer === timer) imageStatusWaiter = undefined;
+      reject(new Error(`Glasses did not acknowledge image tile ${tileIndex + 1}`));
+    }, IMAGE_ACK_TIMEOUT_MS);
+    imageStatusWaiter = { session, imageId, tileIndex, resolve, reject, timer };
+  });
+}
+
+function acceptImageStatus(event) {
+  const waiter = imageStatusWaiter;
+  if (!waiter || waiter.session !== event.session || waiter.imageId !== event.imageId ||
+      waiter.tileIndex !== event.tileIndex) return;
+  clearTimeout(waiter.timer);
+  imageStatusWaiter = undefined;
+  if (event.status === 0) waiter.resolve(event);
+  else waiter.reject(new Error(`Glasses rejected image tile ${event.tileIndex + 1} (status ${event.status})`));
+}
+
+async function renderGray4Frame(source, width, height) {
+  const blob = new Blob([source.bytes], { type: source.mediaType });
+  const drawable = await decodeBrowserImage(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+  if (!context) throw new Error('Canvas rendering is unavailable');
+  context.fillStyle = '#000';
+  context.fillRect(0, 0, width, height);
+  const scale = Math.min(width / drawable.width, height / drawable.height);
+  const drawWidth = Math.max(1, Math.round(drawable.width * scale));
+  const drawHeight = Math.max(1, Math.round(drawable.height * scale));
+  context.drawImage(drawable, Math.floor((width - drawWidth) / 2),
+    Math.floor((height - drawHeight) / 2), drawWidth, drawHeight);
+  drawable.close?.();
+  const rgba = context.getImageData(0, 0, width, height).data;
+  return rgbaToGray4(rgba, width, height);
+}
+
+async function decodeBrowserImage(blob) {
+  if (typeof createImageBitmap === 'function') return createImageBitmap(blob);
+  const url = URL.createObjectURL(blob);
+  try {
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = url;
+    await new Promise((resolve, reject) => {
+      image.addEventListener('load', resolve, { once: true });
+      image.addEventListener('error', () => reject(new Error('EPUB image decoding failed')), { once: true });
+    });
+    return image;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 function persistReadingState() {
@@ -393,6 +572,14 @@ async function handleReaderEvent(message) {
     return;
   }
   if (event.session !== currentSession) return;
+  if (event.type === 'imageStatus') {
+    acceptImageStatus(event);
+    return;
+  }
+  if (event.type === 'needImage') {
+    queueImageTransfer(event);
+    return;
+  }
   if (event.type === 'needWindow') {
     try {
       await sendTextWindow(event);
@@ -433,6 +620,13 @@ async function handleReaderEvent(message) {
     sourceOffset: chapter.sourceOffset,
     windowOffset: chapter.byteOffset,
   });
+}
+
+function cancelPendingImageStatus(message) {
+  if (!imageStatusWaiter) return;
+  clearTimeout(imageStatusWaiter.timer);
+  imageStatusWaiter.reject(new Error(message));
+  imageStatusWaiter = undefined;
 }
 
 async function sendControl(control, value = 0) {
@@ -588,7 +782,7 @@ async function initializeBridge() {
     bridgeReady = true;
     bridgeState.textContent = connected ? 'Glasses Connected' : 'Bridge Ready';
     bridgeState.classList.toggle('connected', connected);
-    setStatus('Bridge ready. You can now import a TXT file.');
+    setStatus('Bridge ready. You can now import a TXT or EPUB file.');
     return true;
   } catch (error) {
     bridgeState.textContent = 'Connection Timed Out · Retry';
@@ -609,7 +803,7 @@ async function initialize() {
     if (books.length > 0) {
       await openBook(books[0].fileId);
     } else {
-      setStatus('Library ready. Import a TXT file to start reading.');
+      setStatus('Library ready. Import a TXT or EPUB file to start reading.');
     }
   } catch (error) {
     setStatus(`Local library unavailable: ${error.message}`, true);
@@ -620,6 +814,8 @@ window.addEventListener('pagehide', () => eyeballCleanup());
 
 function eyeballCleanup() {
   clearTimeout(saveTimer);
+  cancelPendingImageStatus('Reader closed');
+  clearPhoneIllustration();
   const pendingSave = persistReadingState();
   if (gm && currentSession) void gm.plugin.sendMessage(READER_CHANNEL, encodeClose(currentSession)).catch(() => undefined);
   if (gm && subscriptionId) void gm.device.unsubscribeEvents(subscriptionId).catch(() => undefined);

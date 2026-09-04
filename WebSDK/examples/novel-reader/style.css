@@ -7,7 +7,7 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 90% 0, #123228 0, #07120f 38%); }
+body { width: 100%; max-width: 100%; margin: 0; min-height: 100vh; overflow-x: hidden; background: radial-gradient(circle at 90% 0, #123228 0, #07120f 38%); }
 button, select, input { font: inherit; }
 button, select { border: 1px solid #285246; border-radius: 9px; background: #0d211b; color: #e8fff6; }
 button { padding: 9px 12px; cursor: pointer; }
@@ -23,8 +23,8 @@ button.danger { color: #ffaca9; border-color: #683b3a; }
 .connection { padding: 8px 12px; border: 1px solid #315248; border-radius: 999px; color: #9ab9ae; font-size: 12px; }
 .connection.connected { color: #66efba; border-color: #319a74; }
 
-.layout { display: grid; grid-template-columns: minmax(220px, 290px) 1fr; min-height: calc(100vh - 84px); }
-.library-panel { padding: 22px; border-right: 1px solid #1c3a31; background: rgba(4, 14, 11, .62); }
+.layout { display: grid; grid-template-columns: minmax(220px, 290px) minmax(0, 1fr); width: 100%; max-width: 100%; min-height: calc(100vh - 84px); }
+.library-panel { min-width: 0; max-width: 100%; padding: 22px; border-right: 1px solid #1c3a31; background: rgba(4, 14, 11, .62); }
 .section-heading, .dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .section-heading h2 { font-size: 17px; }
 .section-heading span, .hint { color: #78988d; font-size: 11px; }
@@ -32,22 +32,24 @@ button.danger { color: #ffaca9; border-color: #683b3a; }
 .field-label { display: block; margin: 18px 0 7px; color: #9fbbb1; font-size: 11px; }
 select { width: 100%; padding: 9px 10px; }
 .hint { margin-top: 9px; line-height: 1.5; }
-.book-list { display: grid; gap: 8px; margin-top: 20px; }
-.book-card { width: 100%; padding: 12px; text-align: left; }
-.book-card strong, .book-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.book-list { display: grid; min-width: 0; max-width: 100%; gap: 8px; margin-top: 20px; }
+.book-card { width: 100%; min-width: 0; max-width: 100%; padding: 12px; overflow: hidden; text-align: left; }
+.book-card strong { display: -webkit-box; max-width: 100%; overflow: hidden; overflow-wrap: anywhere; line-height: 1.3; white-space: normal; word-break: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.book-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .book-card small { margin-top: 5px; color: #729286; }
 .book-card.active { border-color: #39db9d; box-shadow: inset 3px 0 #39db9d; }
 
-.reader-panel { min-width: 0; padding: 26px; }
+.reader-panel { width: 100%; min-width: 0; max-width: 100%; padding: 26px; overflow: hidden; }
 .empty-state { display: grid; min-height: 470px; place-content: center; justify-items: center; gap: 12px; color: #8ba79e; text-align: center; }
 .empty-state h2 { color: #e8fff6; }
 .empty-icon { display: grid; width: 64px; height: 64px; place-items: center; border: 1px solid #328665; border-radius: 18px; color: #5ae5b0; font-weight: 800; }
-.reader-heading { display: grid; gap: 12px; }
-.reader-heading h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.reader-heading h2 { font-size: 24px; }
+.reader-heading { display: grid; width: 100%; min-width: 0; max-width: 100%; gap: 12px; }
+.reader-heading h2 { display: -webkit-box; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; overflow-wrap: anywhere; font-size: 24px; line-height: 1.25; white-space: normal; word-break: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .heading-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
 .heading-actions button { min-width: 0; }
-.phone-preview { height: 210px; margin-top: 22px; padding: 20px 24px; overflow: hidden; border: 1px solid #22483c; border-radius: 16px; background: #020907; color: #dffcef; font-family: "Noto Serif CJK SC", "Songti SC", SimSun, serif; font-size: 18px; line-height: 1.65; white-space: pre-wrap; }
+.phone-preview-frame { position: relative; height: 210px; margin-top: 22px; overflow: hidden; border: 1px solid #22483c; border-radius: 16px; background: #020907; }
+.phone-preview { box-sizing: border-box; height: 100%; margin: 0; padding: 20px 24px; overflow: hidden; color: #dffcef; font-family: "Noto Serif CJK SC", "Songti SC", SimSun, serif; font-size: 18px; line-height: 1.65; white-space: pre-wrap; }
+.phone-illustration { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #020907; }
 .chapter-name { margin-top: 12px; overflow: hidden; color: #70cfaa; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .progress-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; margin-top: 6px; color: #8eafa3; font-size: 12px; }
 progress { width: 100%; height: 5px; accent-color: #39db9d; }
@@ -73,7 +75,8 @@ dialog::backdrop { background: rgba(0, 0, 0, .72); }
   .library-panel { border-right: 0; border-bottom: 1px solid #1c3a31; }
   .reader-panel { padding: 18px; }
   .heading-actions button { padding: 9px 6px; font-size: 13px; }
-  .phone-preview { height: 168px; padding: 16px; font-size: 17px; }
+  .phone-preview-frame { height: 168px; }
+  .phone-preview { padding: 16px; font-size: 17px; }
   .controls { grid-template-columns: repeat(2, 1fr); }
   .settings { grid-template-columns: 1fr 1fr; }
   #push-to-glasses { grid-column: 1 / -1; }

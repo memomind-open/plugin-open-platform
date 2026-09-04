@@ -21,7 +21,7 @@ export class ReaderStorage {
     const result = await this.gm.files.list();
     const files = Array.isArray(result?.files) ? result.files : [];
     this.filesById = new Map(
-      files.filter(isTextFile).map((file) => [file.fileId, normalizeFile(file)]),
+      files.filter(isBookFile).map((file) => [file.fileId, normalizeFile(file)]),
     );
     return [...this.filesById.values()];
   }
@@ -39,7 +39,7 @@ export class ReaderStorage {
 
   async pickBook() {
     const result = await this.gm.files.pick({
-      extensions: ['txt'],
+      extensions: ['txt', 'epub'],
       allowMultiple: false,
     });
     const file = result?.files?.[0];
@@ -126,9 +126,11 @@ export class ReaderStorage {
 export function createDefaultMetadata(file) {
   const normalized = normalizeFile(file);
   const importedAt = Date.parse(normalized.importedAt) || Date.now();
+  const format = fileFormat(normalized);
   return {
     fileId: normalized.fileId,
     title: safeTitle(normalized.name),
+    format,
     encoding: 'auto',
     sourceBytes: normalized.size,
     textBytes: normalized.size,
@@ -173,9 +175,15 @@ function normalizeFile(file) {
   };
 }
 
-function isTextFile(file) {
+function isBookFile(file) {
   const extension = String(file?.extension ?? '').replace(/^\./u, '').toLowerCase();
-  return extension === 'txt' || (!extension && /\.txt$/iu.test(file?.name ?? ''));
+  return extension === 'txt' || extension === 'epub' ||
+    (!extension && /\.(?:txt|epub)$/iu.test(file?.name ?? ''));
+}
+
+function fileFormat(file) {
+  const extension = String(file?.extension ?? '').replace(/^\./u, '').toLowerCase();
+  return extension === 'epub' || /\.epub$/iu.test(file?.name ?? '') ? 'epub' : 'txt';
 }
 
 function isBookMetadata(value, fileId) {
@@ -221,6 +229,6 @@ function requireFileId(value) {
 }
 
 function safeTitle(filename) {
-  const title = String(filename ?? '').replace(/\.txt$/iu, '').trim();
+  const title = String(filename ?? '').replace(/\.(?:txt|epub)$/iu, '').trim();
   return title || 'Untitled Novel';
 }
