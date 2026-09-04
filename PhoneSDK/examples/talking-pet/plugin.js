@@ -85,31 +85,28 @@ let idleBlinkFrameTimer;
 let idleBlinkGeneration = 0;
 let nativeAudioAvailable = false;
 let nativeAudioState = 'idle';
-let nativeAudioConfigurePromise;
+let nativeCapture;
 let nativeStartRequestInFlight = false;
 let nativePressGeneration = 0;
-let nativeRecordingId;
-let observedNativeFrames = 0;
 
-gm.audio.onFrames((batch) => {
-  observedNativeFrames += batch.frames.length;
-});
-
-gm.audio.onState((audioState) => {
+gm.audio.onCaptureState((audioState) => {
   nativeAudioState = audioState.state;
-  if (audioState.state === 'recording') {
-    nativeRecordingId = audioState.recordingId;
-    observedNativeFrames = 0;
+  if (audioState.state === 'capturing') {
     showListeningState();
+    if (!talkInputActive) requestNativeRecordingStop();
   } else if (audioState.state === 'stopped') {
-    nativeRecordingId = audioState.latestRecordingId ?? audioState.recordingId;
-    if (nativeRecordingId) {
+    nativeCapture = undefined;
+    const recordingId = audioState.result?.mode === 'recording'
+      ? audioState.result.recordingId
+      : undefined;
+    if (recordingId) {
       showProcessingState();
-      void gm.audio.playRecording({ recordingId: nativeRecordingId, voice: 'cute' }).catch(showNativeAudioError);
+      void gm.audio.playRecording({ recordingId, voice: 'cute' }).catch(showNativeAudioError);
     } else {
       resetTalkButton();
     }
   } else if (audioState.state === 'error') {
+    nativeCapture = undefined;
     resetTalkButton();
     stopMouthAnimation();
     const detail = audioState.errorCode === 'NO_AUDIO'
@@ -173,23 +170,13 @@ function showNativeAudioError(error) {
   say(`Glasses audio is temporarily unavailable: ${error?.message ?? error?.errorCode ?? 'Unknown error'}`);
 }
 
-function ensureNativeAudioConfigured() {
-  if (!nativeAudioConfigurePromise) {
-    nativeAudioConfigurePromise = gm.audio
-      .configure({ noiseReduction: true, pickupMode: 'frontFocus' })
-      .catch((error) => {
-        nativeAudioConfigurePromise = undefined;
-        throw error;
-      });
-  }
-  return nativeAudioConfigurePromise;
-}
-
 function requestNativeRecordingStop() {
-  if (nativeAudioState === 'stopping') return;
+  const capture = nativeCapture;
+  if (!capture || nativeAudioState === 'stopping') return;
   nativeAudioState = 'stopping';
-  void gm.audio.stopRecording().catch((error) => {
+  void capture.stop().catch((error) => {
     nativeAudioState = 'error';
+    nativeCapture = undefined;
     showNativeAudioError(error);
   });
 }
@@ -621,17 +608,14 @@ async function startRecording(event) {
     const pressGeneration = ++nativePressGeneration;
     try {
       nativeAudioState = 'starting';
-      observedNativeFrames = 0;
-      await ensureNativeAudioConfigured();
-      if (!talkInputActive || pressGeneration !== nativePressGeneration) {
-        if (pressGeneration === nativePressGeneration) {
-          nativeAudioState = 'idle';
-          resetTalkButton();
-        }
-        return;
-      }
       nativeStartRequestInFlight = true;
-      await gm.audio.startRecording();
+      const capture = await gm.audio.openCapture({
+        mode: 'recording',
+        pickupMode: 'frontFocus',
+        noiseReduction: true,
+        maxDurationMs: 5000,
+      });
+      nativeCapture = capture;
       nativeStartRequestInFlight = false;
       if (!talkInputActive || pressGeneration !== nativePressGeneration) requestNativeRecordingStop();
     } catch (error) {
@@ -675,20 +659,15 @@ function stopRecording(event) {
   window.clearTimeout(recordingTimer);
   if (nativeAudioAvailable) {
     nativePressGeneration += 1;
-    if (nativeAudioState === 'recording') {
+    if (nativeAudioState === 'capturing') {
       showProcessingState();
       requestNativeRecordingStop();
     } else if (nativeAudioState === 'starting') {
-      if (nativeStartRequestInFlight) {
-        // The bridge has accepted START (or is about to); stop it as soon as
-        // that request settles so a quick release cannot leave capture active.
-        showProcessingState();
-        return;
-      }
-      // The user released while only local configuration was pending. No
-      // native recording exists yet, so restore the state for the next press.
-      nativeAudioState = 'idle';
-      resetTalkButton();
+      showProcessingState();
+      // If the descriptor is already available, stop now. Otherwise
+      // startRecording() observes talkInputActive=false when openCapture()
+      // resolves and performs the same stop.
+      if (!nativeStartRequestInFlight && nativeCapture) requestNativeRecordingStop();
     } else {
       resetTalkButton();
     }
@@ -761,8 +740,7 @@ async function initialize() {
   try {
     await gm.ready();
     const capabilities = await gm.runtime.getCapabilities();
-    nativeAudioAvailable = Boolean(capabilities?.audio);
-    if (nativeAudioAvailable) await ensureNativeAudioConfigured();
+    nativeAudioAvailable = Boolean(capabilities?.audio?.modes?.recording);
     const saved = await gm.storage.get('talking-pet-state');
     if (saved.value && typeof saved.value === 'object') Object.assign(state, saved.value);
     render();

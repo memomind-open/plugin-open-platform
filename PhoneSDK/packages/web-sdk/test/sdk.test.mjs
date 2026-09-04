@@ -48,6 +48,38 @@ class FakeTransport {
   }
 }
 
+function encodeTestAudioChunk({
+  sequence = 0,
+  timestampUs = 0,
+  durationMs = 40,
+  frameLengths = [2, 3],
+  droppedFrameCount = 0,
+  discontinuity = false,
+  queueLatencyMs = 4,
+  data = Uint8Array.of(1, 2, 3, 4, 5),
+} = {}) {
+  const headerBytes = 40 + frameLengths.length * 2;
+  const buffer = new ArrayBuffer(headerBytes + data.byteLength);
+  const view = new DataView(buffer);
+  view.setUint32(0, 0x474d4155, false);
+  view.setUint8(4, 1);
+  view.setUint8(5, 1);
+  view.setUint16(6, discontinuity ? 1 : 0, false);
+  view.setUint16(8, headerBytes, false);
+  view.setUint16(10, frameLengths.length, false);
+  view.setUint32(12, sequence, false);
+  const timestampHigh = Math.floor(timestampUs / 0x100000000);
+  view.setUint32(16, timestampHigh, false);
+  view.setUint32(20, timestampUs - timestampHigh * 0x100000000, false);
+  view.setUint32(24, durationMs, false);
+  view.setUint32(28, droppedFrameCount, false);
+  view.setUint32(32, queueLatencyMs, false);
+  view.setUint32(36, data.byteLength, false);
+  frameLengths.forEach((length, index) => view.setUint16(40 + index * 2, length, false));
+  new Uint8Array(buffer, headerBytes).set(data);
+  return buffer;
+}
+
 test('SDK adds the Bridge v1 runtime envelope', async () => {
   const transport = new FakeTransport();
   const gm = createGMPlugin({ transport });
@@ -350,6 +382,67 @@ test('App WebView bridge delivers native plugin.message events', () => {
   });
 });
 
+test('App WebView bridge joins an audio descriptor with event.ports[0]', async () => {
+  let receiveWindowMessage;
+  const globalObject = {
+    MemoPluginBridge: { postMessage: () => {} },
+    addEventListener: (name, listener) => {
+      if (name === 'message') receiveWindowMessage = listener;
+    },
+    removeEventListener: () => {},
+  };
+  const transport = new AppWebViewTransport({ globalObject, timeoutMs: 1000 });
+  globalObject.__memoPluginBootstrap('app-session', 3);
+  const descriptor = {
+    id: 'stream-token-1234567890',
+    kind: 'audio.capture',
+    sessionId: 'capture-app-1',
+    runtimeGeneration: 3,
+  };
+  const responsePromise = transport.send({
+    requestId: 'request-audio-1', method: 'audio.openCapture', runtimeGeneration: 3,
+  });
+  globalObject.__memoPluginResolve({
+    requestId: 'request-audio-1', ok: true,
+    result: { mode: 'stream', sessionId: 'capture-app-1', streamDescriptor: descriptor },
+  });
+  const channel = new MessageChannel();
+  receiveWindowMessage({
+    data: JSON.stringify({ type: 'gm-plugin:stream-port', descriptor }),
+    ports: [channel.port2],
+  });
+  const result = await responsePromise;
+
+  assert.equal(result.streamPort, channel.port2);
+  assert.deepEqual(result.streamDescriptor, descriptor);
+  channel.port1.close();
+  channel.port2.close();
+
+  const earlyDescriptor = {
+    id: 'stream-token-0987654321',
+    kind: 'audio.capture',
+    sessionId: 'capture-app-2',
+    runtimeGeneration: 3,
+  };
+  const earlyChannel = new MessageChannel();
+  receiveWindowMessage({
+    data: { type: 'gm-plugin:stream-port', descriptor: earlyDescriptor },
+    ports: [earlyChannel.port2],
+  });
+  const earlyResponsePromise = transport.send({
+    requestId: 'request-audio-2', method: 'audio.openCapture', runtimeGeneration: 3,
+  });
+  globalObject.__memoPluginResolve({
+    requestId: 'request-audio-2', ok: true,
+    result: { mode: 'stream', sessionId: 'capture-app-2', streamDescriptor: earlyDescriptor },
+  });
+  const earlyResult = await earlyResponsePromise;
+  assert.equal(earlyResult.streamPort, earlyChannel.port2);
+  earlyChannel.port1.close();
+  earlyChannel.port2.close();
+  transport.close();
+});
+
 test('SDK uses refreshed bootstrap credentials after a runtime replacement', async () => {
   const transport = new FakeTransport();
   const gm = createGMPlugin({ transport });
@@ -490,50 +583,151 @@ test('SDK rejects invalid plugin message inputs before transport', async () => {
   assert.equal(transport.requests.length, 0);
 });
 
-test('SDK exposes native audio calls and decodes Opus frame batches', async () => {
+test('SDK exposes host-retained recording through the unified capture session', async () => {
   const transport = new FakeTransport();
+  transport.send = async function send(request) {
+    this.requests.push(request);
+    if (request.method === 'audio.openCapture') return {
+      mode: 'recording',
+      sessionId: 'capture-recording-1',
+      resolvedOptions: {
+        mode: 'recording', pickupMode: 'frontFocus', noiseReduction: true,
+        codec: 'opus', sampleRate: 16000, channels: 1, maxDurationMs: 5000,
+      },
+    };
+    if (request.method === 'audio.stopCapture') return {
+      mode: 'recording', sessionId: 'capture-recording-1', recordingId: 'recording-1',
+      durationMs: 1200, frameCount: 60, opusBytes: 2400,
+    };
+    throw new Error(`unexpected method ${request.method}`);
+  };
   const gm = createGMPlugin({ transport });
-  const batches = [];
-  gm.audio.onFrames((batch) => batches.push(batch));
-
-  await gm.audio.configure({ noiseReduction: true, pickupMode: 'frontFocus' });
-  await gm.audio.startRecording();
-  transport.emit({
-    name: 'audio.frames',
-    data: {
-      recordingId: 'recording-7-1',
-      firstSequence: 0,
-      frameCount: 2,
-      droppedFrameCount: 0,
-      framesBase64: ['AQID', 'BAUG'],
-    },
-    runtimeGeneration: 7,
+  const capture = await gm.audio.openCapture({
+    mode: 'recording', pickupMode: 'frontFocus', noiseReduction: true, maxDurationMs: 5000,
   });
+  const result = await capture.stop();
 
-  assert.equal(transport.requests[0].method, 'audio.configure');
+  assert.equal(capture.mode, 'recording');
+  assert.equal(capture.stream, null);
+  assert.equal(transport.requests[0].method, 'audio.openCapture');
   assert.deepEqual(transport.requests[0].params, {
-    noiseReduction: true,
-    pickupMode: 'frontFocus',
+    mode: 'recording', pickupMode: 'frontFocus', noiseReduction: true, maxDurationMs: 5000,
   });
-  assert.equal(transport.requests[1].method, 'audio.startRecording');
-  assert.equal(batches.length, 1);
-  assert.deepEqual(batches[0].frames, [
-    Uint8Array.of(1, 2, 3),
-    Uint8Array.of(4, 5, 6),
+  assert.equal(transport.requests[1].method, 'audio.stopCapture');
+  assert.equal(result.recordingId, 'recording-1');
+});
+
+test('aborting a host-retained recording stops its capture session', async () => {
+  const transport = new FakeTransport();
+  transport.send = async function send(request) {
+    this.requests.push(request);
+    if (request.method === 'audio.openCapture') return {
+      mode: 'recording', sessionId: 'capture-abort-1',
+      resolvedOptions: {
+        mode: 'recording', pickupMode: 'unchanged', noiseReduction: true,
+        codec: 'opus', sampleRate: 16000, channels: 1, maxDurationMs: 15000,
+      },
+    };
+    if (request.method === 'audio.stopCapture') return {
+      mode: 'recording', sessionId: 'capture-abort-1', recordingId: 'recording-abort-1',
+      durationMs: 20, frameCount: 1, opusBytes: 40,
+    };
+    throw new Error(`unexpected method ${request.method}`);
+  };
+  const controller = new AbortController();
+  const gm = createGMPlugin({ transport });
+  const capture = await gm.audio.openCapture({ mode: 'recording', signal: controller.signal });
+  controller.abort();
+  const result = await capture.stop();
+
+  assert.equal(result.recordingId, 'recording-abort-1');
+  assert.deepEqual(transport.requests.map(({ method }) => method), [
+    'audio.openCapture', 'audio.stopCapture',
   ]);
 });
 
-test('SDK isolates malformed native audio frame events', async () => {
+test('SDK exposes real-time audio only as a backpressured transferable binary stream', async () => {
   const transport = new FakeTransport();
+  let hostPort;
+  transport.send = async function send(request) {
+    this.requests.push(request);
+    if (request.method === 'audio.openCapture') {
+      const channel = new MessageChannel();
+      hostPort = channel.port1;
+      hostPort.onmessage = (event) => {
+        if (JSON.parse(event.data)?.type !== 'pull') return;
+        const buffer = encodeTestAudioChunk();
+        hostPort.postMessage(buffer, [buffer]);
+      };
+      return {
+        mode: 'stream',
+        sessionId: 'capture-stream-1',
+        resolvedOptions: {
+          mode: 'stream', profile: 'interactive', chunkDurationMs: 40, maxQueueMs: 200,
+          overflowStrategy: 'drop-oldest', pickupMode: 'unchanged', noiseReduction: true,
+          codec: 'opus', sampleRate: 16000, channels: 1, maxDurationMs: null,
+        },
+        streamPort: channel.port2,
+      };
+    }
+    if (request.method === 'audio.stopCapture') {
+      hostPort.onmessage = null;
+      hostPort.postMessage(JSON.stringify({ type: 'end' }));
+      return {
+        mode: 'stream', sessionId: 'capture-stream-1', durationMs: 40,
+        deliveredFrameCount: 2, droppedFrameCount: 0,
+      };
+    }
+    throw new Error(`unexpected method ${request.method}`);
+  };
   const gm = createGMPlugin({ transport });
-  await gm.ready();
-  const batches = [];
-  gm.audio.onFrames((batch) => batches.push(batch));
+  const states = [];
+  gm.audio.onCaptureState((state) => states.push(state.state));
+  const capture = await gm.audio.openCapture({ mode: 'stream', profile: 'interactive' });
+  const reader = capture.stream.getReader();
+  const chunk = (await reader.read()).value;
 
-  assert.doesNotThrow(() => transport.emit({
-    name: 'audio.frames',
-    data: { framesBase64: ['not-base64!'] },
+  assert.deepEqual(chunk.data, Uint8Array.of(1, 2, 3, 4, 5));
+  assert.deepEqual(chunk.frameLengths, [2, 3]);
+  transport.emit({
+    name: 'audio.captureState',
+    data: { state: 'capturing', mode: 'stream', sessionId: capture.sessionId },
     runtimeGeneration: 7,
-  }));
-  assert.equal(batches.length, 0);
+  });
+  assert.deepEqual(states, ['capturing']);
+  const result = await capture.stop();
+  assert.equal(result.deliveredFrameCount, 2);
+  assert.equal((await reader.read()).done, true);
+  hostPort.close();
+});
+
+test('SDK rejects a malformed native audio binary envelope', async () => {
+  const transport = new FakeTransport();
+  let hostPort;
+  transport.send = async function send(request) {
+    this.requests.push(request);
+    if (request.method !== 'audio.openCapture') throw new Error(`unexpected method ${request.method}`);
+    const channel = new MessageChannel();
+    hostPort = channel.port1;
+    hostPort.onmessage = (event) => {
+      if (JSON.parse(event.data)?.type !== 'pull') return;
+      const invalid = new ArrayBuffer(40);
+      hostPort.postMessage(invalid, [invalid]);
+    };
+    return {
+      mode: 'stream', sessionId: 'capture-invalid-1',
+      resolvedOptions: {
+        mode: 'stream', profile: 'interactive', chunkDurationMs: 40, maxQueueMs: 200,
+        overflowStrategy: 'drop-oldest', pickupMode: 'unchanged', noiseReduction: true,
+        codec: 'opus', sampleRate: 16000, channels: 1, maxDurationMs: null,
+      },
+      streamPort: channel.port2,
+    };
+  };
+  const gm = createGMPlugin({ transport });
+  const capture = await gm.audio.openCapture({ mode: 'stream', profile: 'interactive' });
+  await assert.rejects(() => capture.stream.getReader().read(), {
+    name: 'GMPluginError', code: 'INTERNAL_ERROR',
+  });
+  hostPort.close();
 });

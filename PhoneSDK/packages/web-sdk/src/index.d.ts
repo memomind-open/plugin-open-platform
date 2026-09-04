@@ -2,7 +2,7 @@ export type BridgeErrorCode =
   | 'INVALID_REQUEST' | 'PAYLOAD_TOO_LARGE' | 'UNAUTHORIZED' | 'PERMISSION_DENIED'
   | 'FILE_NOT_FOUND'
   | 'STALE_RUNTIME' | 'METHOD_NOT_FOUND' | 'RATE_LIMITED' | 'BUSY' | 'QUOTA_EXCEEDED'
-  | 'AUDIO_BUSY' | 'NO_AUDIO'
+  | 'AUDIO_BUSY' | 'NO_AUDIO' | 'BUFFER_OVERFLOW'
   | 'TIMEOUT' | 'DEVICE_DISCONNECTED' | 'CAPABILITY_UNAVAILABLE'
   | 'RUNTIME_CLOSED' | 'RUNTIME_REPLACED' | 'INTERNAL_ERROR';
 
@@ -75,24 +75,114 @@ export type AudioPickupMode =
   | 'unchanged' | 'frontFixed' | 'meetingAuto' | 'nonWearerFocus'
   | 'frontBalanced' | 'frontFocus';
 export type AudioVoice = 'original' | 'cute' | 'deep' | 'overlord';
+export type AudioCaptureMode = 'recording' | 'stream';
+export type AudioCaptureProfile = 'interactive' | 'balanced' | 'reliable' | 'custom';
+export type AudioOverflowStrategy = 'drop-oldest' | 'drop-newest' | 'error';
 
-export interface AudioFrameBatch {
-  recordingId?: string;
-  firstSequence: number;
-  frameCount: number;
-  droppedFrameCount: number;
-  frames: Uint8Array[];
+export interface AudioCaptureCommonOptions {
+  pickupMode?: AudioPickupMode;
+  noiseReduction?: boolean;
+  codec?: 'opus';
+  sampleRate?: 16000;
+  channels?: 1;
+  signal?: AbortSignal;
 }
 
-export interface AudioState {
-  state: 'starting' | 'recording' | 'stopping' | 'stopped' | 'error';
-  recordingId?: string;
-  latestRecordingId?: string;
+export interface AudioRecordingCaptureOptions extends AudioCaptureCommonOptions {
+  mode: 'recording';
+  maxDurationMs?: number;
+}
+
+export interface AudioStreamCaptureOptions extends AudioCaptureCommonOptions {
+  mode: 'stream';
+  profile?: AudioCaptureProfile;
+  chunkDurationMs?: number;
+  maxQueueMs?: number;
+  overflowStrategy?: AudioOverflowStrategy;
+  maxDurationMs?: number | null;
+}
+
+export interface ResolvedAudioRecordingCaptureOptions {
+  mode: 'recording';
+  pickupMode: AudioPickupMode;
+  noiseReduction: boolean;
+  codec: 'opus';
+  sampleRate: 16000;
+  channels: 1;
+  maxDurationMs: number;
+}
+
+export interface ResolvedAudioStreamCaptureOptions {
+  mode: 'stream';
+  profile: AudioCaptureProfile;
+  chunkDurationMs: number;
+  maxQueueMs: number;
+  overflowStrategy: AudioOverflowStrategy;
+  pickupMode: AudioPickupMode;
+  noiseReduction: boolean;
+  codec: 'opus';
+  sampleRate: 16000;
+  channels: 1;
+  maxDurationMs: number | null;
+}
+
+export interface AudioChunk {
+  sessionId: string;
+  sequence: number;
+  timestampUs: number;
+  durationMs: number;
+  frameCount: number;
+  frameLengths: number[];
+  droppedFrameCount: number;
+  discontinuity: boolean;
+  queueLatencyMs: number;
+  data: Uint8Array;
+}
+
+export interface AudioRecordingCaptureResult {
+  mode: 'recording';
+  sessionId: string;
+  recordingId: string;
+  durationMs: number;
+  frameCount: number;
+  opusBytes: number;
+}
+
+export interface AudioStreamCaptureResult {
+  mode: 'stream';
+  sessionId: string;
+  durationMs: number;
+  deliveredFrameCount: number;
+  droppedFrameCount: number;
+}
+
+export type AudioCaptureResult = AudioRecordingCaptureResult | AudioStreamCaptureResult;
+
+export interface AudioRecordingCaptureSession {
+  mode: 'recording';
+  sessionId: string;
+  resolvedOptions: ResolvedAudioRecordingCaptureOptions;
+  stream: null;
+  stop(): Promise<AudioRecordingCaptureResult>;
+}
+
+export interface AudioStreamCaptureSession {
+  mode: 'stream';
+  sessionId: string;
+  resolvedOptions: ResolvedAudioStreamCaptureOptions;
+  stream: ReadableStream<AudioChunk>;
+  stop(): Promise<AudioStreamCaptureResult>;
+}
+
+export type AudioCaptureSession = AudioRecordingCaptureSession | AudioStreamCaptureSession;
+
+export interface AudioCaptureState {
+  state: 'starting' | 'capturing' | 'stopping' | 'stopped' | 'error';
+  mode: AudioCaptureMode;
+  sessionId: string;
+  result?: AudioCaptureResult;
   errorCode?: BridgeErrorCode;
   message?: string;
-  frameCount?: number;
-  opusBytes?: number;
-  durationMs?: number;
 }
 
 export interface AudioPlaybackState {
@@ -134,6 +224,7 @@ export class AppWebViewTransport implements BridgeTransport {
   subscribeBootstrap(listener: (bootstrap: { sessionToken: string; runtimeGeneration: number }) => void): () => void;
   send(request: Record<string, unknown>): Promise<unknown>;
   subscribe(listener: (event: PluginEvent) => void): () => void;
+  close(): void;
 }
 
 export function createGMPlugin(options?: {
@@ -161,13 +252,12 @@ export function createGMPlugin(options?: {
     onMessage(listener: (message: PluginMessage, event: PluginEvent) => void): () => void;
   };
   audio: {
-    configure(options?: { noiseReduction?: boolean; pickupMode?: AudioPickupMode }): Promise<unknown>;
-    startRecording(): Promise<unknown>;
-    stopRecording(): Promise<unknown>;
+    openCapture(options: AudioRecordingCaptureOptions): Promise<AudioRecordingCaptureSession>;
+    openCapture(options: AudioStreamCaptureOptions): Promise<AudioStreamCaptureSession>;
+    stopCapture(sessionId: string): Promise<AudioCaptureResult>;
     playRecording(options: { recordingId: string; voice?: AudioVoice }): Promise<unknown>;
     stopPlayback(): Promise<unknown>;
-    onFrames(listener: (batch: AudioFrameBatch, event: PluginEvent) => void): () => void;
-    onState(listener: (state: AudioState, event: PluginEvent) => void): () => void;
+    onCaptureState(listener: (state: AudioCaptureState, event: PluginEvent) => void): () => void;
     onPlaybackState(listener: (state: AudioPlaybackState, event: PluginEvent) => void): () => void;
   };
   close(): void;

@@ -167,9 +167,8 @@ export class StudioRuntime {
         return { removed: this.subscriptions.delete(requireString(params, 'subscriptionId')) };
       case 'plugin.sendMessage':
         return this.sendPluginMessage(params);
-      case 'audio.configure':
-      case 'audio.startRecording':
-      case 'audio.stopRecording':
+      case 'audio.openCapture':
+      case 'audio.stopCapture':
       case 'audio.playRecording':
       case 'audio.stopPlayback':
         throw new StudioBridgeError(
