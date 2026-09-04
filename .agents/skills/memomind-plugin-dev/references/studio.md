@@ -18,7 +18,7 @@ Keep this layout intact:
 ```text
 plugin-open-platform/
 |-- GlassSDK/
-|-- WebSDK/
+|-- PhoneSDK/
 `-- Studio/<platform>/
 ```
 
@@ -38,7 +38,7 @@ Select the requested Web workspace, static build, or `.mmpkg` and the requested
 built or imported `.gmp`. Confirm that selection focus, input events, locale,
 display output, message routing, and both log panes work as applicable.
 
-## WebSDK Browser Studio
+## PhoneSDK Browser Studio
 
 Use Browser Studio for lightweight Web-only Bridge, lifecycle, event, and
 rendering tests. It requires Node.js 18 or newer and a modern browser. It does
@@ -46,7 +46,7 @@ not execute `.gmp` files and cannot prove paired Web/glasses integration.
 
 Use the launcher from the detected distribution:
 
-- Full WebSDK: `node tools/run-browser-studio.mjs --plugin <absolute-path>`
+- Full PhoneSDK: `node tools/run-browser-studio.mjs --plugin <absolute-path>`
 - DevKit: `node studio/gm-plugin-studio.mjs --plugin <absolute-path>`
 
 The default URL is `http://127.0.0.1:4173`. Use an alternate documented port

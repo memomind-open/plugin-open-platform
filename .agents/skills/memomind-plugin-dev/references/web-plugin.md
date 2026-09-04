@@ -1,12 +1,12 @@
 # Web Plugin Workflow
 
 Use this guide for Web plugins that produce an `.mmpkg` and run in the App
-WebView. First distinguish the full WebSDK source workspace from the extracted
+WebView. First distinguish the full PhoneSDK source workspace from the extracted
 offline DevKit.
 
 ## Choose the local distribution
 
-### Extracted WebSDK DevKit
+### Extracted PhoneSDK DevKit
 
 Confirm that the root contains `DEVKIT-MANIFEST.json`, `sdk/`, `studio/`,
 `tools/`, and `examples/`. It is intended to work without npm registry access.
@@ -20,7 +20,7 @@ Copy the SDK module into a plugin-owned directory that is included in the
 final static build, such as `vendor/`. Import it by a package-relative path.
 Never reference the absolute DevKit location from distributable code.
 
-### Full WebSDK source workspace
+### Full PhoneSDK source workspace
 
 Confirm that `package.json` identifies the GM Web Plugin SDK workspace. Read
 its current scripts before running them.
@@ -55,7 +55,7 @@ From an extracted DevKit, start Web-only debugging with:
 node studio/gm-plugin-studio.mjs --plugin /absolute/path/to/plugin-or-dist
 ```
 
-From a full WebSDK workspace, use:
+From a full PhoneSDK workspace, use:
 
 ```sh
 node tools/run-browser-studio.mjs --plugin /absolute/path/to/plugin-or-dist
@@ -84,4 +84,4 @@ head motion, a real `.gmp`, or Web-to-glasses plugin message routing.
   validation outside the simulator.
 
 For API, manifest, CSP, payload, and release details, use the documentation in
-the local DevKit or `WebSDK/docs/web-plugin/`; do not duplicate or override it.
+the local DevKit or `PhoneSDK/docs/web-plugin/`; do not duplicate or override it.

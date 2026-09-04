@@ -12,7 +12,7 @@ Studio source to build, preview, package, or test plugins.
 
 - [`GlassSDK/`](GlassSDK/) contains the C SDK, build tools, examples, and
   documentation for glasses `.gmp` plugins.
-- [`WebSDK/`](WebSDK/) contains the JavaScript SDK, examples, Browser Studio,
+- [`PhoneSDK/`](PhoneSDK/) contains the JavaScript SDK, examples, Browser Studio,
   DevKit ZIP tools, and `.mmpkg` packager for Web plugins.
 - [`Studio/`](Studio/) contains prebuilt Desktop Studio applications and their
   platform runtime files.
@@ -34,7 +34,7 @@ startup, and platform requirements.
 
 ## Start developing
 
-1. Download or clone this complete repository. Keep the `Studio`, `WebSDK`, and
+1. Download or clone this complete repository. Keep the `Studio`, `PhoneSDK`, and
    `GlassSDK` directories together so Desktop Studio can discover both SDKs.
 2. Run the workspace build from this directory. It discovers Web and glasses
    plugins recursively and only rebuilds inputs that changed:
@@ -51,7 +51,7 @@ startup, and platform requirements.
    append `web` or `glass` to select only one side, for example
    `./tools/build --watch`, `./tools/build web`, or `.\tools\build glass`.
 3. Start the Desktop Studio application for your platform.
-4. Follow the [Web Plugin quick start](WebSDK/docs/web-plugin/quick-start.md) or
+4. Follow the [Web Plugin quick start](PhoneSDK/docs/web-plugin/quick-start.md) or
    the [Glass Plugin SDK guide](GlassSDK/README.md).
 
 The two short launchers delegate to the same cross-platform Python entry point,
@@ -63,8 +63,8 @@ plugin packages can be consumed by the iOS App, but an iPhone or iPad is not a
 build host. Any future native iOS target must run on macOS with Xcode; the same
 Python entry point can dispatch that platform-only step.
 
-Web-only development can also use the public, Node.js-based WebSDK Browser
-Studio included in `WebSDK` and in the WebSDK DevKit ZIP. Browser Studio is a
+Web-only development can also use the public, Node.js-based PhoneSDK Browser
+Studio included in `PhoneSDK` and in the PhoneSDK DevKit ZIP. Browser Studio is a
 lightweight Bridge and display simulator; Desktop Studio is the recommended
 tool when a real `.gmp` must run together with a Web plugin.
 

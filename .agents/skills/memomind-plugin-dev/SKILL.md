@@ -32,19 +32,19 @@ online instructions.
 - When responding in Chinese, show the original error first, then explain its
   cause and next action in Simplified Chinese. Do not translate technical
   identifiers inside commands or source code.
-- Preserve the product names MemoMind, GlassSDK, WebSDK, Desktop Studio, and
+- Preserve the product names MemoMind, GlassSDK, PhoneSDK, Desktop Studio, and
   Browser Studio in every response language.
 
 ## Establish the local context
 
 1. Locate the relevant root without assuming a fixed absolute path:
-   - A complete Plugin Open Platform release contains `GlassSDK/`, `WebSDK/`,
+   - A complete Plugin Open Platform release contains `GlassSDK/`, `PhoneSDK/`,
      `Studio/`, the short `tools/build` and `tools/build.cmd` launchers, and
      their shared top-level `build.py` implementation.
    - A GlassSDK root contains `build.py`, `include/`, and `examples/`.
-   - A WebSDK source root contains `package.json`, `packages/`, `tools/`, and
+   - A PhoneSDK source root contains `package.json`, `packages/`, `tools/`, and
      `examples/`.
-   - An extracted WebSDK DevKit contains `DEVKIT-MANIFEST.json`, `sdk/`,
+   - An extracted PhoneSDK DevKit contains `DEVKIT-MANIFEST.json`, `sdk/`,
      `studio/`, `tools/`, and `examples/`.
 2. If more than one candidate exists and the requested target is ambiguous,
    ask the developer which local package or plugin project to use.
@@ -73,7 +73,7 @@ online instructions.
   the developer separately requests that action.
 - Do not modify Desktop Studio binaries or assume its private source is part of
   the public SDK.
-- Preserve the complete `Studio/`, `WebSDK/`, and `GlassSDK/` sibling layout
+- Preserve the complete `Studio/`, `PhoneSDK/`, and `GlassSDK/` sibling layout
   when using Desktop Studio; moving only the executable prevents automatic SDK
   discovery.
 - Use local relative paths in plugin source and packages. Never embed a
