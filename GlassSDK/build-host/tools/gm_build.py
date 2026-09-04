@@ -309,7 +309,34 @@ def build_cmake(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build GM RISC-V plugins on Windows, macOS, or Linux")
+    parser = argparse.ArgumentParser(
+        description="Build GM RISC-V plugins on Windows, macOS, or Linux.",
+        epilog="""Build examples:
+  Ubuntu/macOS:
+    python3 build.py                         Build affected plugins
+    python3 build.py all                     Build all maintained examples
+    python3 build.py build --example game/2048
+                                             Build one example
+    python3 build.py inspect --example extension
+                                             Build and inspect one plugin
+
+  Windows PowerShell:
+    py build.py                              Build affected plugins
+    py build.py all                          Build all maintained examples
+    py build.py build --example game/2048    Build one example
+
+Output:
+  build-host/.build/<example>/<plugin>.gmp
+
+Run build.py toolchain to display the selected RISC-V compiler.""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,
+    )
+    parser.add_argument(
+        "-h", "--h", "-help", "--help",
+        action="help",
+        help="show this build guide and exit",
+    )
     parser.add_argument("command", nargs="?", choices=("build", "all", "clean", "inspect", "toolchain"), default="build")
     parser.add_argument("--example", help="example path below examples/")
     parser.add_argument("--build-dir", type=pathlib.Path, default=BUILD_INTERNALS)

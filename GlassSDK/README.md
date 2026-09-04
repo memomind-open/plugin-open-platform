@@ -10,9 +10,12 @@ and Linux x64/ARM64. Python 3.8 or newer is required. GNU Make, CMake, and a
 system-wide compiler installation are not required.
 
 When GlassSDK is kept inside the complete Plugin Open Platform directory, run
-`../tools/build glass` (`..\tools\build glass` in Windows PowerShell) to use
-the top-level discovery and incremental-build entry point. The GlassSDK-local
+`../build.py glass` (`py ..\build.py glass` in Windows PowerShell) to use the
+top-level discovery and incremental-build entry point. The GlassSDK-local
 commands below remain available for standalone use and single-plugin builds.
+Both the top-level entry and this GlassSDK-local entry accept `-h`, `--h`,
+`-help`, and `--help` to print platform-specific compilation examples without
+starting a build.
 
 ## Quick start
 
@@ -34,6 +37,19 @@ macOS or Linux:
 ```sh
 python3 build.py
 ```
+
+For the complete command guide, any of these forms is valid:
+
+```sh
+python3 build.py -h
+python3 build.py --h
+python3 build.py -help
+python3 build.py --help
+```
+
+Use `py build.py --help` on Windows PowerShell. The output covers full,
+single-example, inspection, and toolchain commands and identifies the `.gmp`
+output directory.
 
 The output is `build-host/.build/<changed-example>/<example>.gmp`.
 The internal CMake cache is kept separately under
