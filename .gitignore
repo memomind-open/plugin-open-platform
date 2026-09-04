@@ -1,4 +1,5 @@
 /.build/
+/PhoneSDK/.build/
 **/node_modules/
 /PhoneSDK/examples/**/dist/
 /Studio/logs/

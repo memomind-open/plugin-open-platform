@@ -39,8 +39,7 @@ online instructions.
 
 1. Locate the relevant root without assuming a fixed absolute path:
    - A complete Plugin Open Platform release contains `GlassSDK/`, `PhoneSDK/`,
-     `Studio/`, the short `tools/build` and `tools/build.cmd` launchers, and
-     their shared top-level `build.py` implementation.
+     `Studio/`, and the shared top-level `build.py` entry point.
    - A GlassSDK root contains `build.py`, `include/`, and `examples/`.
    - A PhoneSDK source root contains `package.json`, `packages/`, `tools/`, and
      `examples/`.
@@ -82,11 +81,10 @@ online instructions.
 
 ## Execute and verify
 
-From a complete Plugin Open Platform root, prefer `./tools/build` on
-macOS/Linux or `.\tools\build` in Windows PowerShell to discover and
-incrementally build both SDKs. Append `web` or `glass` when the developer
-requests only one side, and append `--watch` only when continuous rebuilding
-is requested. The launchers share the top-level `build.py`; continue to use
+From a complete Plugin Open Platform root, prefer `./build.py` on macOS/Linux
+or `py build.py` in Windows PowerShell to discover and incrementally build both
+SDKs. Append `web` or `glass` when the developer requests only one side, and
+append `--watch` only when continuous rebuilding is requested. Continue to use
 each SDK's narrower command when the developer asks for one specific plugin.
 
 Before changing a plugin, inspect its manifest and the closest maintained

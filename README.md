@@ -36,28 +36,43 @@ startup, and platform requirements.
 
 1. Download or clone this complete repository. Keep the `Studio`, `PhoneSDK`, and
    `GlassSDK` directories together so Desktop Studio can discover both SDKs.
-2. Run the workspace build from this directory. It discovers Web and glasses
+2. Run the top-level build from this directory. It discovers Web and glasses
    plugins recursively and only rebuilds inputs that changed:
 
    ```sh
    # Ubuntu/macOS
-   ./tools/build
+   ./build.py
 
    # Windows PowerShell
-   .\tools\build
+   py build.py
    ```
 
-   Both launchers call the same `build.py`. Add `--watch` to keep scanning, or
-   append `web` or `glass` to select only one side, for example
-   `./tools/build --watch`, `./tools/build web`, or `.\tools\build glass`.
+   Add `--watch` to keep scanning, or append `web` or `glass` to select only
+   one side, for example `./build.py --watch`, `./build.py web`, or
+   `py build.py glass`.
+   To display the complete command guide without compiling, use any one of
+   `-h`, `--h`, `-help`, or `--help`:
+
+   ```sh
+   # Ubuntu/macOS
+   ./build.py --help
+
+   # Windows PowerShell
+   py build.py --h
+   ```
+
+   All four help forms are equivalent. The help output includes commands for
+   building everything, only PhoneSDK Web plugins, or only GlassSDK plugins,
+   plus force, watch, output-directory, and platform examples.
 3. Start the Desktop Studio application for your platform.
 4. Follow the [Web Plugin quick start](PhoneSDK/docs/web-plugin/quick-start.md) or
    the [Glass Plugin SDK guide](GlassSDK/README.md).
 
-The two short launchers delegate to the same cross-platform Python entry point,
-which then uses the existing build backends: Node.js packages Web plugins,
-while CMake/Ninja incrementally builds RISC-V glasses plugins. Build state is
-local to `.build/`; distributable
+The top-level cross-platform Python entry point delegates its Web portion to
+`PhoneSDK/build.py`, which can also be run directly from inside PhoneSDK, while
+CMake/Ninja incrementally builds RISC-V glasses plugins. Build state is local
+to the top-level `.build/` for glasses and `PhoneSDK/.build/` for Web plugins;
+distributable
 `.mmpkg` and `.gmp` files remain in their SDK output directories. The generated
 plugin packages can be consumed by the iOS App, but an iPhone or iPad is not a
 build host. Any future native iOS target must run on macOS with Xcode; the same

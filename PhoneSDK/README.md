@@ -24,15 +24,51 @@ not load or execute `.gmp` files.
 
 ## Quick start
 
-When PhoneSDK is kept inside the complete Plugin Open Platform directory, the
-top-level `build.py` can discover and incrementally package every Web plugin:
+Build every changed Web plugin directly from the PhoneSDK directory:
 
 ```sh
-../tools/build web
+# Ubuntu/macOS
+./build.py
+
+# Windows PowerShell
+py build.py
 ```
 
-Use `..\tools\build web` in Windows PowerShell. The commands below remain
-available when working with PhoneSDK by itself or with one specific plugin.
+The command discovers examples recursively, runs a plugin's own build step when
+needed, and writes versioned `.mmpkg` files to `dist/`. Its incremental state is
+kept in `.build/`. Use `--force` to rebuild everything, `--watch` to keep
+scanning, or `--list` to inspect the discovered inputs and outputs.
+
+Display the complete PhoneSDK compilation guide without starting a build:
+
+```sh
+# All four commands are equivalent on Ubuntu/macOS
+./build.py -h
+./build.py --h
+./build.py -help
+./build.py --help
+
+# Windows PowerShell supports the same arguments
+py build.py --help
+```
+
+The help output shows incremental, forced, watch, and list commands for both
+Ubuntu/macOS and Windows PowerShell, along with the `.mmpkg` output location
+and first-build npm behavior.
+
+When PhoneSDK is kept inside the complete Plugin Open Platform directory, the
+top-level build delegates its Web portion to this same script:
+
+```sh
+# Ubuntu/macOS
+../build.py web
+
+# Windows PowerShell
+py ..\build.py web
+```
+
+The commands below remain available for validation, Browser Studio, DevKit
+creation, or packaging one specific plugin.
 
 Install the PhoneSDK development dependencies and run its validation:
 
