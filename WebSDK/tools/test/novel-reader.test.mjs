@@ -419,3 +419,46 @@ function createStoredZip(files) {
   }
   return output;
 }
+
+test('reacquires a short-lived Host file ticket after a transient HTTP 404', async () => {
+  const fileId = 'b'.repeat(32);
+  let attempts = 0;
+  const expected = { fileId, size: 8, offset: 0, length: 8, stream: {} };
+  const gm = {
+    files: {
+      openRead: async () => {
+        attempts += 1;
+        if (attempts < 3) {
+          throw Object.assign(new Error('Host file stream failed: HTTP 404'), {
+            code: 'INTERNAL_ERROR',
+          });
+        }
+        return expected;
+      },
+    },
+    storage: {},
+  };
+
+  const reader = new ReaderStorage(gm);
+  assert.equal(await reader.openRead(fileId, { offset: 0, length: 8 }), expected);
+  assert.equal(attempts, 3);
+});
+
+test('does not retry permanent Host file errors', async () => {
+  const fileId = 'c'.repeat(32);
+  let attempts = 0;
+  const expected = Object.assign(new Error('File does not exist'), { code: 'FILE_NOT_FOUND' });
+  const gm = {
+    files: {
+      openRead: async () => {
+        attempts += 1;
+        throw expected;
+      },
+    },
+    storage: {},
+  };
+
+  const reader = new ReaderStorage(gm);
+  await assert.rejects(() => reader.openRead(fileId), (error) => error === expected);
+  assert.equal(attempts, 1);
+});

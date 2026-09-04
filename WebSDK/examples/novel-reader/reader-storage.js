@@ -1,6 +1,7 @@
 const STORAGE_KEY_PREFIX = 'novel-reader.book.v3.';
 const CHAPTER_KEY_PREFIX = 'novel-reader.chapters.v1.';
 const CHAPTER_PAGE_BYTES = 48 * 1024;
+const FILE_TICKET_RETRY_DELAYS_MS = [100, 300];
 const encoder = new TextEncoder();
 
 export class ReaderStorage {
@@ -113,9 +114,20 @@ export class ReaderStorage {
     return result?.deleted === true;
   }
 
-  openRead(fileId, options) {
+  async openRead(fileId, options) {
     requireFileId(fileId);
-    return this.gm.files.openRead(fileId, options);
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await this.gm.files.openRead(fileId, options);
+      } catch (error) {
+        if (!isExpiredFileTicket(error) || attempt >= FILE_TICKET_RETRY_DELAYS_MS.length ||
+            options?.signal?.aborted) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, FILE_TICKET_RETRY_DELAYS_MS[attempt]));
+        if (options?.signal?.aborted) throw error;
+      }
+    }
   }
 
   getUsage() {
@@ -231,4 +243,8 @@ function requireFileId(value) {
 function safeTitle(filename) {
   const title = String(filename ?? '').replace(/\.(?:txt|epub)$/iu, '').trim();
   return title || 'Untitled Novel';
+}
+
+function isExpiredFileTicket(error) {
+  return error?.code === 'INTERNAL_ERROR' && /Host file stream failed: HTTP 404\b/u.test(error.message);
 }

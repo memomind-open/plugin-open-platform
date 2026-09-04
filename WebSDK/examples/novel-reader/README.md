@@ -9,6 +9,9 @@ scales and converts each requested illustration to a full-screen GRAY_4 frame,
 then sends it in acknowledged row tiles. The glasses plugin owns font
 measurement, wrapping, automatic scrolling, page continuity, illustration
 presentation, and device input. It never persists novel data.
+If an Android lifecycle race invalidates a newly issued short-lived file
+ticket, the reader transparently requests a fresh ticket before reporting an
+error.
 
 ## Persistent library
 
