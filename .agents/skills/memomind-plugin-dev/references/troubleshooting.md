@@ -6,7 +6,7 @@ the narrowest failing layer before changing dependencies or cleaning caches.
 ## SDK root or files not found
 
 - Re-evaluate whether the developer provided the complete Plugin Open Platform
-  release, a standalone GlassSDK, a WebSDK source tree, or an extracted DevKit.
+  release, a standalone GlassSDK, a PhoneSDK source tree, or an extracted DevKit.
 - Check whether an archive is still unextracted.
 - If multiple copies exist, compare manifests and versions and ask which copy
   is authoritative.
@@ -43,7 +43,7 @@ the narrowest failing layer before changing dependencies or cleaning caches.
 
 - Verify the platform and architecture are supported and that the platform
   directory contains a real release artifact.
-- Restore the sibling `Studio/`, `WebSDK/`, and `GlassSDK/` layout if only the
+- Restore the sibling `Studio/`, `PhoneSDK/`, and `GlassSDK/` layout if only the
   executable was moved.
 - On Windows, verify `WebView2Loader.dll` remains beside the executable and
   check whether the Edge WebView2 Runtime is available.

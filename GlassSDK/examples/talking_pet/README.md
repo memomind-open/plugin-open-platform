@@ -1,6 +1,6 @@
 # Memo Talking Pet
 
-This device example is the native companion for the WebSDK `talking-pet`
+This device example is the native companion for the PhoneSDK `talking-pet`
 example. It draws only the center playroom and character through the native
 GRAY4 framebuffer. LVGL exclusively owns the header and both side panels,
 including their borders, labels, dots, dividers, and status bars. The two

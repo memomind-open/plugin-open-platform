@@ -49,7 +49,7 @@ stride before redrawing current objects.
 
 ## Controls
 
-Run `WebSDK/examples/fighter-controller` together with this `.gmp` in Desktop
+Run `PhoneSDK/examples/fighter-controller` together with this `.gmp` in Desktop
 Studio. The controller provides:
 
 - movement joystick: move, jump, crouch, and retreat/block;

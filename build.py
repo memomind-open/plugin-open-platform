@@ -16,7 +16,7 @@ from dataclasses import dataclass
 
 
 ROOT = pathlib.Path(__file__).resolve().parent
-WEB_SDK = ROOT / "WebSDK"
+PHONE_SDK = ROOT / "PhoneSDK"
 GLASS_SDK = ROOT / "GlassSDK"
 STATE_PATH = ROOT / ".build" / "build-state.json"
 ALWAYS_IGNORED = {".build", ".git", "__pycache__"}
@@ -36,9 +36,9 @@ class WebPlugin:
     @property
     def output(self) -> pathlib.Path:
         version = str(self.manifest["version"])
-        relative = self.workspace.relative_to(WEB_SDK / "examples")
+        relative = self.workspace.relative_to(PHONE_SDK / "examples")
         name = "-".join(relative.parts)
-        return WEB_SDK / "dist" / f"{name}-{version}.mmpkg"
+        return PHONE_SDK / "dist" / f"{name}-{version}.mmpkg"
 
 
 def run(command: list[object], cwd: pathlib.Path | None = None) -> None:
@@ -97,7 +97,7 @@ def read_json(path: pathlib.Path) -> dict[str, object]:
 
 def nearest_web_workspace(manifest: pathlib.Path) -> tuple[pathlib.Path, dict[str, object] | None]:
     current = manifest.parent
-    examples = WEB_SDK / "examples"
+    examples = PHONE_SDK / "examples"
     while current != examples:
         package_json = current / "package.json"
         if package_json.is_file():
@@ -107,7 +107,7 @@ def nearest_web_workspace(manifest: pathlib.Path) -> tuple[pathlib.Path, dict[st
 
 
 def discover_web_plugins() -> list[WebPlugin]:
-    examples = WEB_SDK / "examples"
+    examples = PHONE_SDK / "examples"
     plugins: list[WebPlugin] = []
     claimed_workspaces: set[pathlib.Path] = set()
     for manifest_path in sorted(examples.rglob("manifest.json")):
@@ -126,7 +126,7 @@ def discover_web_plugins() -> list[WebPlugin]:
         has_build_script = isinstance(scripts, dict) and isinstance(scripts.get("build"), str)
         package_root = workspace / "dist" if has_build_script else manifest_path.parent
         plugins.append(WebPlugin(
-            key=f"web:{workspace.relative_to(WEB_SDK).as_posix()}",
+            key=f"web:{workspace.relative_to(PHONE_SDK).as_posix()}",
             workspace=workspace,
             package_root=package_root,
             manifest=manifest,
@@ -212,7 +212,7 @@ def build_web_plugin(plugin: WebPlugin, state: dict[str, object]) -> None:
         )
     run([
         shutil.which("node") or "node",
-        WEB_SDK / "tools" / "build-mmpkg.mjs",
+        PHONE_SDK / "tools" / "build-mmpkg.mjs",
         plugin.package_root,
         plugin.output,
     ])
@@ -233,14 +233,14 @@ def build_once(target: str, force: bool = False, quiet: bool = False) -> bool:
             built_anything = True
 
     if target in ("all", "web"):
-        packager = WEB_SDK / "tools" / "build-mmpkg.mjs"
+        packager = PHONE_SDK / "tools" / "build-mmpkg.mjs"
         discovered_keys = set()
         for plugin in discover_web_plugins():
             discovered_keys.add(plugin.key)
             ignored = ALWAYS_IGNORED | GENERATED_DIRECTORIES if plugin.has_build_script else ALWAYS_IGNORED
             current = fingerprint([ROOT / "build.py", plugin.workspace, packager], ignored)
             if force or targets.get(plugin.key) != current or not plugin.output.is_file():
-                print(f"WebSDK: building {plugin.workspace.relative_to(WEB_SDK)}")
+                print(f"PhoneSDK: building {plugin.workspace.relative_to(PHONE_SDK)}")
                 build_web_plugin(plugin, state)
                 targets[plugin.key] = current
                 built_anything = True
@@ -266,7 +266,7 @@ def list_plugins() -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Discover and incrementally build WebSDK and GlassSDK plugins"
+        description="Discover and incrementally build PhoneSDK and GlassSDK plugins"
     )
     parser.add_argument("target", nargs="?", choices=("all", "web", "glass"), default="all")
     parser.add_argument("--force", action="store_true", help="rebuild every selected plugin")

@@ -40,7 +40,7 @@ Desktop Studio runs both packages in one process and routes their custom
 
 See [`../../../../docs/INSTALLATION.md`](../../../../docs/INSTALLATION.md) for
 the current GMP installation workflow and
-[`../../../../../WebSDK/docs/web-plugin/quick-start.md`](../../../../../WebSDK/docs/web-plugin/quick-start.md)
+[`../../../../../PhoneSDK/docs/web-plugin/quick-start.md`](../../../../../PhoneSDK/docs/web-plugin/quick-start.md)
 for Web plugin packaging and App delivery.
 
 ## Controls

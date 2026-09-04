@@ -41,7 +41,7 @@ your platform under `../Studio/`:
 ```text
 plugin-open-platform/
 |-- GlassSDK/
-|-- WebSDK/
+|-- PhoneSDK/
 `-- Studio/<platform>/
 ```
 
@@ -123,7 +123,7 @@ and install the selected package again from its QR code.
 
 ## Troubleshooting
 
-- **Studio cannot find SDK examples:** keep `Studio`, `GlassSDK`, and `WebSDK`
+- **Studio cannot find SDK examples:** keep `Studio`, `GlassSDK`, and `PhoneSDK`
   together in the Plugin Open Platform layout, or import the `.gmp` directly.
 - **Phone cannot open the QR address:** confirm that phone and computer are on
   the same LAN, allow Desktop Studio through the computer firewall, and verify

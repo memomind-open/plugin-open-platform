@@ -8,7 +8,7 @@ Read this file after locating the local SDK and before choosing commands.
 | --- | --- | --- | --- |
 | GlassSDK build tools | x64 | Intel and Apple silicon | x64 and ARM64 |
 | Desktop Studio | Windows 10/11 x64 | Universal 2 | x64 |
-| WebSDK Browser Studio | Node.js 18+ and a modern browser | Node.js 18+ and a modern browser | Node.js 18+ and a modern browser |
+| PhoneSDK Browser Studio | Node.js 18+ and a modern browser | Node.js 18+ and a modern browser | Node.js 18+ and a modern browser |
 
 Traditional 32-bit x86 Desktop Studio builds are not distributed. A source
 checkout may contain only a placeholder for some Studio platforms, so verify
@@ -21,9 +21,9 @@ Check only tools required for the selected path:
 - GlassSDK: Python 3.8 or newer. The SDK driver provides or installs its pinned
   build components and does not require a system C compiler, GNU Make, CMake,
   or Ninja.
-- WebSDK DevKit: Node.js 18 or newer and a modern browser. Its Browser Studio
+- PhoneSDK DevKit: Node.js 18 or newer and a modern browser. Its Browser Studio
   and packager have no third-party runtime dependencies.
-- WebSDK source workspace: Node.js 18 or newer and npm. Use the lockfile with
+- PhoneSDK source workspace: Node.js 18 or newer and npm. Use the lockfile with
   `npm ci` when dependencies must be installed.
 - Windows Desktop Studio: keep `WebView2Loader.dll` beside the executable; the
   Microsoft Edge WebView2 Runtime may also be required.
