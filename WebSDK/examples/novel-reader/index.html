@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
-    <title>Memo Novel Reader</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+    <title>Novel Reader</title>
     <link rel="stylesheet" href="./style.css">
   </head>
   <body>
     <header class="topbar">
       <div>
-        <p class="eyebrow">MEMO NOVEL READER</p>
+        <p class="eyebrow">NOVEL READER</p>
         <h1>Novel Reader</h1>
       </div>
       <button id="bridge-state" class="connection" type="button">Connecting to glasses…</button>
@@ -22,8 +22,8 @@
           <h2>My Library</h2>
           <span id="book-count">0 books</span>
         </div>
-        <button id="import-button" class="import-button" type="button" aria-describedby="file-import-hint" disabled>Import TXT</button>
-        <label class="field-label" for="encoding">Text Encoding</label>
+        <button id="import-button" class="import-button" type="button" aria-describedby="file-import-hint" disabled>Import TXT / EPUB</button>
+        <label class="field-label" for="encoding">TXT Encoding</label>
         <select id="encoding">
           <option value="auto">Auto Detect</option>
           <option value="utf-8">UTF-8</option>
@@ -37,7 +37,7 @@
 
       <section class="reader-panel">
         <div id="empty-state" class="empty-state">
-          <span class="empty-icon">TXT</span>
+          <span class="empty-icon">BOOK</span>
           <h2>Import a novel to start reading</h2>
           <p>Your phone stores the book; your glasses lay out and scroll the text.</p>
         </div>
@@ -52,7 +52,10 @@
             </div>
           </div>
 
-          <article id="phone-preview" class="phone-preview"></article>
+          <div class="phone-preview-frame">
+            <article id="phone-preview" class="phone-preview"></article>
+            <img id="phone-illustration" class="phone-illustration" alt="EPUB illustration" hidden>
+          </div>
 
           <p id="chapter-name" class="chapter-name">Full Text</p>
           <div class="progress-row">

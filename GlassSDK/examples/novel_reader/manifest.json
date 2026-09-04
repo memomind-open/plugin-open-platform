@@ -1,11 +1,11 @@
 {
   "id": "com.memomind.example.novel-reader",
-  "name": "Memo Novel Reader",
-  "version": 10,
+  "name": "Novel Reader",
+  "version": 11,
   "abi_version": 256,
   "provides": {
     "protocols": [
-      { "id": "gm.novel-reader", "version": "1.3" }
+      { "id": "gm.novel-reader", "version": "1.4" }
     ]
   }
 }
