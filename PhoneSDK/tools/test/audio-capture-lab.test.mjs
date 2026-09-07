@@ -68,6 +68,11 @@ test('Audio Capture Lab stays on the native binary audio path', async () => {
   assert.doesNotMatch(gmp, /AudioChunk|openCapture|opus/i);
 });
 
+test('Audio Capture Lab does not expose transport implementation copy in the UI', async () => {
+  const html = await readFile(`${root}/examples/audio-capture-lab/index.html`, 'utf8');
+  assert.doesNotMatch(html, /No Base64|不使用 Base64|data-i18n="stream\.chip"/);
+});
+
 test('Audio Capture Lab keeps advanced controls collapsed by default', async () => {
   const html = await readFile(`${root}/examples/audio-capture-lab/index.html`, 'utf8');
   assert.match(html, /<details class="advanced-section">/);
@@ -124,4 +129,18 @@ test('Audio Capture Lab separates recording results from stream-only metrics', a
   assert.match(plugin, /result\.frameCount\.toLocaleString\(\)/);
   assert.match(plugin, /formatBytes\(result\.opusBytes\)/);
   assert.match(plugin, /streamMetrics\.classList\.toggle\('hidden', mode !== 'stream'\)/);
+});
+
+test('Audio Capture Lab aborts an opening capture when the page becomes hidden', async () => {
+  const plugin = await readFile(`${root}/examples/audio-capture-lab/plugin.js`, 'utf8');
+  assert.match(plugin, /if \(captureOpening\) abortCapture\(\)/);
+  assert.match(plugin, /abortController\.signal\.aborted\s*\|\|\s*document\.visibilityState === 'hidden'/);
+  assert.match(plugin, /await session\.stop\(\)\.catch\(\(\) => \{\}\)/);
+  assert.match(plugin, /document\.visibilityState === 'hidden'\) void stopActiveOperation\('page-hidden'\)/);
+});
+
+test('Audio Capture Lab exits the GMP on primary LONG and VERY_LONG actions', async () => {
+  const gmp = await readFile(`${root}/../GlassSDK/examples/audio_capture_lab/audio_capture_lab.c`, 'utf8');
+  assert.match(gmp, /GM_PLUGIN_BUTTON_ACTION_LONG\s*\|\|[\s\S]*GM_PLUGIN_BUTTON_ACTION_VERY_LONG/);
+  assert.match(gmp, /self->host->app_exit\(\)/);
 });

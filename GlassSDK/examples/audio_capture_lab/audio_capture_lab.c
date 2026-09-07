@@ -399,7 +399,9 @@ static bool on_event(void *context, const gm_plugin_event_t *event)
     if (event->type == GM_PLUGIN_EVENT_BUTTON) {
         bool handled = send_button(self, event);
         if ((event->data.button.button == GM_PLUGIN_BUTTON_PRIMARY &&
-             event->data.button.action == GM_PLUGIN_BUTTON_ACTION_LONG) ||
+             (event->data.button.action == GM_PLUGIN_BUTTON_ACTION_LONG ||
+              event->data.button.action ==
+                  GM_PLUGIN_BUTTON_ACTION_VERY_LONG)) ||
             (event->data.button.button == GM_PLUGIN_BUTTON_BACK &&
              event->data.button.action == GM_PLUGIN_BUTTON_ACTION_TRIGGER)) {
             self->host->app_exit();

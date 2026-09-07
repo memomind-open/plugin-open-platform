@@ -1,7 +1,7 @@
 {
   "id": "com.memomind.demo.audio-capture-lab",
   "name": "Audio Capture Lab",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "entry": "index.html",
   "bridgeVersion": "1.0",
   "permissions": ["audio.capture", "device.events"],

@@ -317,17 +317,19 @@ async function consumeStream(session, generation) {
 }
 
 async function startCapture() {
-  if (!audioAvailable || !deviceConnected || captureOpening || currentCapture || playbackActive) return;
+  if (!audioAvailable || !deviceConnected || captureOpening || currentCapture || playbackActive
+      || document.visibilityState === 'hidden') return;
   const generation = ++captureGeneration;
   recordingResult = undefined;
   metrics.reset();
   renderRecordingMetrics();
   renderStreamMetrics();
   ui.finalResult.textContent = t('empty.result');
-  captureAbortController = new AbortController();
+  const abortController = new AbortController();
+  captureAbortController = abortController;
   let options;
   try {
-    options = buildCaptureOptions(captureAbortController.signal);
+    options = buildCaptureOptions(abortController.signal);
   } catch (error) {
     captureAbortController = undefined;
     logEvent('capture.error', { code: errorCode(error), message: error.message });
@@ -343,8 +345,13 @@ async function startCapture() {
   logEvent('capture.request', requestForDisplay);
   try {
     const session = await gm.audio.openCapture(options);
-    if (generation !== captureGeneration) {
+    if (generation !== captureGeneration || abortController.signal.aborted
+        || document.visibilityState === 'hidden') {
+      captureOpening = false;
       await session.stop().catch(() => {});
+      if (captureAbortController === abortController) captureAbortController = undefined;
+      operationStartedAt = 0;
+      setLabState('ready', t('notice.aborted'));
       return;
     }
     currentCapture = session;
@@ -357,7 +364,7 @@ async function startCapture() {
   } catch (error) {
     captureOpening = false;
     currentCapture = undefined;
-    if (captureAbortController.signal.aborted) {
+    if (abortController.signal.aborted) {
       operationStartedAt = 0;
       setLabState('ready', t('notice.aborted'));
     } else {
@@ -365,6 +372,9 @@ async function startCapture() {
       setLabState('error', t('notice.captureFailed', { message: error.message }), errorCode(error));
     }
   } finally {
+    if (!captureOpening && !currentCapture && captureAbortController === abortController) {
+      captureAbortController = undefined;
+    }
     updateControls();
   }
 }
@@ -427,7 +437,8 @@ async function stopPlayback() {
 }
 
 async function stopActiveOperation(reason) {
-  if (currentCapture) await stopCapture(reason);
+  if (captureOpening) abortCapture();
+  else if (currentCapture) await stopCapture(reason);
   else if (playbackActive) await stopPlayback();
   else setNotice(t('notice.noOperation'));
 }
