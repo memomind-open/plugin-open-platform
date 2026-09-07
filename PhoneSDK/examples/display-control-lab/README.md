@@ -18,6 +18,12 @@ Range controls send one command on release instead of sending every slider
 movement over Bluetooth. Every command carries a request ID and receives a
 complete state response with a result code.
 
+Restore is executed as a short state machine. The GMP performs at most one Host
+display-control call per loop and sends progress after each step; the Web plugin
+keeps the same request alive while progress is reported. This prevents several
+slow hardware setters from blocking one event callback and being mistaken for a
+lost glasses response.
+
 ## Simulator behavior
 
 PhoneSDK Browser Studio applies all controls to a local preview model. Desktop

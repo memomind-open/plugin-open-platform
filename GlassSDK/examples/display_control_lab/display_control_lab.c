@@ -16,6 +16,16 @@ enum {
     OP_RESTORE,
 };
 
+enum {
+    RESTORE_STEP_SCREEN_ON = 0,
+    RESTORE_STEP_BRIGHTNESS,
+    RESTORE_STEP_DISTANCE,
+    RESTORE_STEP_HEIGHT,
+    RESTORE_STEP_AUTO_BRIGHTNESS,
+    RESTORE_STEP_SCREEN_OFF,
+    RESTORE_STEP_DONE,
+};
+
 typedef struct {
     const gm_plugin_host_api_t *host;
     const gm_plugin_lvgl_api_t *ui;
@@ -33,6 +43,7 @@ typedef struct {
     bool requested_screen_on;
     bool preview_only;
     bool auto_brightness_blocked;
+    bool restore_active;
     uint8_t initial_brightness;
     uint8_t initial_height;
     uint8_t initial_distance;
@@ -40,7 +51,10 @@ typedef struct {
     uint8_t height;
     uint8_t distance;
     uint8_t last_operation;
+    uint8_t restore_step;
     gm_plugin_result_t last_result;
+    gm_plugin_result_t restore_result;
+    uint32_t restore_request_id;
     uint8_t language;
 } display_lab_t;
 
@@ -151,6 +165,8 @@ static void read_current_state(display_lab_t *self)
 
 static const char *result_text(display_lab_t *self)
 {
+    if (self->restore_active)
+        return self->language != 0U ? "正在恢复" : "RESTORING";
     if (self->last_result != GM_PLUGIN_OK)
         return self->language != 0U ? "执行失败" : "CONTROL ERROR";
     if (self->preview_only)
@@ -245,6 +261,19 @@ static gm_plugin_result_t create_ui(display_lab_t *self)
     return GM_PLUGIN_OK;
 }
 
+static void clear_ui(display_lab_t *self)
+{
+    if (self->root != 0) self->ui->obj_clean(self->root);
+    self->root = 0;
+    self->title_label = 0;
+    self->status_label = 0;
+    self->screen_label = 0;
+    self->brightness_label = 0;
+    self->height_label = 0;
+    self->distance_label = 0;
+    self->hint_label = 0;
+}
+
 static void send_state(display_lab_t *self, uint32_t request_id)
 {
     uint8_t data[STATE_PACKET_SIZE];
@@ -254,6 +283,7 @@ static void send_state(display_lab_t *self, uint32_t request_id)
     if (self->auto_brightness_blocked) flags |= 0x02U;
     if (self->preview_only) flags |= 0x04U;
     if (self->requested_screen_on) flags |= 0x08U;
+    if (self->restore_active) flags |= 0x10U;
     data[0] = PROTOCOL_VERSION;
     data[1] = 1U;
     data[2] = status_code(self->last_result);
@@ -272,47 +302,102 @@ static gm_plugin_result_t first_error(gm_plugin_result_t current,
     return current == GM_PLUGIN_OK ? next : current;
 }
 
-static gm_plugin_result_t restore_initial(display_lab_t *self)
+static gm_plugin_result_t release_auto_brightness(display_lab_t *self)
 {
-    gm_plugin_result_t result = GM_PLUGIN_OK;
-    bool working_screen_on;
-    bool settings_changed;
+    gm_plugin_result_t result;
+    if (!self->auto_brightness_blocked) return GM_PLUGIN_OK;
+    result = self->host->display_control.auto_brightness_block(false);
+    if (result == GM_PLUGIN_OK) self->auto_brightness_blocked = false;
+    return result;
+}
 
+static gm_plugin_result_t start_restore(display_lab_t *self,
+                                        uint32_t request_id)
+{
+    if (self->restore_active) return GM_PLUGIN_EBUSY;
     read_current_state(self);
-    working_screen_on = self->screen_on;
-    settings_changed = self->brightness != self->initial_brightness ||
-                       self->distance != self->initial_distance ||
-                       self->height != self->initial_height;
-
-    if (!working_screen_on && (self->initial_screen_on || settings_changed)) {
-        gm_plugin_result_t next =
-            self->host->display_control.screen_turn_on(true);
-        result = first_error(result, next);
-        if (next == GM_PLUGIN_OK) working_screen_on = true;
-    }
-    if (self->brightness != self->initial_brightness)
-        result = first_error(result,
-            self->host->display_control.brightness_set(
-                (gm_plugin_display_brightness_t)self->initial_brightness));
-    if (self->distance != self->initial_distance)
-        result = first_error(result,
-            self->host->display_control.distance_set(
-                (gm_plugin_display_distance_t)self->initial_distance));
-    if (self->height != self->initial_height)
-        result = first_error(result,
-            self->host->display_control.height_set(
-                (gm_plugin_display_height_t)self->initial_height));
-    if (self->auto_brightness_blocked) {
-        result = first_error(result,
-            self->host->display_control.auto_brightness_block(false));
-        self->auto_brightness_blocked = false;
-    }
-    if (!self->initial_screen_on && working_screen_on)
-        result = first_error(result,
-            self->host->display_control.screen_turn_on(false));
     self->preview_only = false;
     self->requested_screen_on = self->initial_screen_on;
-    return result;
+    self->restore_active = true;
+    self->restore_step = RESTORE_STEP_SCREEN_ON;
+    self->restore_result = GM_PLUGIN_OK;
+    self->restore_request_id = request_id;
+    return GM_PLUGIN_OK;
+}
+
+static void restore_loop(display_lab_t *self)
+{
+    gm_plugin_result_t next = GM_PLUGIN_OK;
+    bool called_host = false;
+    bool settings_changed;
+
+    if (!self->restore_active) return;
+    while (self->restore_step < RESTORE_STEP_DONE && !called_host) {
+        switch (self->restore_step) {
+        case RESTORE_STEP_SCREEN_ON:
+            settings_changed =
+                self->brightness != self->initial_brightness ||
+                self->distance != self->initial_distance ||
+                self->height != self->initial_height;
+            if (!self->screen_on &&
+                (self->initial_screen_on || settings_changed)) {
+                next = self->host->display_control.screen_turn_on(true);
+                called_host = true;
+            }
+            break;
+        case RESTORE_STEP_BRIGHTNESS:
+            if (self->brightness != self->initial_brightness) {
+                next = self->host->display_control.brightness_set(
+                    (gm_plugin_display_brightness_t)self->initial_brightness);
+                called_host = true;
+            }
+            break;
+        case RESTORE_STEP_DISTANCE:
+            if (self->distance != self->initial_distance) {
+                next = self->host->display_control.distance_set(
+                    (gm_plugin_display_distance_t)self->initial_distance);
+                called_host = true;
+            }
+            break;
+        case RESTORE_STEP_HEIGHT:
+            if (self->height != self->initial_height) {
+                next = self->host->display_control.height_set(
+                    (gm_plugin_display_height_t)self->initial_height);
+                called_host = true;
+            }
+            break;
+        case RESTORE_STEP_AUTO_BRIGHTNESS:
+            if (self->auto_brightness_blocked) {
+                next = release_auto_brightness(self);
+                called_host = true;
+            }
+            break;
+        case RESTORE_STEP_SCREEN_OFF:
+            if (!self->initial_screen_on && self->screen_on) {
+                next = self->host->display_control.screen_turn_on(false);
+                called_host = true;
+            }
+            break;
+        default:
+            self->restore_step = RESTORE_STEP_DONE;
+            break;
+        }
+        if (self->restore_step < RESTORE_STEP_DONE) self->restore_step++;
+    }
+
+    if (called_host) {
+        self->restore_result = first_error(self->restore_result, next);
+        self->last_result = self->restore_result;
+        send_state(self, self->restore_request_id);
+        update_labels(self);
+        return;
+    }
+
+    self->restore_active = false;
+    self->last_result = self->restore_result;
+    self->requested_screen_on = self->initial_screen_on;
+    send_state(self, self->restore_request_id);
+    update_labels(self);
 }
 
 static bool receive_command(display_lab_t *self,
@@ -377,7 +462,7 @@ static bool receive_command(display_lab_t *self,
         break;
     case OP_RESTORE:
         if (value != 0U || preview_only) result = GM_PLUGIN_EINVAL;
-        else result = restore_initial(self);
+        else result = start_restore(self, request_id);
         break;
     default:
         result = GM_PLUGIN_EINVAL;
@@ -396,6 +481,10 @@ static gm_plugin_result_t on_start(void *context)
     gm_plugin_result_t result;
     self->preview_only = false;
     self->auto_brightness_blocked = false;
+    self->restore_active = false;
+    self->restore_step = RESTORE_STEP_DONE;
+    self->restore_request_id = 0U;
+    self->restore_result = GM_PLUGIN_OK;
     self->last_operation = OP_QUERY;
     self->last_result = GM_PLUGIN_OK;
     read_current_state(self);
@@ -413,18 +502,17 @@ static gm_plugin_result_t on_start(void *context)
     result = self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_GESTURES);
     if (result != GM_PLUGIN_OK) return result;
     result = create_ui(self);
-    if (result != GM_PLUGIN_OK)
+    if (result != GM_PLUGIN_OK) {
         (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
+        clear_ui(self);
+    }
     return result;
 }
 
 static void safe_exit(display_lab_t *self)
 {
     (void)self->host->display_control.screen_turn_on(true);
-    if (self->auto_brightness_blocked) {
-        (void)self->host->display_control.auto_brightness_block(false);
-        self->auto_brightness_blocked = false;
-    }
+    (void)release_auto_brightness(self);
     self->host->app_exit();
 }
 
@@ -495,23 +583,19 @@ static void on_resume(void *context)
     update_labels(self);
 }
 
+static void on_loop(void *context, uint32_t elapsed_ms)
+{
+    (void)elapsed_ms;
+    restore_loop((display_lab_t *)context);
+}
+
 static void on_stop(void *context)
 {
     display_lab_t *self = context;
+    self->restore_active = false;
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
-    if (self->auto_brightness_blocked) {
-        (void)self->host->display_control.auto_brightness_block(false);
-        self->auto_brightness_blocked = false;
-    }
-    if (self->root != 0) self->ui->obj_clean(self->root);
-    self->root = 0;
-    self->title_label = 0;
-    self->status_label = 0;
-    self->screen_label = 0;
-    self->brightness_label = 0;
-    self->height_label = 0;
-    self->distance_label = 0;
-    self->hint_label = 0;
+    (void)release_auto_brightness(self);
+    clear_ui(self);
 }
 
 gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
@@ -550,6 +634,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
     plugin->context = &s_lab;
     plugin->on_start = on_start;
     plugin->on_resume = on_resume;
+    plugin->on_loop = on_loop;
     plugin->on_event = on_event;
     plugin->on_stop = on_stop;
     return GM_PLUGIN_OK;

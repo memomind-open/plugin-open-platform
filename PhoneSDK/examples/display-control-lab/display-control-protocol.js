@@ -92,6 +92,7 @@ export function decodeDisplayControlState(message) {
     autoBrightnessBlocked: (flags & 0x02) !== 0,
     previewOnly: (flags & 0x04) !== 0,
     requestedScreenOn: (flags & 0x08) !== 0,
+    restoreInProgress: (flags & 0x10) !== 0,
     brightness: data[4],
     distance: data[5],
     height: data[6],

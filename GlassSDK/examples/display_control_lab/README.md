@@ -8,6 +8,9 @@ values captured during `on_start`.
 Manual brightness temporarily blocks automatic brightness. The block is
 released by Restore, long-press recovery, and `on_stop`. The Host remains
 responsible for restoring every control changed by the plugin when it stops.
+Restore runs incrementally from `on_loop`, performs at most one Host control
+call per iteration, and reports progress after each step. A failed automatic
+brightness release remains marked as blocked so a later cleanup path can retry.
 
 The plugin enables firmware gesture events. While the display is off, any
 glasses or accessory button and an active head-raise gesture turn it on. The

@@ -32,7 +32,7 @@ test('Display Control Lab encodes bounded big-endian commands', () => {
 
 test('Display Control Lab decodes complete state and preview flags', () => {
   const data = Uint8Array.from([
-    1, 1, 0, 0x0f, 7, 3, 6, displayControlOperation.setScreen,
+    1, 1, 0, 0x1f, 7, 3, 6, displayControlOperation.setScreen,
     0xde, 0xad, 0xbe, 0xef,
   ]);
   const state = decodeDisplayControlState({ channel: DISPLAY_CONTROL_STATE_CHANNEL, data });
@@ -43,6 +43,7 @@ test('Display Control Lab decodes complete state and preview flags', () => {
     autoBrightnessBlocked: true,
     previewOnly: true,
     requestedScreenOn: true,
+    restoreInProgress: true,
     brightness: 7,
     distance: 3,
     height: 6,
@@ -106,10 +107,21 @@ test('Display Control Lab treats restore as one guarded long-running operation',
   assert.match(plugin, /const RESTORE_TIMEOUT_MS = 12000/);
   assert.match(plugin, /if \(commandRunning\) return/);
   assert.match(plugin, /operation === displayControlOperation\.restore[\s\S]*RESTORE_TIMEOUT_MS/);
+  assert.match(plugin, /next\.restoreInProgress[\s\S]*armWaiter/);
   assert.match(plugin, /notice\.restoring/);
+  assert.match(gmp, /RESTORE_STEP_BRIGHTNESS/);
+  assert.match(gmp, /static void restore_loop/);
+  assert.match(gmp, /plugin->on_loop = on_loop/);
   assert.match(gmp, /self->brightness != self->initial_brightness/);
   assert.match(gmp, /self->distance != self->initial_distance/);
   assert.match(gmp, /self->height != self->initial_height/);
+});
+
+test('Display Control Lab preserves cleanup state when Host calls fail', async () => {
+  const gmp = await readFile(
+    `${root}/../GlassSDK/examples/display_control_lab/display_control_lab.c`, 'utf8');
+  assert.match(gmp, /auto_brightness_block\(false\);[\s\S]*if \(result == GM_PLUGIN_OK\) self->auto_brightness_blocked = false/);
+  assert.match(gmp, /if \(result != GM_PLUGIN_OK\) \{[\s\S]*clear_ui\(self\);/);
 });
 
 test('Display Control Lab wakes and synchronizes power from glasses input', async () => {

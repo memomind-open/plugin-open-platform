@@ -32,6 +32,7 @@ const state = {
   screenOn: true,
   requestedScreenOn: true,
   previewOnly: false,
+  restoreInProgress: false,
   autoBrightnessBlocked: false,
   brightness: 6,
   height: 4,
@@ -128,6 +129,7 @@ function acceptState(next) {
     screenOn: next.screenOn,
     requestedScreenOn: next.requestedScreenOn,
     previewOnly: next.previewOnly,
+    restoreInProgress: next.restoreInProgress,
     autoBrightnessBlocked: next.autoBrightnessBlocked,
     brightness: next.brightness,
     height: next.height,
@@ -140,6 +142,11 @@ function acceptState(next) {
   if (wokeFromGlasses) setNotice('notice.woke', 'success');
   const waiter = pending.get(next.requestId);
   if (waiter) {
+    if (next.restoreInProgress) {
+      armWaiter(next.requestId, waiter);
+      setNotice('notice.restoring');
+      return;
+    }
     pending.delete(next.requestId);
     clearTimeout(waiter.timer);
     if (next.statusCode === 0) waiter.resolve(next);
@@ -147,13 +154,19 @@ function acceptState(next) {
   }
 }
 
+function armWaiter(id, waiter) {
+  clearTimeout(waiter.timer);
+  waiter.timer = setTimeout(() => {
+    pending.delete(id);
+    waiter.reject(new Error('GLASSES_RESPONSE_TIMEOUT'));
+  }, waiter.timeoutMs);
+}
+
 function waitForState(id, timeoutMs = COMMAND_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      pending.delete(id);
-      reject(new Error('GLASSES_RESPONSE_TIMEOUT'));
-    }, timeoutMs);
-    pending.set(id, { resolve, reject, timer });
+    const waiter = { resolve, reject, timer: undefined, timeoutMs };
+    pending.set(id, waiter);
+    armWaiter(id, waiter);
   });
 }
 
