@@ -1,0 +1,12 @@
+{
+  "id": "com.memomind.demo.audio-capture-lab",
+  "name": "Audio Capture Lab",
+  "version": 1,
+  "abi_version": 256,
+  "provides": {
+    "protocols": [
+      { "id": "gm.audio-lab", "version": "1.0" },
+      { "id": "gm.device-events", "version": "1.0" }
+    ]
+  }
+}

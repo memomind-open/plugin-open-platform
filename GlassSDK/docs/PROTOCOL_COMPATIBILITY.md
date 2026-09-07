@@ -35,6 +35,7 @@ Current public protocol IDs are:
 | `gm.scene-lz4` | Independent LZ4 GRAY_4 tile channel |
 | `gm.scene-atomic-frame` | Framed LZ4 tiles with stop-and-wait status ACKs |
 | `gm.device-events` | Button, IMU and connection event uplink |
+| `gm.audio-lab` | Audio Capture Lab state and telemetry on channel `0x414C`; audio is not carried by this protocol |
 | `gm.fighter-control` | Fighter Arena input snapshots on channel `0x4647` |
 | `gm.fighter-events` | Fighter Arena events on channel `0x4648` |
 

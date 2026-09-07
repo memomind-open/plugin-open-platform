@@ -28,6 +28,7 @@ spacing, or minimum usable layout sizes rather than device width or height.
 | `imu` | gesture events and pull-based raw IMU | IMU events/raw + libc extension |
 | `bluetooth` | bidirectional channel + byte messages | Bluetooth + libc extension |
 | `web_bridge` | WebView-driven Scene rendering plus button/IMU uplink and framed LZ4 transfer | display bitmap + Bluetooth + button + IMU + libc; optional LZ4 |
+| `audio_capture_lab` | lightweight foreground/status companion for the Web Audio Capture Lab | Bluetooth + button + libc extension |
 | `talking_pet` | native animated companion paired with the phone-side Talking Pet | display bitmap + Bluetooth + button + libc extension |
 | `game/breakout` | complete local game | button + raw IMU + locale + libc extension |
 | `game/tetris` | grid game with IMU movement and button rotation | button + raw IMU + locale + libc extension |
@@ -60,6 +61,7 @@ python3 build.py build --example game/2048
 
 On Windows, replace `python3` with `py`.
 
-Audio is intentionally outside the plugin ABI. A plugin requests phone-side
-playback/capture through Bluetooth messages; the glasses remain the phone's HFP
-audio device. Persistent storage is also not currently exposed.
+Audio is intentionally outside the GMP ABI. Web plugins request Host-owned
+glasses capture and playback through the PhoneSDK `gm.audio` API. The
+`audio_capture_lab` GMP receives only low-rate UI state over Bluetooth; audio
+uses the dedicated Host/Web binary stream and never passes through the GMP.

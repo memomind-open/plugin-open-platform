@@ -1,0 +1,17 @@
+{
+  "id": "com.memomind.demo.audio-capture-lab",
+  "name": "Audio Capture Lab",
+  "version": "0.1.2",
+  "entry": "index.html",
+  "bridgeVersion": "1.0",
+  "permissions": ["audio.capture", "device.events"],
+  "deviceRequirements": {
+    "preferredPluginId": "com.memomind.demo.audio-capture-lab",
+    "requiredPluginId": "com.memomind.demo.audio-capture-lab",
+    "minPluginVersion": "1",
+    "protocols": [
+      { "id": "gm.audio-lab", "minVersion": "1.0" },
+      { "id": "gm.device-events", "minVersion": "1.0" }
+    ]
+  }
+}
