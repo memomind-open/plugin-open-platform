@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#061713">
+    <title>Audio Capture Lab</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">MEMOMIND AUDIO SDK</p>
+          <h1>Audio Capture Lab</h1>
+          <p class="summary" data-i18n="app.summary">Try native recording and real-time audio streaming.</p>
+        </div>
+        <div class="hero-actions">
+          <button class="language-toggle" id="language-toggle" type="button" data-i18n="language.switch">中文</button>
+          <div class="hero-state" id="lab-state" data-state="unavailable">
+            <span class="state-dot"></span>
+            <strong data-i18n="state.initializing">INITIALIZING</strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="runtime-strip" aria-label="Runtime status">
+        <span><span data-i18n="runtime.host">Host</span> <strong id="host-status" data-i18n="runtime.connecting">Connecting</strong></span>
+        <span><span data-i18n="runtime.glasses">Glasses</span> <strong id="device-status" data-i18n="runtime.unknown">Unknown</strong></span>
+        <span><span data-i18n="runtime.audio">Audio</span> <strong id="capability-status" data-i18n="runtime.checking">Checking</strong></span>
+        <span><span data-i18n="runtime.format">Format</span> <strong id="format-status">Opus / 16 kHz / Mono</strong></span>
+      </section>
+
+      <p class="notice" id="notice" role="status" data-i18n="notice.waiting">Waiting for the plugin Host...</p>
+
+      <section class="workspace">
+        <nav class="mode-tabs" aria-label="Capture mode">
+          <button class="mode-tab active" data-mode="recording" type="button" data-i18n="mode.recording">Recording</button>
+          <button class="mode-tab" data-mode="stream" type="button" data-i18n="mode.stream">Real-time Stream</button>
+        </nav>
+
+        <section class="panel core-panel">
+          <div class="panel-heading">
+            <div><span data-i18n="core.eyebrow">CORE SETTINGS</span><h2 data-i18n="core.title">Capture Setup</h2></div>
+          </div>
+          <div class="field-grid">
+            <label class="field">
+              <span data-i18n="core.pickup">Pickup Mode</span>
+              <select id="pickup-mode">
+                <option value="frontFixed" data-i18n="pickup.frontFixed">Front fixed</option>
+                <option value="meetingAuto" data-i18n="pickup.meetingAuto">Meeting auto</option>
+                <option value="nonWearerFocus" data-i18n="pickup.nonWearerFocus">Non-wearer focus</option>
+                <option value="frontBalanced" data-i18n="pickup.frontBalanced" selected>Front balanced</option>
+                <option value="frontFocus" data-i18n="pickup.frontFocus">Front focus</option>
+              </select>
+            </label>
+            <label class="switch-field">
+              <span><strong data-i18n="core.nr">Noise Reduction</strong><small data-i18n="core.nrHint">Native processing</small></span>
+              <input id="noise-reduction" type="checkbox" checked>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel mode-settings" id="recording-settings">
+          <div class="mode-summary">
+            <div><span data-i18n="recording.eyebrow">RECORDING</span><h2 data-i18n="recording.title">Host-retained audio</h2></div>
+            <span class="mode-chip" data-i18n="recording.chip">Audio stays in Host</span>
+          </div>
+          <details class="advanced-section">
+            <summary data-i18n="recording.advanced">Advanced recording settings</summary>
+            <label class="range-field">
+              <span><span data-i18n="duration.maximum">Maximum Duration</span> <output id="recording-duration-output">5 s</output></span>
+              <input id="recording-duration" type="range" min="1" max="15" value="5" step="1">
+              <small>1 s</small><small>15 s</small>
+            </label>
+          </details>
+        </section>
+
+        <section class="panel mode-settings hidden" id="stream-settings">
+          <div class="mode-summary">
+            <div><span data-i18n="stream.eyebrow">REAL-TIME STREAM</span><h2 data-i18n="stream.title">Binary Opus stream</h2></div>
+          </div>
+          <label class="field full-field profile-field">
+            <span data-i18n="stream.profile">Stream Profile</span>
+            <select id="stream-profile">
+              <option value="interactive" data-i18n="profile.interactive">Interactive - lowest latency</option>
+              <option value="balanced" data-i18n="profile.balanced">Balanced - recommended</option>
+              <option value="reliable" data-i18n="profile.reliable">Reliable - larger queue</option>
+              <option value="custom" data-i18n="profile.custom">Custom</option>
+            </select>
+          </label>
+          <details class="advanced-section" id="stream-advanced">
+            <summary data-i18n="stream.advanced">Advanced stream settings</summary>
+            <div class="advanced-grid hidden" id="custom-settings">
+              <label class="field"><span data-i18n="stream.chunk">Chunk Duration</span><select id="chunk-duration"></select></label>
+              <label class="field"><span data-i18n="stream.queue">Host Queue</span><input id="max-queue" type="number" min="100" max="5000" step="20" value="500"></label>
+              <label class="field full-field"><span data-i18n="stream.overflow">Overflow Strategy</span><select id="overflow-strategy"><option value="drop-oldest">drop-oldest</option><option value="drop-newest">drop-newest</option><option value="error">error</option></select></label>
+            </div>
+            <div class="duration-row">
+              <label class="switch-field compact-switch">
+                <span><strong data-i18n="stream.unlimited">Unlimited Duration</strong><small data-i18n="stream.lifecycle">Stops on lifecycle changes</small></span>
+                <input id="unlimited-duration" type="checkbox" checked>
+              </label>
+              <label class="range-field disabled" id="stream-duration-field">
+                <span><span data-i18n="duration.maximum">Maximum Duration</span> <output id="stream-duration-output">60 s</output></span>
+                <input id="stream-duration" type="range" min="1" max="3600" value="60" step="1" disabled>
+                <small>1 s</small><small>1 h</small>
+              </label>
+            </div>
+            <label class="field full-field diagnostic-field">
+              <span><span data-i18n="stream.consumerDelay">Consumer Delay</span> <small data-i18n="stream.backpressure">Backpressure test only</small></span>
+              <select id="consumer-delay"><option value="0">0 ms - normal</option><option value="50">50 ms</option><option value="200">200 ms</option><option value="500">500 ms</option><option value="1000">1000 ms</option></select>
+            </label>
+          </details>
+        </section>
+
+        <div class="primary-actions">
+          <button class="primary" id="start-capture" type="button" disabled data-i18n="action.startRecording">Start Recording</button>
+          <button id="stop-capture" type="button" disabled data-i18n="action.stop">Stop</button>
+        </div>
+
+        <section class="panel playback-panel" id="playback-panel">
+          <div class="mode-summary">
+            <div><span data-i18n="playback.eyebrow">LAST RECORDING</span><h2 data-i18n="playback.title">Playback</h2></div>
+          </div>
+          <div class="playback-actions">
+            <button id="play-recording" type="button" disabled data-i18n="action.play">Play</button>
+            <button id="stop-playback" type="button" disabled data-i18n="action.stop">Stop</button>
+          </div>
+        </section>
+
+        <section class="quick-metrics recording-metrics" id="recording-metrics" aria-label="Recording metrics">
+          <article><span data-i18n="metric.duration">Duration</span><strong id="recording-metric-duration">00:00</strong></article>
+          <article><span data-i18n="metric.opusFrames">Opus Frames</span><strong id="recording-metric-frames">—</strong></article>
+          <article><span data-i18n="metric.encodedSize">Encoded Size</span><strong id="recording-metric-bytes">—</strong></article>
+        </section>
+
+        <section class="quick-metrics hidden" id="stream-metrics" aria-label="Stream metrics">
+          <article><span data-i18n="metric.elapsed">Elapsed</span><strong id="metric-elapsed">00:00</strong></article>
+          <article><span data-i18n="metric.chunks">Chunks</span><strong id="metric-chunks">0</strong></article>
+          <article><span data-i18n="metric.dropped">Dropped</span><strong id="metric-dropped">0</strong></article>
+          <article><span data-i18n="metric.queue">Queue</span><strong id="metric-latency">0 ms</strong></article>
+        </section>
+
+        <details class="panel diagnostics-panel">
+          <summary data-i18n="diagnostics.title">Diagnostics and API details</summary>
+          <div class="diagnostics-body">
+            <div class="secondary-metrics hidden" id="stream-diagnostics-metrics">
+              <article><span data-i18n="metric.frames">Frames</span><strong id="metric-frames">0</strong></article>
+              <article><span data-i18n="metric.data">Data</span><strong id="metric-bytes">0 B</strong></article>
+              <article><span data-i18n="metric.bitrate">Bitrate</span><strong id="metric-bitrate">0 kbps</strong></article>
+              <article><span data-i18n="metric.discontinuities">Discontinuities</span><strong id="metric-discontinuities">0</strong></article>
+            </div>
+            <p class="last-chunk hidden" id="last-chunk" data-i18n="diagnostics.noChunk">No stream chunk received.</p>
+            <details><summary data-i18n="diagnostics.options">Resolved Options</summary><pre id="resolved-options" data-i18n="empty.session">No session opened.</pre></details>
+            <details><summary data-i18n="diagnostics.result">Final Result</summary><pre id="final-result" data-i18n="empty.result">No completed session.</pre></details>
+            <details><summary data-i18n="diagnostics.capability">Advertised Audio Capability</summary><pre id="capability-json" data-i18n="empty.capability">Waiting for Host...</pre></details>
+            <div class="event-heading"><strong data-i18n="diagnostics.events">State Events</strong><button class="text-button" id="clear-events" type="button" data-i18n="action.clear">Clear</button></div>
+            <ol id="event-log" aria-live="polite"></ol>
+            <button class="abort-action" id="abort-capture" type="button" disabled data-i18n="action.abort">Abort current session</button>
+          </div>
+        </details>
+      </section>
+    </main>
+    <script type="module" src="./plugin.js"></script>
+  </body>
+</html>

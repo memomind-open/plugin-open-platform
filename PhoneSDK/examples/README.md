@@ -40,6 +40,7 @@ npm run pack:plugin -- examples/<relative-path> dist/<plugin-name>.mmpkg
 | Directory | Plugin ID | Development form |
 | --- | --- | --- |
 | `app-counter/` | `com.memomind.demo.counter` | App built-in counter example |
+| `audio-capture-lab/` | `com.memomind.demo.audio-capture-lab` | Native recording and binary-stream parameter lab |
 | `talking-pet/` | `com.memomind.example.talking-pet` | Interactive talking-pet game |
 | `novel-reader/` | `com.memomind.example.novel-reader` | TXT/EPUB reader with glasses-side text layout and standalone illustration pages |
 | `tic-tac-toe/` | `com.memomind.demo.tictactoe` | TypeScript/Vite source project |
