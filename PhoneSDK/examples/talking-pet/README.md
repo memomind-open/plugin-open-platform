@@ -1,4 +1,4 @@
-# Memo Talking Pet
+# Audio Talking Pet
 
 An original talking-pet game built as a static GM Web Plugin example. Memo can
 be petted, fed, played with, and put to sleep. Hold the microphone button to

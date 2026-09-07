@@ -1,4 +1,4 @@
-# Memo Talking Pet
+# Audio Talking Pet
 
 This device example is the native companion for the PhoneSDK `talking-pet`
 example. It draws only the center playroom and character through the native
