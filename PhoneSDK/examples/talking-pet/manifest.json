@@ -1,7 +1,7 @@
 {
   "id": "com.memomind.example.talking-pet",
-  "name": "Memo Talking Pet",
-  "version": "0.7.2",
+  "name": "Audio Talking Pet",
+  "version": "0.7.3",
   "entry": "index.html",
   "bridgeVersion": "1.0",
   "permissions": ["device.events", "storage", "audio.capture"],

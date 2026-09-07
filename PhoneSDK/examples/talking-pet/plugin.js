@@ -523,7 +523,7 @@ function drawDeviceBar(label, value, y, level) {
 function renderDeviceFrame() {
   deviceContext.fillStyle = gray(0);
   deviceContext.fillRect(0, 0, DEVICE_WIDTH, DEVICE_HEIGHT);
-  deviceText('MEMO TALKING PET', 20, 22, 16, 13, 750);
+  deviceText('AUDIO TALKING PET', 20, 22, 16, 13, 750);
   deviceText(`LV.${Math.floor(state.xp / 100) + 1}`, 578, 22, 16, 15, 750, 'right');
   deviceContext.strokeStyle = gray(4);
   deviceContext.lineWidth = 1;
@@ -574,7 +574,7 @@ function deviceBytesToBase64(bytes) {
 
 async function syncToGlasses(announce = false) {
   if (!glassesConnected) {
-    if (announce) say('Connect the glasses and run the native Memo plugin first.');
+    if (announce) say('Connect the glasses and run the native Audio Talking Pet plugin first.');
     return;
   }
   if (glassesSyncInFlight) {
@@ -761,8 +761,8 @@ async function initialize() {
     connectionDot.classList.toggle('connected', glassesConnected);
     const audioMode = nativeAudioAvailable ? 'Glasses microphone ready' : 'Using phone microphone';
     status.textContent = glassesConnected
-      ? `Native Memo plugin ready · ${audioMode}`
-      : `Native Memo plugin ready · ${audioMode} · Waiting for glasses`;
+      ? `Audio Talking Pet plugin ready · ${audioMode}`
+      : `Audio Talking Pet plugin ready · ${audioMode} · Waiting for glasses`;
     if (glassesConnected) await syncToGlasses();
   } catch (error) {
     status.textContent = `Standalone demo mode · ${error.code ?? 'Bridge disconnected'}`;
