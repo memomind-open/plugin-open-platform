@@ -29,6 +29,7 @@ spacing, or minimum usable layout sizes rather than device width or height.
 | `bluetooth` | bidirectional channel + byte messages | Bluetooth + libc extension |
 | `web_bridge` | WebView-driven Scene rendering plus button/IMU uplink and framed LZ4 transfer | display bitmap + Bluetooth + button + IMU + libc; optional LZ4 |
 | `audio_capture_lab` | lightweight foreground/status companion for the Web Audio Capture Lab | Bluetooth + button + libc extension |
+| `display_control_lab` | phone-driven display power, brightness, height, optical-distance, and input wake lab | display control + Bluetooth + button + IMU gestures + libc extension |
 | `talking_pet` | native animated companion paired with the phone-side Talking Pet | display bitmap + Bluetooth + button + libc extension |
 | `game/breakout` | complete local game | button + raw IMU + locale + libc extension |
 | `game/tetris` | grid game with IMU movement and button rotation | button + raw IMU + locale + libc extension |

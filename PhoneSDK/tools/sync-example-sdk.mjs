@@ -10,6 +10,7 @@ const packageJson = JSON.parse(await readFile(resolve(repositoryRoot, 'package.j
 const bundled = await bundlePhoneSdk(repositoryRoot, packageJson.version);
 
 for (const plugin of [
+  'examples/display-control-lab',
   'examples/fighter-controller',
   'examples/life-desk',
   'examples/novel-reader',

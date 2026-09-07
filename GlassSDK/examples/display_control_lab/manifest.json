@@ -1,0 +1,11 @@
+{
+  "id": "com.memomind.demo.display-control-lab",
+  "name": "Display Control Lab",
+  "version": 2,
+  "abi_version": 256,
+  "provides": {
+    "protocols": [
+      { "id": "gm.display-control-lab", "version": "1.0" }
+    ]
+  }
+}
