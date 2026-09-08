@@ -71,10 +71,12 @@ test('Display Control Lab pairs one Web plugin with one GMP protocol', async () 
     {
       name: 'device.messaging',
       required: true,
-      scope: { channels: [DISPLAY_CONTROL_COMMAND_CHANNEL] },
+      scope: {
+        channels: [DISPLAY_CONTROL_COMMAND_CHANNEL, DISPLAY_CONTROL_STATE_CHANNEL],
+      },
     },
   ]);
-  assert.equal(manifest.version, '0.1.1');
+  assert.equal(manifest.version, '0.1.2');
   assert.equal(manifest.deviceRequirements.requiredPluginId, manifest.id);
   assert.equal(manifest.deviceRequirements.minPluginVersion, '2');
   assert.equal(glassManifest.id, manifest.id);

@@ -1,6 +1,6 @@
 # Display Control Lab Web plugin
 
-Display Control Lab 0.1.1 is the phone-side controller for the paired
+Display Control Lab 0.1.2 is the phone-side controller for the paired
 `display_control_lab.gmp`. The Web plugin does not expose privileged optical
 controls directly. It sends bounded binary commands to the glasses plugin,
 which validates and applies them through the frozen GlassSDK display-control
@@ -43,7 +43,7 @@ automatic-brightness block and exits the demo.
 From `PhoneSDK`:
 
 ```sh
-node tools/build-mmpkg.mjs examples/display-control-lab dist/display-control-lab-0.1.1.mmpkg
+node tools/build-mmpkg.mjs examples/display-control-lab dist/display-control-lab-0.1.2.mmpkg
 ```
 
 Pair it with:

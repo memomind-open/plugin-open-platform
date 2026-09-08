@@ -1,7 +1,7 @@
 {
   "id": "com.memomind.demo.display-control-lab",
   "name": "Display Control Lab",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "entry": "index.html",
   "bridgeVersion": "2.0",
   "permissions": [
@@ -20,7 +20,7 @@
       "name": "device.messaging",
       "required": true,
       "scope": {
-        "channels": [17475]
+        "channels": [17475, 17476]
       }
     }
   ],
