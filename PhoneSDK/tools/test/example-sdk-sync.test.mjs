@@ -12,6 +12,7 @@ const packageJson = JSON.parse(await readFile(resolve(repositoryRoot, 'package.j
 test('example SDK copies match the formal standalone SDK', async () => {
   const expected = await bundlePhoneSdk(repositoryRoot, packageJson.version);
   for (const plugin of [
+    'examples/display-control-lab',
     'examples/permission-debug',
     'examples/fighter-controller',
     'examples/life-desk',

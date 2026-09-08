@@ -11,6 +11,7 @@ const bundled = await bundlePhoneSdk(repositoryRoot, packageJson.version);
 
 for (const plugin of [
   'examples/audio-capture-lab',
+  'examples/display-control-lab',
   'examples/permission-debug',
   'examples/fighter-controller',
   'examples/life-desk',

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#07131b">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+    <title>Display Control Lab</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow" data-i18n="app.eyebrow">MEMOMIND DISPLAY SDK</p>
+          <h1 data-i18n="app.title">Display Control Lab</h1>
+          <p class="summary" data-i18n="app.summary">Control glasses display power and optical levels.</p>
+        </div>
+        <button id="language-toggle" class="language-toggle" type="button" data-i18n="language.switch">中文</button>
+      </header>
+
+      <section class="runtime-strip" aria-label="Runtime status">
+        <span><small data-i18n="runtime.host">Host</small><strong id="host-status" data-i18n="runtime.connecting">Connecting</strong></span>
+        <span><small data-i18n="runtime.glasses">Glasses</small><strong id="device-status">—</strong></span>
+        <span><small data-i18n="runtime.mode">Mode</small><strong id="runtime-mode">—</strong></span>
+      </section>
+
+      <p id="notice" class="notice" role="status" data-i18n="notice.initializing">Waiting for the plugin Host...</p>
+
+      <section class="panel power-panel">
+        <div class="panel-heading">
+          <div><h2 data-i18n="panel.screen">Screen Power</h2><p data-i18n="panel.screenHint">Turn off only the display, not the glasses.</p></div>
+          <strong id="screen-value">—</strong>
+        </div>
+        <div class="power-actions">
+          <button type="button" data-screen="1" data-i18n="screen.on">Turn On</button>
+          <button type="button" data-screen="0" data-i18n="screen.off">Turn Off</button>
+        </div>
+      </section>
+
+      <section class="control-grid">
+        <label class="panel range-control" for="brightness">
+          <span class="control-heading"><span><strong data-i18n="control.brightness">Brightness</strong><small data-i18n="control.brightnessHint">Level 1–10</small></span><output id="brightness-value">6</output></span>
+          <input id="brightness" type="range" min="1" max="10" step="1" value="6">
+          <span class="limits"><span>1</span><span>10</span></span>
+        </label>
+
+        <label class="panel range-control" for="height">
+          <span class="control-heading"><span><strong data-i18n="control.height">Display Height</strong><small data-i18n="control.heightHint">Vertical optical level 0–8</small></span><output id="height-value">4</output></span>
+          <input id="height" type="range" min="0" max="8" step="1" value="4">
+          <span class="limits"><span>0</span><span>8</span></span>
+        </label>
+
+        <label class="panel range-control" for="distance">
+          <span class="control-heading"><span><strong data-i18n="control.distance">Display Distance</strong><small data-i18n="control.distanceHint">Optical distance level 0–8</small></span><output id="distance-value">4</output></span>
+          <input id="distance" type="range" min="0" max="8" step="1" value="4">
+          <span class="limits"><span>0</span><span>8</span></span>
+        </label>
+      </section>
+
+      <button id="restore" class="restore" type="button" disabled data-i18n="action.restore">Restore Initial Settings</button>
+
+      <section class="safety">
+        <strong data-i18n="safety.title">Safety recovery</strong>
+        <p data-i18n="safety.body">If the physical display is off, turn it on from this phone page. Holding the primary glasses button also turns the display on and exits the demo.</p>
+      </section>
+
+      <footer data-i18n="footer">Studio validates commands and values. Verify brightness, height, distance, and power on physical glasses.</footer>
+    </main>
+    <script type="module" src="./plugin.js"></script>
+  </body>
+</html>

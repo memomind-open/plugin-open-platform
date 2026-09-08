@@ -1,0 +1,62 @@
+:root {
+  color: #eaf7ff;
+  background: #07131b;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-synthesis: none;
+  --cyan: #51d9e8;
+  --green: #55e0a4;
+  --panel: #0c202a;
+  --line: #21434f;
+  --muted: #89a7b2;
+}
+
+* { box-sizing: border-box; }
+body { min-width: 0; min-height: 100vh; margin: 0; overflow-x: hidden; background: radial-gradient(circle at 85% 0, #153847 0, #07131b 42%); }
+button, input { font: inherit; }
+button { border: 1px solid var(--line); border-radius: 12px; background: #102a35; color: #eaf7ff; cursor: pointer; }
+button:hover:not(:disabled), button:focus-visible { border-color: var(--cyan); }
+button:disabled { cursor: wait; opacity: .45; }
+.shell { width: min(920px, 100%); margin: 0 auto; padding: 24px clamp(18px, 4vw, 40px) 32px; }
+.hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.eyebrow { margin: 0; color: var(--cyan); font-size: 10px; font-weight: 800; letter-spacing: .18em; }
+h1 { margin: 5px 0 0; font-size: clamp(28px, 5vw, 46px); line-height: 1.05; }
+.summary { margin: 10px 0 0; color: var(--muted); font-size: 15px; }
+.language-toggle { min-width: 68px; padding: 10px 14px; color: var(--cyan); font-weight: 750; }
+.runtime-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 24px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--line); }
+.runtime-strip span { display: grid; gap: 4px; min-width: 0; padding: 12px 15px; background: #0a1b24; }
+.runtime-strip small { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.runtime-strip strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.notice { min-height: 22px; margin: 16px 2px; color: #a8c3cc; font-size: 13px; }
+.notice.success { color: var(--green); }
+.notice.error { color: #ff9c9c; }
+.panel { border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(145deg, rgba(15, 42, 52, .96), rgba(8, 27, 35, .96)); }
+.power-panel { padding: 20px; }
+.panel-heading, .control-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.panel-heading h2 { margin: 0; font-size: 18px; }
+.panel-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+#screen-value { color: var(--green); font-size: 14px; }
+.power-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+.power-actions button { min-height: 48px; font-weight: 750; }
+.power-actions button.active { border-color: var(--green); background: #173f38; color: #8ff2c9; box-shadow: inset 0 0 0 1px #55e0a455; }
+.control-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.range-control { display: block; min-width: 0; padding: 18px; }
+.control-heading > span { display: grid; min-width: 0; gap: 5px; }
+.control-heading strong { font-size: 14px; }
+.control-heading small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.control-heading output { min-width: 36px; color: var(--cyan); font-size: 22px; font-weight: 800; text-align: right; }
+.range-control input { width: 100%; height: 38px; margin: 12px 0 0; accent-color: var(--cyan); cursor: pointer; }
+.limits { display: flex; justify-content: space-between; margin-top: -7px; color: #6f8e99; font-size: 10px; }
+.restore { width: 100%; min-height: 48px; margin-top: 14px; border-color: #397264; color: #87ecc2; font-weight: 750; }
+.safety { margin-top: 16px; padding: 15px 17px; border-left: 3px solid #e5b85f; border-radius: 0 10px 10px 0; background: #30281755; }
+.safety strong { color: #f1ca7f; font-size: 12px; }
+.safety p { margin: 5px 0 0; color: #bdad8b; font-size: 11px; line-height: 1.55; }
+footer { margin-top: 18px; color: #6f8e99; font-size: 10px; line-height: 1.55; text-align: center; }
+
+@media (max-width: 680px) {
+  .shell { padding-top: max(18px, env(safe-area-inset-top)); }
+  .hero { align-items: center; }
+  .summary { font-size: 13px; }
+  .runtime-strip { grid-template-columns: 1fr; }
+  .control-grid { grid-template-columns: 1fr; }
+  .range-control { padding: 16px 18px; }
+}
