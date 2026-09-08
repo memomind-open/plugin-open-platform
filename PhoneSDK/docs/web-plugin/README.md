@@ -1,3 +1,5 @@
+> 本开发分支已切换 Bridge 2.0。权限与接口调试以 [权限调试说明](permission-debug.md) 为准；下列旧版文档中的 Bridge 1.0、字符串权限和旧音频方法不再适用。
+
 # Web Plugin Development Documentation (Draft)
 
 This directory contains the first public draft of the GM Web Plugin developer

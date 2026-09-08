@@ -1,4 +1,4 @@
-export const BRIDGE_VERSION = '1.0';
+export const BRIDGE_VERSION = '2.0';
 
 export const DEVICE_PROFILE = Object.freeze({
   id: 'jhv3-reference-v1',
@@ -47,18 +47,27 @@ export const AUDIO_PROFILE = Object.freeze({
   sampleRate: 16000,
   channels: 1,
   noiseReduction: true,
+  maxDurationMs: 15000,
+  maxFrames: 750,
+  maxOpusBytes: 64 * 1024,
   pickupModes: Object.freeze([
     'unchanged', 'frontFixed', 'meetingAuto', 'nonWearerFocus',
     'frontBalanced', 'frontFocus',
   ]),
-  voices: Object.freeze(['original', 'cute', 'deep', 'overlord']),
   modes: Object.freeze({
     recording: Object.freeze({
       maxDurationMs: 15000,
       maxFrames: 750,
       maxOpusBytes: 64 * 1024,
-      retention: 'host-memory',
-      exposesAudioToWeb: false,
+      transport: 'message-port',
+      payload: 'binary-envelope-v1',
+      envelope: AUDIO_STREAM_ENVELOPE,
+      exposesAudioToWeb: true,
+      delivery: Object.freeze({
+        chunkDurationMs: 100,
+        maxQueueMs: 3000,
+        overflowStrategy: 'error',
+      }),
     }),
     stream: Object.freeze({
       transport: 'message-port',
@@ -129,8 +138,9 @@ export const METHOD_NAMES = Object.freeze([
   'plugin.sendMessage',
   'audio.openCapture',
   'audio.stopCapture',
-  'audio.playRecording',
-  'audio.stopPlayback',
+  'location.getCurrentPosition',
+  'location.watchPosition',
+  'location.clearWatch',
 ]);
 
 export const EVENT_NAMES = Object.freeze([
@@ -140,7 +150,8 @@ export const EVENT_NAMES = Object.freeze([
   'device.connection',
   'plugin.message',
   'audio.captureState',
-  'audio.playbackState',
+  'location.position',
+  'location.error',
   'runtime.lifecycleChanged',
 ]);
 

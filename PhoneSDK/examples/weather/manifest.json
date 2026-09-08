@@ -3,20 +3,35 @@
   "name": "City Weather",
   "version": "0.1.0",
   "entry": "index.html",
-  "bridgeVersion": "1.0",
+  "bridgeVersion": "2.0",
   "permissions": [
     {
       "name": "network",
-      "description": "Fetch a public weather forecast",
-      "origins": ["https://api.open-meteo.com"]
+      "required": true,
+      "reason": "Fetch a public weather forecast"
     },
-    "display"
+    {
+      "name": "display",
+      "required": true
+    },
+    {
+      "name": "device.info",
+      "required": false
+    }
   ],
   "deviceRequirements": {
     "preferredPluginId": "com.gm.example.web-bridge",
     "protocols": [
-      { "id": "gm.scene", "minVersion": "1.0" },
-      { "id": "gm.scene-lz4", "minVersion": "1.0" }
+      {
+        "id": "gm.scene",
+        "minVersion": "1.0"
+      },
+      {
+        "id": "gm.scene-lz4",
+        "minVersion": "1.0"
+      }
     ]
-  }
+  },
+  "schemaVersion": 2,
+  "permissionPolicyVersion": 1
 }

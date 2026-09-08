@@ -1,3 +1,5 @@
+> 自定义配对插件：必须配对本示例对应的设备插件，声明并批准 device.messaging 通道后才能通信。当前恢复包准入与受控消息能力；不应与默认 Web Bridge 任意混配，真机功能仍需对应设备插件验收。
+
 # Novel Reader Web plugin
 
 Version 0.4.0 imports user-selected TXT and reflowable EPUB novels through the Host Bridge and

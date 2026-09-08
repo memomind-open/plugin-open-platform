@@ -3,20 +3,58 @@
   "name": "Glow Desktop",
   "version": "2.2.3",
   "entry": "index.html",
-  "bridgeVersion": "1.0",
+  "bridgeVersion": "2.0",
   "permissions": [
-    "display",
-    "device.events",
-    "storage",
-    "network"
+    {
+      "name": "display",
+      "required": true
+    },
+    {
+      "name": "device.events",
+      "required": true,
+      "scope": {
+        "types": [
+          "button",
+          "imuGesture",
+          "rawImu",
+          "connection"
+        ]
+      }
+    },
+    {
+      "name": "storage",
+      "required": true
+    },
+    {
+      "name": "network",
+      "required": true
+    },
+    {
+      "name": "device.info",
+      "required": false
+    }
   ],
   "deviceRequirements": {
     "preferredPluginId": "com.gm.example.web-bridge",
     "protocols": [
-      { "id": "gm.scene", "minVersion": "1.0" },
-      { "id": "gm.scene-lz4", "minVersion": "1.0" },
-      { "id": "gm.scene-atomic-frame", "minVersion": "1.0" },
-      { "id": "gm.device-events", "minVersion": "1.0" }
+      {
+        "id": "gm.scene",
+        "minVersion": "1.0"
+      },
+      {
+        "id": "gm.scene-lz4",
+        "minVersion": "1.0"
+      },
+      {
+        "id": "gm.scene-atomic-frame",
+        "minVersion": "1.0"
+      },
+      {
+        "id": "gm.device-events",
+        "minVersion": "1.0"
+      }
     ]
-  }
+  },
+  "schemaVersion": 2,
+  "permissionPolicyVersion": 1
 }

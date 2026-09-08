@@ -5,6 +5,7 @@ import {
   AppWebViewTransport,
   createGMPlugin,
   GMPluginError,
+  opusRecordingToOgg,
   ParentFrameTransport,
 } from '../src/index.js';
 
@@ -48,6 +49,15 @@ class FakeTransport {
   }
 }
 
+test('SDK wraps raw Opus frames as an H5-playable Ogg Blob', async () => {
+  const blob = opusRecordingToOgg({ data: Uint8Array.of(1, 2, 3, 4, 5), frameLengths: [2, 3] });
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  assert.equal(blob.type, 'audio/ogg; codecs=opus');
+  assert.equal(new TextDecoder().decode(bytes.slice(0, 4)), 'OggS');
+  assert.equal(new TextDecoder().decode(bytes.slice(28, 36)), 'OpusHead');
+  assert.throws(() => opusRecordingToOgg({ data: Uint8Array.of(1), frameLengths: [2] }), TypeError);
+});
+
 function encodeTestAudioChunk({
   sequence = 0,
   timestampUs = 0,
@@ -80,13 +90,44 @@ function encodeTestAudioChunk({
   return buffer;
 }
 
-test('SDK adds the Bridge v1 runtime envelope', async () => {
+function recordingFixture(sessionId) {
+  const channel = new MessageChannel();
+  let sent = false;
+  let finished = false;
+  channel.port1.onmessage = (event) => {
+    if (JSON.parse(event.data)?.type !== 'pull' || sent) return;
+    sent = true;
+    const buffer = encodeTestAudioChunk();
+    channel.port1.postMessage(buffer, [buffer]);
+    if (finished) channel.port1.postMessage(JSON.stringify({ type: 'end' }));
+  };
+  return {
+    ticket: {
+      mode: 'recording', sessionId, streamPort: channel.port2,
+      resolvedOptions: {
+        mode: 'recording', pickupMode: 'frontFocus', noiseReduction: true,
+        codec: 'opus', sampleRate: 16000, channels: 1, maxDurationMs: 5000,
+        delivery: { chunkDurationMs: 100, maxQueueMs: 3000, overflowStrategy: 'error' },
+      },
+    },
+    finish() {
+      finished = true;
+      if (sent) channel.port1.postMessage(JSON.stringify({ type: 'end' }));
+      return {
+        mode: 'recording', sessionId, durationMs: 40, frameCount: 2, opusBytes: 5,
+        deliveredFrameCount: 2, droppedFrameCount: 0,
+      };
+    },
+  };
+}
+
+test('SDK adds the Bridge v2 runtime envelope', async () => {
   const transport = new FakeTransport();
   const gm = createGMPlugin({ transport });
   await gm.ready();
   await gm.storage.set('score', 42);
 
-  assert.equal(transport.requests[0].version, '1.0');
+  assert.equal(transport.requests[0].version, '2.0');
   assert.equal(transport.requests[0].sessionToken, 'test-session');
   assert.equal(transport.requests[0].runtimeGeneration, 7);
   assert.equal(transport.requests[1].method, 'storage.set');
@@ -262,6 +303,21 @@ test('SDK filters stale events and exposes typed helpers', async () => {
   assert.deepEqual(gestures, ['headLower']);
 });
 
+test('SDK exposes bounded custom messaging with decoded uplink', async () => {
+ const transport=new FakeTransport(); const gm=createGMPlugin({transport});
+ await gm.ready(); await gm.plugin.sendMessage(500,Uint8Array.of(1));
+ assert.equal(transport.requests.at(-1).method,'plugin.sendMessage');
+ const received=[];gm.plugin.onMessage(m=>received.push(m));
+ transport.emit({name:'plugin.message',runtimeGeneration:7,data:{channel:500,dataBase64:'AQ=='}});
+ assert.equal(received.length,1);assert.deepEqual(received[0].data,Uint8Array.of(1));
+ transport.emit({name:'plugin.message',runtimeGeneration:6,data:{channel:500,dataBase64:'AQ=='}});
+ transport.emit({name:'plugin.message',runtimeGeneration:7,data:{channel:500,dataBase64:'_w=='}});
+ assert.equal(received.length,1);
+ await assert.rejects(gm.plugin.sendMessage(500,new Uint8Array()),{code:'INVALID_REQUEST'});
+ await assert.rejects(gm.plugin.sendMessage(500,new Uint8Array(81902)),{code:'PAYLOAD_TOO_LARGE'});
+  gm.close();
+});
+
 test('SDK exposes glasses-to-Web plugin messages as Uint8Array values', async () => {
   const transport = new FakeTransport();
   const gm = createGMPlugin({ transport });
@@ -382,6 +438,10 @@ test('App WebView bridge delivers native plugin.message events', () => {
   });
 });
 
+
+
+
+
 test('App WebView bridge joins an audio descriptor with event.ports[0]', async () => {
   let receiveWindowMessage;
   const globalObject = {
@@ -404,6 +464,7 @@ test('App WebView bridge joins an audio descriptor with event.ports[0]', async (
   });
   globalObject.__memoPluginResolve({
     requestId: 'request-audio-1', ok: true,
+    runtimeGeneration: 3,
     result: { mode: 'stream', sessionId: 'capture-app-1', streamDescriptor: descriptor },
   });
   const channel = new MessageChannel();
@@ -434,6 +495,7 @@ test('App WebView bridge joins an audio descriptor with event.ports[0]', async (
   });
   globalObject.__memoPluginResolve({
     requestId: 'request-audio-2', ok: true,
+    runtimeGeneration: 3,
     result: { mode: 'stream', sessionId: 'capture-app-2', streamDescriptor: earlyDescriptor },
   });
   const earlyResult = await earlyResponsePromise;
@@ -583,22 +645,66 @@ test('SDK rejects invalid plugin message inputs before transport', async () => {
   assert.equal(transport.requests.length, 0);
 });
 
-test('SDK exposes host-retained recording through the unified capture session', async () => {
+
+
+
+
+
+test('SDK exposes Bridge 2.0 capture and foreground location without old aliases', async()=>{
+  const transport=new FakeTransport();
+  const fixture=recordingFixture('capture-7-1');
+  transport.send=async function(request){
+    this.requests.push(request);
+    if(request.method==='audio.openCapture')return fixture.ticket;
+    if(request.method==='audio.stopCapture')return fixture.finish();
+    return {};
+  };
+  const gm=createGMPlugin({transport}); const states=[];
+  gm.audio.onCaptureState(s=>states.push(s));
+  await gm.audio.openCapture({
+    mode:'recording',noiseReduction:true,pickupMode:'frontFocus',maxDurationMs:5000,
+  });
+  await gm.audio.stopCapture('capture-7-1');
+  assert.deepEqual(transport.requests.at(-1).params,{sessionId:'capture-7-1'});
+  await gm.location.getCurrentPosition({timeoutMs:1000});
+  await gm.location.watchPosition();
+  await gm.location.clearWatch('watch-1');
+  transport.emit({name:'audio.captureState',data:{state:'capturing'},runtimeGeneration:7});
+  assert.deepEqual(transport.requests.map(r=>r.method),['audio.openCapture','audio.stopCapture','location.getCurrentPosition','location.watchPosition','location.clearWatch']);
+  assert.equal(states.length,1);
+  assert.equal(gm.audio.configure,undefined);
+  assert.equal(gm.audio.onFrames,undefined);
+});
+test('SDK ignores old audio frames and stale generation location events',async()=>{
+  const transport=new FakeTransport();const gm=createGMPlugin({transport});await gm.ready();
+  const positions=[];gm.location.onPosition(p=>positions.push(p));
+  transport.emit({name:'audio.frames',data:{framesBase64:['bad']},runtimeGeneration:7});
+  transport.emit({name:'location.position',data:{latitude:1},runtimeGeneration:6});
+  assert.equal(positions.length,0);
+});
+
+test('stopCapture requires an explicit capture ID before sending',async()=>{
+ const transport=new FakeTransport();
+ transport.send=async function(request){
+  this.requests.push(request);
+  return {
+   mode:'recording',sessionId:'capture-7-2',durationMs:20,frameCount:1,opusBytes:40,
+   deliveredFrameCount:1,droppedFrameCount:0,
+  };
+ };
+ const gm=createGMPlugin({transport});
+ for(const id of [undefined,null,'',' ',{},1])await assert.rejects(gm.audio.stopCapture(id),{code:'INVALID_REQUEST'});
+ assert.equal(transport.requests.length,0);
+ await gm.audio.stopCapture('capture-7-2');
+ assert.deepEqual(transport.requests[0].params,{sessionId:'capture-7-2'});
+});
+test('SDK returns H5-owned Opus bytes through the unified recording session', async () => {
   const transport = new FakeTransport();
+  const fixture = recordingFixture('capture-recording-1');
   transport.send = async function send(request) {
     this.requests.push(request);
-    if (request.method === 'audio.openCapture') return {
-      mode: 'recording',
-      sessionId: 'capture-recording-1',
-      resolvedOptions: {
-        mode: 'recording', pickupMode: 'frontFocus', noiseReduction: true,
-        codec: 'opus', sampleRate: 16000, channels: 1, maxDurationMs: 5000,
-      },
-    };
-    if (request.method === 'audio.stopCapture') return {
-      mode: 'recording', sessionId: 'capture-recording-1', recordingId: 'recording-1',
-      durationMs: 1200, frameCount: 60, opusBytes: 2400,
-    };
+    if (request.method === 'audio.openCapture') return fixture.ticket;
+    if (request.method === 'audio.stopCapture') return fixture.finish();
     throw new Error(`unexpected method ${request.method}`);
   };
   const gm = createGMPlugin({ transport });
@@ -614,24 +720,21 @@ test('SDK exposes host-retained recording through the unified capture session', 
     mode: 'recording', pickupMode: 'frontFocus', noiseReduction: true, maxDurationMs: 5000,
   });
   assert.equal(transport.requests[1].method, 'audio.stopCapture');
-  assert.equal(result.recordingId, 'recording-1');
+  assert.deepEqual([...result.data], [1, 2, 3, 4, 5]);
+  assert.deepEqual(result.frameLengths, [2, 3]);
+  assert.equal('recordingId' in result, false);
 });
 
-test('aborting a host-retained recording stops its capture session', async () => {
+test('aborting an H5-owned recording stops its capture session', async () => {
   const transport = new FakeTransport();
+  const fixture = recordingFixture('capture-abort-1');
   transport.send = async function send(request) {
     this.requests.push(request);
     if (request.method === 'audio.openCapture') return {
-      mode: 'recording', sessionId: 'capture-abort-1',
-      resolvedOptions: {
-        mode: 'recording', pickupMode: 'unchanged', noiseReduction: true,
-        codec: 'opus', sampleRate: 16000, channels: 1, maxDurationMs: 15000,
-      },
+      ...fixture.ticket,
+      resolvedOptions: { ...fixture.ticket.resolvedOptions, pickupMode: 'unchanged', maxDurationMs: 15000 },
     };
-    if (request.method === 'audio.stopCapture') return {
-      mode: 'recording', sessionId: 'capture-abort-1', recordingId: 'recording-abort-1',
-      durationMs: 20, frameCount: 1, opusBytes: 40,
-    };
+    if (request.method === 'audio.stopCapture') return fixture.finish();
     throw new Error(`unexpected method ${request.method}`);
   };
   const controller = new AbortController();
@@ -640,7 +743,7 @@ test('aborting a host-retained recording stops its capture session', async () =>
   controller.abort();
   const result = await capture.stop();
 
-  assert.equal(result.recordingId, 'recording-abort-1');
+  assert.equal(result.data.byteLength, 5);
   assert.deepEqual(transport.requests.map(({ method }) => method), [
     'audio.openCapture', 'audio.stopCapture',
   ]);
@@ -730,4 +833,20 @@ test('SDK rejects a malformed native audio binary envelope', async () => {
     name: 'GMPluginError', code: 'INTERNAL_ERROR',
   });
   hostPort.close();
+});
+
+for (const kind of ['app','parent']) test(kind+' rejects stale reply before requestId resolution',async()=>{
+  let listener;
+  const parent={postMessage(){}};
+  const windowObject={parent,addEventListener(n,fn){listener=fn;},removeEventListener(){}};
+  const globalObject={MemoPluginBridge:{postMessage(){}}};
+  const transport=kind==='app'?new AppWebViewTransport({globalObject}):new ParentFrameTransport({windowObject,parentOrigin:'http://host.test'});
+  transport.replaceBootstrap({sessionToken:'token',runtimeGeneration:2});
+  const pending=transport.send({requestId:'same',runtimeGeneration:2,method:'runtime.ping'});
+  const deliver=response=>kind==='app'?transport.resolve(response):listener({source:parent,origin:'http://host.test',data:{type:'gm-plugin:response',response}});
+  deliver({requestId:'same',runtimeGeneration:1,ok:true,result:'stale'});
+  assert.equal(transport.pending.size,1);
+  deliver({requestId:'same',runtimeGeneration:2,ok:true,result:'current'});
+  assert.equal(await pending,'current');
+  transport.close?.();
 });

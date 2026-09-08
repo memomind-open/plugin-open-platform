@@ -3,14 +3,50 @@
   "name": "Fighter Arena Controller",
   "version": "0.1.0",
   "entry": "index.html",
-  "bridgeVersion": "1.0",
-  "permissions": ["device.events"],
+  "bridgeVersion": "2.0",
+  "permissions": [
+    {
+      "name": "device.events",
+      "required": true,
+      "scope": {
+        "types": [
+          "button",
+          "imuGesture",
+          "rawImu",
+          "connection"
+        ]
+      }
+    },
+    {
+      "name": "device.info",
+      "required": false
+    },
+    {
+      "name": "device.messaging",
+      "required": false,
+      "scope": {
+        "channels": [
+          17991,
+          17992
+        ]
+      }
+    },
+    {
+      "name": "audio.playback",
+      "required": false
+    }
+  ],
   "deviceRequirements": {
     "preferredPluginId": "com.gm.game.fighter_arena",
     "requiredPluginId": "com.gm.game.fighter_arena",
     "minPluginVersion": "29",
     "protocols": [
-      { "id": "gm.fighter-control", "minVersion": "2.0" }
+      {
+        "id": "gm.fighter-control",
+        "minVersion": "2.0"
+      }
     ]
-  }
+  },
+  "schemaVersion": 2,
+  "permissionPolicyVersion": 1
 }

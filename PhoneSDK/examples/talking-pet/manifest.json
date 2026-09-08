@@ -1,15 +1,61 @@
 {
   "id": "com.memomind.example.talking-pet",
   "name": "Audio Talking Pet",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "entry": "index.html",
-  "bridgeVersion": "1.0",
-  "permissions": ["device.events", "storage", "audio.capture"],
+  "bridgeVersion": "2.0",
+  "permissions": [
+    {
+      "name": "device.events",
+      "required": true,
+      "scope": {
+        "types": [
+          "button",
+          "imuGesture",
+          "rawImu",
+          "connection"
+        ]
+      }
+    },
+    {
+      "name": "storage",
+      "required": true
+    },
+    {
+      "name": "audio.capture",
+      "required": false
+    },
+    {
+      "name": "device.info",
+      "required": false
+    },
+    {
+      "name": "device.messaging",
+      "required": false,
+      "scope": {
+        "channels": [
+          19792
+        ]
+      }
+    },
+    {
+      "name": "audio.playback",
+      "required": false
+    }
+  ],
   "deviceRequirements": {
     "preferredPluginId": "com.memomind.example.talking-pet",
     "protocols": [
-      { "id": "gm.talking-pet", "minVersion": "1.0" },
-      { "id": "gm.device-events", "minVersion": "1.0" }
+      {
+        "id": "gm.talking-pet",
+        "minVersion": "1.0"
+      },
+      {
+        "id": "gm.device-events",
+        "minVersion": "1.0"
+      }
     ]
-  }
+  },
+  "schemaVersion": 2,
+  "permissionPolicyVersion": 1
 }

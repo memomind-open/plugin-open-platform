@@ -1,0 +1,54 @@
+{
+  "id": "com.memomind.debug.permissions",
+  "name": "插件能力实验室 · Bridge 2.0",
+  "version": "0.2.5",
+  "entry": "index.html",
+  "schemaVersion": 2,
+  "permissionPolicyVersion": 1,
+  "bridgeVersion": "2.0",
+  "permissions": [
+    {
+      "name": "storage",
+      "required": false
+    },
+    {
+      "name": "display",
+      "required": false
+    },
+    {
+      "name": "device.info",
+      "required": false
+    },
+    {
+      "name": "device.events",
+      "required": false,
+      "scope": {
+        "types": [
+          "button",
+          "imuGesture",
+          "connection"
+        ]
+      }
+    },
+    {
+      "name": "files.user-selected",
+      "required": false
+    },
+    {
+      "name": "location.foreground",
+      "required": false
+    },
+    {
+      "name": "audio.playback",
+      "required": false
+    },
+    {
+      "name": "audio.capture",
+      "required": false
+    },
+    {
+      "name": "network",
+      "required": false
+    }
+  ]
+}

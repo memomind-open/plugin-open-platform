@@ -58,7 +58,13 @@ test('Audio Capture Lab stays on the native binary audio path', async () => {
   const plugin = await readFile(`${root}/examples/audio-capture-lab/plugin.js`, 'utf8');
   const manifest = JSON.parse(await readFile(`${root}/examples/audio-capture-lab/manifest.json`, 'utf8'));
   const gmp = await readFile(`${root}/../GlassSDK/examples/audio_capture_lab/audio_capture_lab.c`, 'utf8');
-  assert.deepEqual(manifest.permissions, ['audio.capture', 'device.events']);
+  assert.deepEqual(manifest.permissions, [
+    { name: 'audio.capture', required: true },
+    { name: 'audio.playback', required: false },
+    { name: 'device.events', required: true, scope: { types: ['button', 'connection'] } },
+    { name: 'device.info', required: true },
+    { name: 'device.messaging', required: false, scope: { channels: [0x414c] } },
+  ]);
   assert.equal(manifest.deviceRequirements.requiredPluginId, 'com.memomind.demo.audio-capture-lab');
   assert.match(plugin, /session\.stream\.getReader\(\)/);
   assert.match(plugin, /await reader\.read\(\)/);
@@ -86,7 +92,6 @@ test('Audio Capture Lab covers every visible label in English and Chinese', asyn
   const keys = [...html.matchAll(/data-i18n="([^"]+)"/g)].map((match) => match[1]);
   const environment = (language) => ({
     navigator: { language },
-    localStorage: { getItem: () => null, setItem() {} },
   });
   const english = createI18n(environment('en-US'));
   const chinese = createI18n(environment('zh-CN'));
@@ -99,6 +104,34 @@ test('Audio Capture Lab covers every visible label in English and Chinese', asyn
   assert.equal(chinese.language, 'zh');
 });
 
+test('Audio Capture Lab starts and switches language without browser storage', () => {
+  const translatedNodes = [
+    { dataset: { i18n: 'language.switch' }, textContent: '' },
+  ];
+  const document = {
+    documentElement: { lang: '' },
+    querySelectorAll: () => translatedNodes,
+  };
+  const environment = {
+    navigator: { language: 'en-US' },
+    document,
+    get localStorage() {
+      throw new DOMException('Blocked by the plugin sandbox', 'SecurityError');
+    },
+  };
+
+  const i18n = createI18n(environment);
+  i18n.apply();
+  assert.equal(i18n.language, 'en');
+  assert.equal(document.documentElement.lang, 'en');
+  assert.equal(translatedNodes[0].textContent, '中文');
+
+  i18n.toggle();
+  assert.equal(i18n.language, 'zh');
+  assert.equal(document.documentElement.lang, 'zh-CN');
+  assert.equal(translatedNodes[0].textContent, 'EN');
+});
+
 test('Audio Capture Lab exposes only the five active pickup modes', async () => {
   const html = await readFile(`${root}/examples/audio-capture-lab/index.html`, 'utf8');
   const values = [...html.matchAll(/<option value="(frontFixed|meetingAuto|nonWearerFocus|frontBalanced|frontFocus|unchanged)"/g)]
@@ -109,12 +142,14 @@ test('Audio Capture Lab exposes only the five active pickup modes', async () => 
   assert.match(html, /<option value="frontBalanced"[^>]* selected>/);
 });
 
-test('Audio Capture Lab playback stays on the original voice without a voice selector', async () => {
+test('Audio Capture Lab plays transferred Opus in H5 without native playback methods', async () => {
   const html = await readFile(`${root}/examples/audio-capture-lab/index.html`, 'utf8');
   const plugin = await readFile(`${root}/examples/audio-capture-lab/plugin.js`, 'utf8');
   assert.doesNotMatch(html, /voice-effect|playback\.voice|voice\.(?:original|cute|deep|overlord)/);
   assert.doesNotMatch(plugin, /voiceEffect|voice\.(?:cute|deep|overlord)/);
-  assert.match(plugin, /gm\.audio\.playRecording\(\{ recordingId: recordingResult\.recordingId \}\)/);
+  assert.match(plugin, /opusRecordingToOgg\(recordingResult\)/);
+  assert.match(plugin, /recordingPlayer\.play\(\)/);
+  assert.doesNotMatch(plugin, /gm\.audio\.(?:playRecording|stopPlayback)/);
 });
 
 test('Audio Capture Lab separates recording results from stream-only metrics', async () => {

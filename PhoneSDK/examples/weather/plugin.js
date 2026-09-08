@@ -49,7 +49,7 @@
       }, 7000);
       pendingBridgeCalls.set(requestId, { resolve, reject, timer });
       window.MemoPluginBridge.postMessage(JSON.stringify({
-        version: '1.0',
+        version: '2.0',
         sessionToken: bridgeToken,
         requestId,
         method,

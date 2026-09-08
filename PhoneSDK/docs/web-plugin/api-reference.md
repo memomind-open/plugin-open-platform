@@ -1,3 +1,5 @@
+> Bridge 2.0 开发分支说明：权限与接口变更以 [权限调试说明](permission-debug.md) 为准。本文旧版字符串权限和旧音频接口不再适用。
+
 # Bridge v1 API Overview
 
 ## Runtime
@@ -123,58 +125,16 @@ Events include `device.button`, `device.imuGesture`, `device.rawImu`, and
 to or unsubscribing from device events requires the `device.events` manifest
 permission.
 
-## Plugin Message
+## Custom messages — not available in the first release
 
-Use `plugin.sendMessage` to send a custom binary message to the device plugin
-currently running on the glasses:
-
-```js
-const frame = Uint8Array.of(2, sequence, buttons >> 8, buttons & 0xff);
-const result = await gm.plugin.sendMessage(0x4647, frame);
-```
-
-Receive a generic binary message sent by the currently running glasses plugin:
-
-```js
-const offMessage = gm.plugin.onMessage(({ channel, data }) => {
-  if (channel !== 0x4648) return;
-  console.log([...data]); // data is a Uint8Array
-});
-
-// Remove the listener when it is no longer needed.
-offMessage();
-```
-
-The Bridge event name is `plugin.message`. Its wire data is
-`{ channel, dataBase64 }`; `gm.plugin.onMessage()` validates the channel and
-payload and exposes the decoded payload as `Uint8Array`. The event uses the
-active `runtimeGeneration`, is not part of `device.subscribeEvents`, and does
-not require a manifest permission.
-
-An App Host forwards an uplink by invoking the WebView callback with the same
-event envelope:
-
-```js
-window.__memoPluginEmit({
-  name: 'plugin.message',
-  data: { channel, dataBase64 },
-  runtimeGeneration,
-});
-```
-
-- `channel` must be an integer from `0` through `65535`.
-- `data` must be a non-empty `Uint8Array` no larger than 81,901 bytes.
-- Plugin messaging is available by default and requires no manifest permission.
-- A successful send means that the device acknowledged the message and
-  delivered it to the running GMP. It does not mean that the GMP completed its
-  business logic or display update.
+`device.messaging`, `plugin.sendMessage`, and `plugin.message` are not public capabilities. Manifests declaring this permission are rejected; raw calls return `METHOD_NOT_FOUND`. Use `display` for graphics and `device.events` for input. The internal Bluetooth transport remains available to the Host, not to H5 plugins.
 
 ## Native glasses audio
 
 Plugins declaring `audio.capture` can use the glasses microphone when
 `(await gm.runtime.getCapabilities()).audio` is present:
 
-### Short recording retained by the Host
+### Short recording delivered to H5
 
 ```js
 const capture = await gm.audio.openCapture({
@@ -186,14 +146,16 @@ const capture = await gm.audio.openCapture({
 
 // Later, after an explicit user action or when maxDurationMs is reached:
 const result = await capture.stop();
-await gm.audio.playRecording({ recordingId: result.recordingId, voice: 'cute' });
+const audio = new Audio(URL.createObjectURL(opusRecordingToOgg(result)));
+await audio.play();
 ```
 
-In `recording` mode, encoded audio stays in Host memory. The Web plugin receives
-only metadata and a short-lived `recordingId`; it never receives audio bytes.
-The Host limits a recording to 15 seconds, 750 Opus frames, and 64 KiB. A
-recording is released when the runtime is hidden, suspended, reloaded, closed,
-or replaced.
+In `recording` mode, the SDK receives the encoded Opus frames through a binary
+MessagePort and returns `data: Uint8Array` plus `frameLengths` from
+`capture.stop()`. The Host limits a recording to 15 seconds, 750 Opus frames,
+and 64 KiB. The plugin can decode, transform, upload, or play this data subject
+to its other granted permissions. `opusRecordingToOgg(result)` is a convenience
+helper for direct H5 `<audio>` playback.
 
 ### Real-time binary stream
 
@@ -317,22 +279,21 @@ Use `profile: 'custom'` to set `chunkDurationMs` (20-200 ms in 20 ms steps),
 `drop-newest`, or `error`). A stream is unlimited by default; set
 `maxDurationMs` to a value from 1000 through 3600000 when a hard stop is needed.
 
-Capture is always Opus, 16 kHz, mono, with 20 ms frames. Only one capture or
-playback operation can own the glasses audio channel at a time.
+Capture is always Opus, 16 kHz, mono, with 20 ms frames. Only one native capture
+operation can own the glasses audio channel at a time. Playback is owned by H5.
 
 ### State and lifecycle
 
 ```js
 const offCapture = gm.audio.onCaptureState(console.log);
-const offPlayback = gm.audio.onPlaybackState(console.log);
 ```
 
-The control methods are `audio.openCapture`, `audio.stopCapture`,
-`audio.playRecording`, and `audio.stopPlayback`. Prefer the capture session's
-`stop()` method over calling `stopCapture(sessionId)` directly. Capture state is
-reported through `audio.captureState`; playback uses `audio.playbackState`.
-Supported pickup modes, voice effects, limits, and stream profiles are
-advertised in the audio capability object.
+The native control methods are `audio.openCapture` and `audio.stopCapture`.
+Prefer the capture session's `stop()` method because recording sessions return
+their transferred Opus data there. Capture state is reported through
+`audio.captureState`. `audio.playback` has no Bridge methods; it controls whether
+the WebView may use H5 media playback. Supported pickup modes, limits, and
+stream profiles are advertised in the audio capability object.
 
 The App shows native consent and a recording indicator outside the WebView.
 Hiding, suspending, reloading, or closing the plugin stops audio and closes any

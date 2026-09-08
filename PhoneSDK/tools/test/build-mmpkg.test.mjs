@@ -18,8 +18,8 @@ test('builds an App-compatible mmpkg with a complete SHA-256 file table', async 
     name: 'Weather',
     version: '1.2.3',
     entry: 'index.html',
-    bridgeVersion: '1.0',
-    permissions: ['display', 'storage', 'files.user-selected'],
+    schemaVersion: 2, permissionPolicyVersion: 1, bridgeVersion: '2.0',
+    permissions: ['display', 'storage', 'files.user-selected'].map(name=>({name,required:true})),
     deviceRequirements: {
       preferredPluginId: 'com.gm.example.web-bridge',
       protocols: [{ id: 'gm.scene', minVersion: '1.0' }],
@@ -35,7 +35,7 @@ test('builds an App-compatible mmpkg with a complete SHA-256 file table', async 
 
   assert.equal(result.id, 'com.example.weather');
   assert.deepEqual([...entries.keys()], ['manifest.json', 'assets/app.js', 'index.html']);
-  assert.equal(manifest.schemaVersion, 1);
+  assert.equal(manifest.schemaVersion, 2);
   assert.deepEqual(manifest.deviceRequirements, {
     preferredPluginId: 'com.gm.example.web-bridge',
     protocols: [{ id: 'gm.scene', minVersion: '1.0' }],
@@ -54,7 +54,7 @@ test('rejects symlinks and output paths inside the plugin directory', async (con
     name: 'Invalid',
     version: '1.0.0',
     entry: 'index.html',
-    bridgeVersion: '1.0',
+    schemaVersion: 2, permissionPolicyVersion: 1, bridgeVersion: '2.0',
     permissions: [],
   }));
   await writeFile(join(root, 'index.html'), '<!doctype html>');

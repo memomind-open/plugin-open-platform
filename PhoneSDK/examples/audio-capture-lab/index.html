@@ -63,8 +63,8 @@
 
         <section class="panel mode-settings" id="recording-settings">
           <div class="mode-summary">
-            <div><span data-i18n="recording.eyebrow">RECORDING</span><h2 data-i18n="recording.title">Host-retained audio</h2></div>
-            <span class="mode-chip" data-i18n="recording.chip">Audio stays in Host</span>
+            <div><span data-i18n="recording.eyebrow">RECORDING</span><h2 data-i18n="recording.title">Opus delivered to H5</h2></div>
+            <span class="mode-chip" data-i18n="recording.chip">H5 owns the result</span>
           </div>
           <details class="advanced-section">
             <summary data-i18n="recording.advanced">Advanced recording settings</summary>
@@ -127,6 +127,7 @@
             <button id="play-recording" type="button" disabled data-i18n="action.play">Play</button>
             <button id="stop-playback" type="button" disabled data-i18n="action.stop">Stop</button>
           </div>
+          <audio id="recording-player" controls preload="none"></audio>
         </section>
 
         <section class="quick-metrics recording-metrics" id="recording-metrics" aria-label="Recording metrics">

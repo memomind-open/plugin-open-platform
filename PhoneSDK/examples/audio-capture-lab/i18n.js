@@ -27,8 +27,8 @@ const messages = Object.freeze({
     'pickup.frontBalanced': 'Front balanced',
     'pickup.frontFocus': 'Front focus',
     'recording.eyebrow': 'RECORDING',
-    'recording.title': 'Host-retained audio',
-    'recording.chip': 'Audio stays in Host',
+    'recording.title': 'Opus delivered to H5',
+    'recording.chip': 'H5 owns the result',
     'recording.advanced': 'Advanced recording settings',
     'duration.maximum': 'Maximum Duration',
     'stream.eyebrow': 'REAL-TIME STREAM',
@@ -89,7 +89,7 @@ const messages = Object.freeze({
     'notice.ready': 'Audio API and the paired glasses app are ready.',
     'notice.openingRecording': 'Opening recording capture...',
     'notice.openingStream': 'Opening real-time stream...',
-    'notice.recording': 'Recording is retained by the Host.',
+    'notice.recording': 'Recording Opus is being transferred to H5.',
     'notice.streaming': 'Streaming binary Opus chunks to Web.',
     'notice.aborted': 'Capture was aborted before it opened.',
     'notice.stopping': 'Stopping capture and draining the stream tail...',
@@ -103,7 +103,7 @@ const messages = Object.freeze({
     'notice.captureFailed': 'Capture failed: {message}',
     'notice.streamFailed': 'Stream failed: {message}',
     'notice.stopFailed': 'Stop failed: {message}',
-    'notice.playback': 'Playing the Host-retained recording.',
+    'notice.playback': 'H5 is playing the received Opus recording.',
     'notice.playbackFailed': 'Playback failed: {message}',
     'notice.playbackGeneric': 'Playback failed.',
     'notice.playbackStopFailed': 'Playback stop failed: {message}',
@@ -141,8 +141,8 @@ const messages = Object.freeze({
     'pickup.frontBalanced': '正前方均衡',
     'pickup.frontFocus': '正前方聚焦',
     'recording.eyebrow': '短录音',
-    'recording.title': '宿主保留音频',
-    'recording.chip': '音频不进入 Web',
+    'recording.title': 'Opus 交给 H5',
+    'recording.chip': '结果归 H5 使用',
     'recording.advanced': '高级录音设置',
     'duration.maximum': '最长时间',
     'stream.eyebrow': '实时音频流',
@@ -167,7 +167,7 @@ const messages = Object.freeze({
     'action.clear': '清空',
     'action.abort': '中止当前会话',
     'playback.eyebrow': '最近一次录音',
-    'playback.title': '宿主播放',
+    'playback.title': 'H5 播放',
     'metric.duration': '录音时长',
     'metric.opusFrames': 'Opus 帧数',
     'metric.encodedSize': '编码大小',
@@ -203,7 +203,7 @@ const messages = Object.freeze({
     'notice.ready': '音频 API 和配套眼镜应用已就绪。',
     'notice.openingRecording': '正在启动短录音...',
     'notice.openingStream': '正在启动实时音频流...',
-    'notice.recording': '录音由宿主保留。',
+    'notice.recording': '正在把录音 Opus 数据传给 H5。',
     'notice.streaming': '正在向 Web 传输二进制 Opus 音频分片。',
     'notice.aborted': '采集在启动完成前已中止。',
     'notice.stopping': '正在停止采集并排空流尾部数据...',
@@ -217,7 +217,7 @@ const messages = Object.freeze({
     'notice.captureFailed': '采集失败：{message}',
     'notice.streamFailed': '实时流失败：{message}',
     'notice.stopFailed': '停止失败：{message}',
-    'notice.playback': '正在播放宿主录音。',
+    'notice.playback': 'H5 正在播放收到的 Opus 录音。',
     'notice.playbackFailed': '播放失败：{message}',
     'notice.playbackGeneric': '播放失败。',
     'notice.playbackStopFailed': '停止播放失败：{message}',
@@ -229,13 +229,8 @@ const messages = Object.freeze({
   }),
 });
 
-const STORAGE_KEY = 'audio-capture-lab.language';
-
 export function createI18n(environment = globalThis) {
-  const preferred = environment.localStorage?.getItem(STORAGE_KEY);
-  const language = preferred === 'zh' || preferred === 'en'
-    ? preferred
-    : String(environment.navigator?.language ?? 'en').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+  let language = String(environment.navigator?.language ?? 'en').toLowerCase().startsWith('zh') ? 'zh' : 'en';
 
   const t = (key, values = {}) => {
     const template = messages[language][key] ?? messages.en[key] ?? key;
@@ -244,19 +239,20 @@ export function createI18n(environment = globalThis) {
       template,
     );
   };
+  const apply = (root = environment.document) => {
+    root.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+    for (const node of root.querySelectorAll('[data-i18n]')) {
+      node.textContent = t(node.dataset.i18n);
+    }
+  };
 
   return Object.freeze({
-    language,
+    get language() { return language; },
     t,
-    apply(root = environment.document) {
-      root.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
-      for (const node of root.querySelectorAll('[data-i18n]')) {
-        node.textContent = t(node.dataset.i18n);
-      }
-    },
+    apply,
     toggle() {
-      environment.localStorage?.setItem(STORAGE_KEY, language === 'zh' ? 'en' : 'zh');
-      environment.location.reload();
+      language = language === 'zh' ? 'en' : 'zh';
+      apply();
     },
   });
 }

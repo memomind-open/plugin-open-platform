@@ -39,7 +39,7 @@ describe('Aphrodite Bridge v1 SDK', () => {
     target.__memoPluginBootstrap?.('token-a', 3);
     const promise = client.call<{ ready: boolean }>('runtime.ready');
     expect(messages[0]).toMatchObject({
-      version: '1.0', sessionToken: 'token-a', method: 'runtime.ready', params: {}, runtimeGeneration: 3,
+      version: '2.0', sessionToken: 'token-a', method: 'runtime.ready', params: {}, runtimeGeneration: 3,
     });
     const requestId = messages[0].requestId as string;
     target.__memoPluginResolve?.({ requestId, ok: true, result: { ready: true }, runtimeGeneration: 3 });

@@ -1,3 +1,5 @@
+> 自定义配对插件：必须配对本示例对应的设备插件，声明并批准 device.messaging 通道后才能通信。当前恢复包准入与受控消息能力；不应与默认 Web Bridge 任意混配，真机功能仍需对应设备插件验收。
+
 # Audio Talking Pet
 
 An original talking-pet game built as a static GM Web Plugin example. Memo can
@@ -27,12 +29,11 @@ When the Host does not advertise native glasses audio, this example falls back
 to browser `MediaRecorder`. It never falls back after a native audio failure:
 the user sees the actual device or permission error instead.
 
-The native flow registers `gm.audio.onCaptureState` and
-`gm.audio.onPlaybackState`, then opens `mode: 'recording'` with `frontFocus`
-pickup and noise reduction. Audio remains entirely inside the Host. Stopping
-returns only a `recordingId`, which is played with the allowlisted `cute` voice
-effect. This simple pet example intentionally does not consume the real-time
-binary stream API.
+The native flow registers `gm.audio.onCaptureState`, then opens
+`mode: 'recording'` with `frontFocus` pickup and noise reduction. Stopping
+returns Opus bytes and frame boundaries to H5. The page wraps those packets in
+Ogg and plays them with `<audio>` at a higher playback rate for the pet effect.
+This simple pet example intentionally does not consume the real-time stream API.
 
 ## Device controls
 

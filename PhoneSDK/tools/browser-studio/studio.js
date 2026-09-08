@@ -1,9 +1,12 @@
+import {requestDebugApprovals} from '/contract/debug-consent.js';
+import {validateManifestPolicy} from '/contract/permission-policy.js';
 import { CanvasDeviceRenderer } from '@memomind/gm-plugin-device-renderer';
 import { StudioRuntime } from '@memomind/gm-plugin-studio-runtime';
 
 const frame = document.querySelector('#plugin-frame');
 const renderer = new CanvasDeviceRenderer(document.querySelector('#device-canvas'));
-const runtime = new StudioRuntime({ renderer, filePicker: pickLocalFiles });
+let runtime = new StudioRuntime({ renderer, filePicker: pickLocalFiles });
+let launchGeneration = 0;
 const logs = document.querySelector('#logs');
 const transportStatus = document.querySelector('#transport-status');
 
@@ -14,7 +17,7 @@ const log = (kind, value) => {
   while (logs.children.length > 100) logs.lastElementChild.remove();
 };
 
-const postBootstrap = () => frame.contentWindow?.postMessage({ type: 'gm-plugin:bootstrap', bootstrap: runtime.bootstrap }, '*');
+const postBootstrap = () => runtime.lifecycleState === 'running' && frame.contentWindow?.postMessage({ type: 'gm-plugin:bootstrap', bootstrap: runtime.bootstrap }, '*');
 
 window.addEventListener('message', async (message) => {
   if (message.source !== frame.contentWindow) return;
@@ -25,7 +28,9 @@ window.addEventListener('message', async (message) => {
   if (message.data?.type !== 'gm-plugin:request') return;
   const request = message.data.request;
   log('REQUEST', { method: request?.method, params: summarizeParams(request?.params) });
-  const response = await runtime.handle(request);
+  const current = runtime;
+  const response = await current.handle(request);
+  if (current !== runtime || ['stopped','failed'].includes(current.lifecycleState)) return;
   log(response.ok ? 'RESPONSE' : 'ERROR', response.ok ? response.result : response.error);
   updateTransportStatus(response);
   const transfer = response.ok && response.result?.streamPort?.postMessage
@@ -34,19 +39,35 @@ window.addEventListener('message', async (message) => {
   frame.contentWindow?.postMessage({ type: 'gm-plugin:response', response }, '*', transfer);
 });
 
-runtime.onEvent((event) => {
+function subscribeRuntime() { runtime.onEvent((event) => {
   log('EVENT', { name: event.name, data: event.data });
   frame.contentWindow?.postMessage({ type: 'gm-plugin:event', event }, '*');
 });
 
+}
 frame.addEventListener('load', postBootstrap);
 // The iframe can finish loading before this module installs its load listener.
 // Sending once immediately makes bootstrap delivery independent of load order.
 postBootstrap();
-document.querySelector('#reload').addEventListener('click', () => {
-  runtime.invalidateFileStreams();
-  frame.contentWindow.location.reload();
-});
+async function launch() {
+  const generation = ++launchGeneration;
+  runtime.setLifecycle('stopped');
+  frame.src = 'about:blank';
+  const manifest = await (await fetch('/plugin/manifest.json')).json();
+  const permissions = validateManifestPolicy(manifest);
+  const approvals = await requestDebugApprovals(permissions);
+  if (approvals === null || generation !== launchGeneration) return;
+  // Reloading this fixed workspace keeps its data, but never reuses its grants.
+  runtime = new StudioRuntime({renderer,filePicker:pickLocalFiles,permissions,approvals,runtimeGeneration:generation,
+    storage:runtime.storage,fileStore:runtime.fileStore});
+  subscribeRuntime();
+  frame.src = '/plugin/' + manifest.entry;
+}
+document.querySelector('#reload').addEventListener('click',()=>void launch().catch(e=>log('ERROR',e.message)));
+const revoke=document.createElement('button'); revoke.textContent='撤销授权并停止';
+revoke.onclick=()=>{++launchGeneration;runtime.setLifecycle('stopped');runtime.approvals={};frame.src='about:blank';log('AUTH','已撤销，下次启动重新授权');};
+document.querySelector('#reload').after(revoke);
+void launch().catch(e=>log('ERROR',e.message));
 document.querySelector('#clear').addEventListener('click', () => renderer.clear());
 document.querySelector('#clear-log').addEventListener('click', () => logs.replaceChildren());
 
@@ -146,3 +167,5 @@ function pickLocalFiles({ extensions, allowMultiple }) {
     input.click();
   });
 }
+
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) runtime.setLifecycle('suspended'); else if(runtime.lifecycleState==='suspended') runtime.setLifecycle('running'); });

@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev:permissions": "node tools/run-browser-studio.mjs --plugin examples/permission-debug",
     "dev": "node tools/run-browser-studio.mjs --plugin examples/app-counter",
     "build:devkit": "node tools/build-devkit.mjs",
     "sync:example-sdk": "node tools/sync-example-sdk.mjs",

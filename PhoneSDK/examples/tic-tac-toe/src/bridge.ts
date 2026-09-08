@@ -98,7 +98,7 @@ export class MemoBridgeClient {
       });
       try {
         transport.postMessage(JSON.stringify({
-          version: '1.0',
+          version: '2.0',
           sessionToken: configuration.sessionToken,
           requestId,
           method,
