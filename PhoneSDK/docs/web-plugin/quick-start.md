@@ -1,3 +1,5 @@
+> Bridge 2.0 开发分支说明：权限与接口变更以 [权限调试说明](permission-debug.md) 为准。本文旧版字符串权限和旧音频接口不再适用。
+
 # Quick Start
 
 The public PhoneSDK is available directly in Plugin Open Platform and as

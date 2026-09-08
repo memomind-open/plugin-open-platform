@@ -27,6 +27,7 @@ await copy('packages/studio-runtime/src', 'internal/packages/studio-runtime/src'
 await copy('packages/web-sdk/src', 'internal/packages/web-sdk/src');
 await copy('examples/app-counter', 'examples/app-counter');
 await copy('tools/build-mmpkg.mjs', 'tools/build-mmpkg.mjs');
+await copy('packages/bridge-contract/src/permission-policy.js', 'packages/bridge-contract/src/permission-policy.js');
 await copy('tools/run-browser-studio.mjs', 'studio/gm-plugin-studio.mjs');
 await copy('tools/browser-studio-paths.mjs', 'studio/browser-studio-paths.mjs');
 await copy('tools/devkit/README.md', 'README.md');
@@ -49,7 +50,7 @@ await writeFile(resolve(staging, 'package.json'), `${JSON.stringify({
 await writeFile(resolve(staging, 'DEVKIT-MANIFEST.json'), `${JSON.stringify({
   name: 'GM Phone Plugin DevKit',
   version,
-  bridgeVersion: '1.0',
+  bridgeVersion: '2.0',
   distribution: 'public-devkit-zip',
   node: '>=18.0.0',
   browserStudio: {

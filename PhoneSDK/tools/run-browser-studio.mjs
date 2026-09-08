@@ -16,6 +16,7 @@ if (!existsSync(resolve(pluginRoot, 'index.html'))) {
 }
 
 const mounts = [
+  ['/bridge-contract/src/', resolve(repositoryRoot, 'packages/bridge-contract/src')],
   ['/plugin/', pluginRoot],
   ['/sdk/', resolve(repositoryRoot, 'packages/web-sdk/src')],
   ['/contract/', resolve(repositoryRoot, 'packages/bridge-contract/src')],

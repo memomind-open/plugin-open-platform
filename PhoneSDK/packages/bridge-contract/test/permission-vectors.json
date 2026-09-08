@@ -1,0 +1,540 @@
+{
+  "fixtureVersion": 1,
+  "revision": "p7-handoff-r1",
+  "status": "app-contract-only-not-platform-acceptance",
+  "versions": {
+    "schemaVersion": 2,
+    "permissionPolicyVersion": 1,
+    "bridgeVersion": "2.0"
+  },
+  "permissions": [
+    "storage",
+    "files.user-selected",
+    "display",
+    "device.info",
+    "device.events",
+    "device.messaging",
+    "audio.capture",
+    "audio.playback",
+    "network",
+    "location.foreground"
+  ],
+  "methodPermissions": {
+    "runtime.ready": null,
+    "runtime.ping": null,
+    "runtime.getBridgeVersion": null,
+    "runtime.getCapabilities": null,
+    "runtime.getLifecycleState": null,
+    "storage.get": "storage",
+    "storage.set": "storage",
+    "storage.remove": "storage",
+    "storage.clear": "storage",
+    "files.pick": "files.user-selected",
+    "files.list": "files.user-selected",
+    "files.stat": "files.user-selected",
+    "files.openRead": "files.user-selected",
+    "files.getUsage": "files.user-selected",
+    "files.delete": "files.user-selected",
+    "display.createPage": "display",
+    "display.closePage": "display",
+    "display.updateText": "display",
+    "display.updateImage": "display",
+    "display.updateImageLz4": "display",
+    "display.rebuildPage": "display",
+    "display.beginFrame": "display",
+    "display.updateFrameImageLz4": "display",
+    "device.getInfo": "device.info",
+    "device.subscribeEvents": "device.events",
+    "device.unsubscribeEvents": "device.events",
+    "audio.openCapture": "audio.capture",
+    "audio.stopCapture": "audio.capture",
+    "location.getCurrentPosition": "location.foreground",
+    "location.watchPosition": "location.foreground",
+    "location.clearWatch": "location.foreground",
+    "plugin.sendMessage": "device.messaging"
+  },
+  "declarationCases": [
+    {
+      "id": "empty",
+      "input": [],
+      "normalized": [],
+      "error": null
+    },
+    {
+      "id": "sort-scopes",
+      "input": [
+        {
+          "name": "storage",
+          "required": true
+        },
+        {
+          "name": "device.events",
+          "required": false,
+          "scope": {
+            "types": [
+              "connection",
+              "button"
+            ]
+          }
+        }
+      ],
+      "normalized": [
+        {
+          "name": "device.events",
+          "required": false,
+          "scope": {
+            "types": [
+              "button",
+              "connection"
+            ]
+          }
+        },
+        {
+          "name": "storage",
+          "required": true
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "old-shorthand",
+      "input": [
+        "storage"
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "INVALID_PERMISSION_CONFIG"
+      }
+    },
+    {
+      "id": "messaging-scoped",
+      "input": [
+        {
+          "name": "device.messaging",
+          "required": false,
+          "scope": {
+            "channels": [
+              32766
+            ]
+          }
+        }
+      ],
+      "normalized": [
+        {
+          "name": "device.messaging",
+          "required": false,
+          "scope": {
+            "channels": [
+              32766
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "required-missing",
+      "input": [
+        {
+          "name": "storage"
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "INVALID_PERMISSION_CONFIG"
+      }
+    },
+    {
+      "id": "duplicate",
+      "input": [
+        {
+          "name": "storage",
+          "required": true
+        },
+        {
+          "name": "storage",
+          "required": false
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "INVALID_PERMISSION_CONFIG"
+      }
+    },
+    {
+      "id": "unknown-permission",
+      "input": [
+        {
+          "name": "camera",
+          "required": false
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "INVALID_PERMISSION_CONFIG"
+      }
+    },
+    {
+      "id": "network-no-domain-scope",
+      "input": [
+        {
+          "name": "network",
+          "required": false,
+          "scope": {
+            "origins": [
+              "https://example.com"
+            ]
+          }
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "INVALID_PERMISSION_CONFIG"
+      }
+    },
+    {
+      "id": "scope-required",
+      "input": [
+        {
+          "name": "device.events",
+          "required": false
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "INVALID_PERMISSION_CONFIG"
+      }
+    },
+    {
+      "id": "unknown-event",
+      "input": [
+        {
+          "name": "device.events",
+          "required": false,
+          "scope": {
+            "types": [
+              "gps"
+            ]
+          }
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "INVALID_PERMISSION_CONFIG"
+      }
+    },
+    {
+      "id": "channel-out-of-range",
+      "input": [
+        {
+          "name": "device.messaging",
+          "required": false,
+          "scope": {
+            "channels": [
+              65536
+            ]
+          }
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "INVALID_PERMISSION_CONFIG"
+      }
+    },
+    {
+      "id": "null-scope",
+      "input": [
+        {
+          "name": "storage",
+          "required": false,
+          "scope": null
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "INVALID_PERMISSION_CONFIG"
+      }
+    },
+    {
+      "id": "unknown-security-field",
+      "input": [
+        {
+          "name": "storage",
+          "required": false,
+          "granted": true
+        }
+      ],
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "INVALID_PERMISSION_CONFIG"
+      }
+    }
+  ],
+  "authorizationCases": [
+    {
+      "id": "base-only",
+      "declarations": [],
+      "approvals": {},
+      "method": "runtime.ping",
+      "params": {},
+      "error": null
+    },
+    {
+      "id": "unknown-method",
+      "declarations": [],
+      "approvals": {},
+      "method": "network.request",
+      "params": {},
+      "error": {
+        "code": "METHOD_NOT_FOUND",
+        "message": "METHOD_NOT_FOUND"
+      }
+    },
+    {
+      "id": "undeclared",
+      "declarations": [],
+      "approvals": {},
+      "method": "storage.get",
+      "params": {},
+      "error": {
+        "code": "PERMISSION_DENIED",
+        "message": "UNDECLARED"
+      }
+    },
+    {
+      "id": "declared-not-granted",
+      "declarations": [
+        {
+          "name": "storage",
+          "required": false
+        }
+      ],
+      "approvals": {},
+      "method": "storage.get",
+      "params": {},
+      "error": {
+        "code": "PERMISSION_DENIED",
+        "message": "NOT_GRANTED"
+      }
+    },
+    {
+      "id": "storage-granted",
+      "declarations": [
+        {
+          "name": "storage",
+          "required": true
+        }
+      ],
+      "approvals": {
+        "storage": null
+      },
+      "method": "storage.get",
+      "params": {},
+      "error": null
+    },
+    {
+      "id": "required-refused-blocks-start",
+      "declarations": [
+        {
+          "name": "network",
+          "required": true
+        }
+      ],
+      "approvals": {},
+      "method": "runtime.ping",
+      "params": {},
+      "error": {
+        "code": "PERMISSION_DENIED",
+        "message": "NOT_GRANTED"
+      }
+    },
+    {
+      "id": "event-subset-allowed",
+      "declarations": [
+        {
+          "name": "device.events",
+          "required": false,
+          "scope": {
+            "types": [
+              "button",
+              "connection"
+            ]
+          }
+        }
+      ],
+      "approvals": {
+        "device.events": {
+          "types": [
+            "button"
+          ]
+        }
+      },
+      "method": "device.subscribeEvents",
+      "params": {
+        "types": [
+          "button"
+        ]
+      },
+      "error": null
+    },
+    {
+      "id": "event-subset-denied",
+      "declarations": [
+        {
+          "name": "device.events",
+          "required": false,
+          "scope": {
+            "types": [
+              "button",
+              "connection"
+            ]
+          }
+        }
+      ],
+      "approvals": {
+        "device.events": {
+          "types": [
+            "button"
+          ]
+        }
+      },
+      "method": "device.subscribeEvents",
+      "params": {
+        "types": [
+          "connection"
+        ]
+      },
+      "error": {
+        "code": "PERMISSION_DENIED",
+        "message": "OUT_OF_SCOPE"
+      }
+    },
+    {
+      "id": "invalid-event-request",
+      "declarations": [
+        {
+          "name": "device.events",
+          "required": false,
+          "scope": {
+            "types": [
+              "button"
+            ]
+          }
+        }
+      ],
+      "approvals": {
+        "device.events": {
+          "types": [
+            "button"
+          ]
+        }
+      },
+      "method": "device.subscribeEvents",
+      "params": {
+        "types": []
+      },
+      "error": {
+        "code": "INVALID_REQUEST",
+        "message": "INVALID_EVENT_TYPES"
+      }
+    },
+    {
+      "id": "custom-channel-granted",
+      "declarations": [
+        {
+          "name": "device.messaging",
+          "required": false,
+          "scope": {
+            "channels": [
+              1000
+            ]
+          }
+        }
+      ],
+      "approvals": {
+        "device.messaging": {
+          "channels": [
+            1000
+          ]
+        }
+      },
+      "method": "plugin.sendMessage",
+      "params": {
+        "channel": 1000
+      }
+    },
+    {
+      "id": "channel-denied",
+      "declarations": [
+        {
+          "name": "device.messaging",
+          "required": false,
+          "scope": {
+            "channels": [
+              1000
+            ]
+          }
+        }
+      ],
+      "approvals": {
+        "device.messaging": {
+          "channels": [
+            1000
+          ]
+        }
+      },
+      "method": "plugin.sendMessage",
+      "params": {
+        "channel": 1001
+      },
+      "error": {
+        "code": "PERMISSION_DENIED",
+        "message": "OUT_OF_SCOPE"
+      }
+    },
+    {
+      "id": "display-channel-needs-display",
+      "declarations": [
+        {
+          "name": "device.messaging",
+          "required": false,
+          "scope": {
+            "channels": [
+              1
+            ]
+          }
+        }
+      ],
+      "approvals": {
+        "device.messaging": {
+          "channels": [
+            1
+          ]
+        }
+      },
+      "method": "plugin.sendMessage",
+      "params": {
+        "channel": 1
+      },
+      "error": {
+        "code": "PERMISSION_DENIED",
+        "message": "UNDECLARED"
+      }
+    },
+    {
+      "id": "location-declared-not-granted",
+      "declarations": [
+        {
+          "name": "location.foreground",
+          "required": false
+        }
+      ],
+      "approvals": {},
+      "method": "location.getCurrentPosition",
+      "params": {},
+      "error": {
+        "code": "PERMISSION_DENIED",
+        "message": "NOT_GRANTED"
+      }
+    }
+  ]
+}

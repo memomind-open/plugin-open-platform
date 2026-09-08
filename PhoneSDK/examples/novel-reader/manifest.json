@@ -3,12 +3,52 @@
   "name": "Novel Reader",
   "version": "0.4.0",
   "entry": "index.html",
-  "bridgeVersion": "1.0",
-  "permissions": ["device.events", "storage", "files.user-selected"],
+  "bridgeVersion": "2.0",
+  "permissions": [
+    {
+      "name": "device.events",
+      "required": true,
+      "scope": {
+        "types": [
+          "button",
+          "imuGesture",
+          "rawImu",
+          "connection"
+        ]
+      }
+    },
+    {
+      "name": "storage",
+      "required": true
+    },
+    {
+      "name": "files.user-selected",
+      "required": true
+    },
+    {
+      "name": "device.info",
+      "required": false
+    },
+    {
+      "name": "device.messaging",
+      "required": false,
+      "scope": {
+        "channels": [
+          20050,
+          20051
+        ]
+      }
+    }
+  ],
   "deviceRequirements": {
     "requiredPluginId": "com.memomind.example.novel-reader",
     "protocols": [
-      { "id": "gm.novel-reader", "minVersion": "1.4" }
+      {
+        "id": "gm.novel-reader",
+        "minVersion": "1.4"
+      }
     ]
-  }
+  },
+  "schemaVersion": 2,
+  "permissionPolicyVersion": 1
 }

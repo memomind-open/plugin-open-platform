@@ -1,0 +1,5 @@
+MemoMind 文件预览测试
+
+这是一份无敏感内容的测试文件。
+通过宿主 files.pick 选择，再用 files.openRead 读取。
+中文、英文与数字：Hello MemoMind 12345。

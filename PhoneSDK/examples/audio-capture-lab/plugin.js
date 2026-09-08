@@ -1,4 +1,4 @@
-import { createGMPlugin } from './vendor/gm-plugin-web-sdk.esm.js';
+import { createGMPlugin, opusRecordingToOgg } from './vendor/gm-plugin-web-sdk.esm.js';
 import { AUDIO_LAB_STATE_CHANNEL, encodeAudioLabState } from './device-protocol.js';
 import { createI18n } from './i18n.js';
 import { StreamMetrics } from './stream-metrics.js';
@@ -24,7 +24,7 @@ const ui = {
   consumerDelay: element('consumer-delay'), startCapture: element('start-capture'),
   stopCapture: element('stop-capture'), abortCapture: element('abort-capture'),
   playbackPanel: element('playback-panel'), playRecording: element('play-recording'),
-  stopPlayback: element('stop-playback'), resolvedOptions: element('resolved-options'),
+  stopPlayback: element('stop-playback'), recordingPlayer: element('recording-player'), resolvedOptions: element('resolved-options'),
   finalResult: element('final-result'), capabilityJson: element('capability-json'),
   eventLog: element('event-log'), clearEvents: element('clear-events'),
   recordingMetrics: element('recording-metrics'), streamMetrics: element('stream-metrics'),
@@ -56,6 +56,7 @@ let captureAbortController;
 let consumePromise;
 let operationStartedAt = 0;
 let recordingResult;
+let recordingUrl;
 let playbackActive = false;
 let currentState = 'unavailable';
 let lastErrorCode;
@@ -75,7 +76,8 @@ for (let duration = 20; duration <= 200; duration += 20) {
 ui.chunkDuration.value = '100';
 
 function asJson(value) {
-  return JSON.stringify(value, null, 2);
+  return JSON.stringify(value, (_key, nested) => nested instanceof Uint8Array
+    ? `<Uint8Array ${nested.byteLength} bytes>` : nested, 2);
 }
 
 function formatBytes(bytes) {
@@ -268,7 +270,7 @@ function buildCaptureOptions(signal) {
 function applyFinalResult(result) {
   if (!result) return;
   ui.finalResult.textContent = asJson(result);
-  if (result.mode === 'recording' && result.recordingId) {
+  if (result.mode === 'recording' && result.data instanceof Uint8Array) {
     recordingResult = result;
     renderRecordingMetrics(result);
   }
@@ -415,8 +417,11 @@ async function playRecording() {
   try {
     playbackActive = true;
     setLabState('playback', t('notice.playback'));
-    logEvent('playback.request', { recordingId: recordingResult.recordingId });
-    await gm.audio.playRecording({ recordingId: recordingResult.recordingId });
+    if (recordingUrl) URL.revokeObjectURL(recordingUrl);
+    recordingUrl = URL.createObjectURL(opusRecordingToOgg(recordingResult));
+    ui.recordingPlayer.src = recordingUrl;
+    logEvent('playback.h5', { frames: recordingResult.frameCount, bytes: recordingResult.opusBytes });
+    await ui.recordingPlayer.play();
   } catch (error) {
     playbackActive = false;
     logEvent('playback.error', { code: errorCode(error), message: error.message });
@@ -428,12 +433,10 @@ async function playRecording() {
 
 async function stopPlayback() {
   if (!playbackActive) return;
-  try {
-    await gm.audio.stopPlayback();
-  } catch (error) {
-    logEvent('playback.error', { code: errorCode(error), message: error.message });
-    setLabState('error', t('notice.playbackStopFailed', { message: error.message }), errorCode(error));
-  }
+  ui.recordingPlayer.pause();
+  playbackActive = false;
+  setLabState('ready', t('notice.playbackState', { state: t('playback.stopped') }));
+  updateControls();
 }
 
 async function stopActiveOperation(reason) {
@@ -452,12 +455,7 @@ gm.audio.onCaptureState((event) => {
   }
   if (event.state === 'stopping') setLabState('stopping');
   if (event.state === 'stopped') {
-    applyFinalResult(event.result);
-    if (currentCapture?.sessionId === event.sessionId) currentCapture = undefined;
-    captureOpening = false;
-    captureAbortController = undefined;
-    operationStartedAt = 0;
-    setLabState('ready', t('notice.hostStopped'));
+    if (currentCapture?.sessionId === event.sessionId) void stopCapture('host-limit');
   }
   if (event.state === 'error') {
     currentCapture = undefined;
@@ -468,16 +466,9 @@ gm.audio.onCaptureState((event) => {
   }
 });
 
-gm.audio.onPlaybackState((event) => {
-  logEvent('playback.state', event);
-  playbackActive = event.state === 'preparing' || event.state === 'playing';
-  if (playbackActive) setLabState('playback');
-  if (event.state === 'completed' || event.state === 'stopped') {
-    setLabState('ready', t('notice.playbackState', { state: t(`playback.${event.state}`) }));
-  }
-  if (event.state === 'error') {
-    setLabState('error', event.message ?? event.errorCode ?? t('notice.playbackGeneric'), event.errorCode);
-  }
+ui.recordingPlayer.addEventListener('ended', () => {
+  playbackActive = false;
+  setLabState('ready', t('notice.playbackState', { state: t('playback.completed') }));
   updateControls();
 });
 
@@ -582,7 +573,8 @@ async function cleanup() {
   captureGeneration += 1;
   captureAbortController?.abort('Audio Capture Lab lifecycle ended');
   if (currentCapture) await currentCapture.stop().catch(() => {});
-  if (playbackActive) await gm.audio.stopPlayback().catch(() => {});
+  if (playbackActive) ui.recordingPlayer.pause();
+  if (recordingUrl) URL.revokeObjectURL(recordingUrl);
 }
 
 window.addEventListener('pagehide', () => { void cleanup(); }, { once: true });

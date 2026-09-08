@@ -8,12 +8,11 @@ the audio channel.
 The example intentionally provides no browser-microphone fallback and sends no
 audio to a server. It exists to expose the exact Host contract:
 
-- `recording` keeps Opus frames in Host memory and returns only a short-lived
-  `recordingId` plus duration, frame count, and encoded byte count;
+- `recording` transfers bounded Opus frames to H5 and returns `Uint8Array` data
+  plus frame boundaries, duration, frame count, and encoded byte count;
 - `stream` exposes `ReadableStream<AudioChunk>` over the SDK's transferable
   binary MessagePort path, never Bridge JSON or Base64;
-- `captureState` and `playbackState` events drive both the phone UI and the
-  compact glasses status screen;
+- `captureState` drives native capture UI; playback is ordinary H5 `<audio>`;
 - a single click on the glasses asks the Web plugin to stop active audio, while
   a long press exits the GMP and lets the Host release the paired runtime.
 
@@ -35,8 +34,8 @@ Common capture options:
 - fixed Opus, 16 kHz, mono format;
 - `AbortSignal` cancellation.
 
-Recording mode demonstrates a 1-15 second limit and Host playback using the
-original recorded voice.
+Recording mode demonstrates a 1-15 second limit and H5 playback of the
+transferred Opus recording.
 
 Stream mode demonstrates `interactive`, `balanced`, `reliable`, and `custom`
 profiles. Custom mode exposes 20-200 ms chunks, a 100-5000 ms Host queue,
