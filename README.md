@@ -83,18 +83,6 @@ Studio included in `PhoneSDK` and in the PhoneSDK DevKit ZIP. Browser Studio is 
 lightweight Bridge and display simulator; Desktop Studio is the recommended
 tool when a real `.gmp` must run together with a Web plugin.
 
-## AI-assisted development
-
-This repository includes an AI development skill at
-`.agents/skills/memomind-plugin-dev/SKILL.md`. Codex automatically discovers
-this repository-scoped skill when working inside the repository; no separate
-Cloud-specific path is required.
-
-If another AI agent does not support automatic skill discovery, ask it to read
-`.agents/skills/memomind-plugin-dev/SKILL.md` explicitly before it builds,
-runs, debugs, validates, or packages a plugin. Always refer to this relative
-path instead of a machine- or Cloud-specific absolute path.
-
 ## Public support boundary
 
 The SDK headers, JavaScript packages, examples, package formats, transport
