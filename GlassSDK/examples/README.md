@@ -23,6 +23,7 @@ spacing, or minimum usable layout sizes rather than device width or height.
 | --- | --- | --- |
 | `extension` | query, validate and call `extension_get` function tables | LZ4 + libc extensions |
 | `lvgl_ui` | core `host->graphics.lvgl` drawing, text and `on_loop` | none (core LVGL) |
+| `image_animation` | indexed-4 transparent images, source changes, and Host-driven frame animation | LVGL API 1.1 |
 | `framebuffer` | zero-copy lock/draw/unlock across Host framebuffer slices | display bitmap |
 | `input` | button events and active exit | button |
 | `imu` | gesture events and pull-based raw IMU | IMU events/raw + libc extension |

@@ -67,6 +67,13 @@ extension growth receives a new extension ID. Extension IDs are allocated only
 in `include/gm_plugin_extensions.h`, so new modules do not change the frozen
 core layout or consume capability bits.
 
+The graphics aggregate points to its own versioned LVGL table. LVGL 1.1 keeps
+the complete 1.0 prefix unchanged and appends image and frame-animation
+functions. Plugins must check `api_version` together with the size macro for the
+specific LVGL minor version they use; `GM_PLUGIN_LVGL_API_MIN_SIZE` continues to
+name the frozen 1.0 prefix, while `GM_PLUGIN_LVGL_API_1_1_SIZE` includes the
+image entries.
+
 `manifest.json` contains package-time identity and version metadata only.
 Runtime support is determined by Host ABI validation, capabilities, and
 `extension_get` results.

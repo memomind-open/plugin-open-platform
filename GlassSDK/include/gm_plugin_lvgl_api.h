@@ -12,7 +12,7 @@ extern "C" {
  * minor version by appending fields only. A breaking change needs a new
  * separately named table while firmware continues serving the old table. */
 #define GM_PLUGIN_LVGL_API_MIN_VERSION GM_PLUGIN_VERSION(1U, 0U)
-#define GM_PLUGIN_LVGL_API_VERSION GM_PLUGIN_LVGL_API_MIN_VERSION
+#define GM_PLUGIN_LVGL_API_VERSION GM_PLUGIN_VERSION(1U, 1U)
 
 /* Match the native LVGL types used by this platform so compatible entries can
  * point straight at firmware functions without plugin-side LVGL code. */
@@ -36,6 +36,38 @@ typedef struct {
     gm_plugin_lvgl_coord_t y;
 } gm_plugin_lvgl_point_t;
 #endif
+
+/* ABI-FROZEN 1.1 image values and descriptor. The image payload is already in
+ * the layout consumed by LVGL; it is not a PNG or a serialized lv_img_dsc_t. */
+typedef uint8_t gm_plugin_lvgl_image_format_t;
+enum {
+    /* data begins with 16 BGRA8888 palette entries (64 bytes), followed by
+     * tightly packed 4-bit indexes. Even x is in the high nibble and odd x is
+     * in the low nibble. Palette alpha is composited by LVGL before G4 flush. */
+    GM_PLUGIN_LVGL_IMAGE_INDEXED_4BIT = 1,
+};
+
+typedef struct {
+    /** Size of this descriptor; initialize to sizeof(gm_plugin_lvgl_image_dsc_t). */
+    uint16_t struct_size;
+    /** Image width in pixels. */
+    uint16_t width;
+    /** Image height in pixels. */
+    uint16_t height;
+    /** One GM_PLUGIN_LVGL_IMAGE_* value. */
+    gm_plugin_lvgl_image_format_t format;
+    /** Must be zero. Reserved for a future compatible descriptor extension. */
+    uint8_t reserved;
+    /** Palette and packed indexes. The Host does not copy this payload. */
+    const uint8_t *data;
+    /** Exact payload size in bytes. */
+    uint32_t data_size;
+} gm_plugin_lvgl_image_dsc_t;
+
+#define GM_PLUGIN_LVGL_IMAGE_DSC_MIN_SIZE \
+    ((uint16_t)GM_PLUGIN_MEMBER_END(gm_plugin_lvgl_image_dsc_t, data_size))
+#define GM_PLUGIN_LVGL_ANIM_REPEAT_INFINITE UINT16_MAX
+#define GM_PLUGIN_LVGL_ANIM_IMAGE_MAX_FRAMES UINT16_C(127)
 
 /* This target uses LV_COLOR_DEPTH=8. In firmware builds use the exact native
  * type so function-table entries can point directly at LVGL. */
@@ -456,11 +488,82 @@ typedef struct gm_plugin_lvgl_api {
      */
     void (*label_set_selection_end)(gm_plugin_lvgl_obj_t *label,
                                     uint32_t index);
+
+    /**
+     * Create an indexed image whose transparent palette entries reveal its
+     * parent and lower siblings.
+     * @param parent Non-NULL plugin object or Host root.
+     * @param source Non-NULL image descriptor copied during this call. The
+     *        source data itself remains borrowed and must stay readable and
+     *        unchanged until the next image_set_source() call or object
+     *        deletion.
+     * @return New image object, or NULL for invalid input/allocation failure.
+     */
+    gm_plugin_lvgl_obj_t *(*image_create)(
+        gm_plugin_lvgl_obj_t *parent,
+        const gm_plugin_lvgl_image_dsc_t *source);
+    /**
+     * Change an image frame without copying its pixel payload.
+     * @param image Non-NULL live object returned by image_create().
+     * @param source Non-NULL descriptor copied during this call. Its data must
+     *        remain readable and unchanged until the next source change or
+     *        object deletion.
+     * @return GM_PLUGIN_OK, GM_PLUGIN_EINVAL for malformed input/wrong object,
+     *         or GM_PLUGIN_ESTATE when no plugin UI cycle is active.
+     */
+    gm_plugin_result_t (*image_set_source)(
+        gm_plugin_lvgl_obj_t *image,
+        const gm_plugin_lvgl_image_dsc_t *source);
+
+    /**
+     * Create a frame animation backed by static indexed image payloads.
+     * Descriptor values are copied, so the frames array and descriptors may be
+     * temporary; every descriptor's data remains borrowed for the lifetime of
+     * the animation object or until anim_image_set_sources() replaces it.
+     * @param parent Non-NULL plugin object or Host root.
+     * @param frames Non-NULL array of non-NULL descriptor pointers.
+     * @param frame_count Number of frames, 1..GM_PLUGIN_LVGL_ANIM_IMAGE_MAX_FRAMES.
+     * @param frame_duration_ms Non-zero display duration of each frame.
+     * @param repeat_count Number of repeats after the first play; use zero to
+     *        play once or GM_PLUGIN_LVGL_ANIM_REPEAT_INFINITE to loop forever.
+     * @return New stopped animation object, or NULL for invalid input/allocation
+     *         failure. Call anim_image_start() to begin playback.
+     */
+    gm_plugin_lvgl_obj_t *(*anim_image_create)(
+        gm_plugin_lvgl_obj_t *parent,
+        const gm_plugin_lvgl_image_dsc_t *const frames[],
+        uint16_t frame_count, uint32_t frame_duration_ms,
+        uint16_t repeat_count);
+    /** Replace all animation frames and stop playback on the first frame. */
+    gm_plugin_result_t (*anim_image_set_sources)(
+        gm_plugin_lvgl_obj_t *animation,
+        const gm_plugin_lvgl_image_dsc_t *const frames[],
+        uint16_t frame_count);
+    /**
+     * Set the non-zero duration of each frame in milliseconds. A running
+     * animation keeps its current timing until anim_image_start() restarts it.
+     */
+    gm_plugin_result_t (*anim_image_set_frame_duration)(
+        gm_plugin_lvgl_obj_t *animation, uint32_t frame_duration_ms);
+    /**
+     * Set repeats after the first play. A running animation keeps its current
+     * count until anim_image_start() restarts it. Use
+     * GM_PLUGIN_LVGL_ANIM_REPEAT_INFINITE for infinite playback.
+     */
+    gm_plugin_result_t (*anim_image_set_repeat_count)(
+        gm_plugin_lvgl_obj_t *animation, uint16_t repeat_count);
+    /** Start or restart playback from the first frame. */
+    gm_plugin_result_t (*anim_image_start)(gm_plugin_lvgl_obj_t *animation);
+    /** Stop playback while keeping the current frame visible. */
+    gm_plugin_result_t (*anim_image_stop)(gm_plugin_lvgl_obj_t *animation);
 } gm_plugin_lvgl_api_t;
 
 #define GM_PLUGIN_LVGL_API_MIN_SIZE \
     ((uint16_t)GM_PLUGIN_MEMBER_END(gm_plugin_lvgl_api_t, \
                                     label_set_selection_end))
+#define GM_PLUGIN_LVGL_API_1_1_SIZE \
+    ((uint16_t)GM_PLUGIN_MEMBER_END(gm_plugin_lvgl_api_t, \
+                                    anim_image_stop))
 
 #ifdef __cplusplus
 }
