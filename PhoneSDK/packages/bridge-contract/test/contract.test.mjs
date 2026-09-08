@@ -18,8 +18,8 @@ import {
   isMethodName,
 } from '../src/index.js';
 
-test('Bridge v1 contract contains unique methods and events', () => {
-  assert.equal(BRIDGE_VERSION, '1.0');
+test('Bridge v2 contract contains unique methods and events', () => {
+  assert.equal(BRIDGE_VERSION, '2.0');
   assert.equal(new Set(METHOD_NAMES).size, METHOD_NAMES.length);
   assert.equal(new Set(EVENT_NAMES).size, EVENT_NAMES.length);
   assert.equal(new Set(ERROR_CODES).size, ERROR_CODES.length);
@@ -43,7 +43,8 @@ test('audio uses one capture session API and never exposes Base64 frame events',
   assert.equal(EVENT_NAMES.includes('audio.frames'), false);
   assert.equal(EVENT_NAMES.includes('audio.captureState'), true);
   assert.equal(ERROR_CODES.includes('BUFFER_OVERFLOW'), true);
-  assert.equal(AUDIO_PROFILE.modes.recording.exposesAudioToWeb, false);
+  assert.equal(AUDIO_PROFILE.modes.recording.exposesAudioToWeb, true);
+  assert.equal(AUDIO_PROFILE.modes.recording.transport, 'message-port');
   assert.equal(AUDIO_PROFILE.modes.stream.payload, 'binary-envelope-v1');
   assert.equal(AUDIO_PROFILE.modes.stream.envelope, AUDIO_STREAM_ENVELOPE);
   assert.equal(STREAM_PORT_MESSAGE_TYPE, 'gm-plugin:stream-port');

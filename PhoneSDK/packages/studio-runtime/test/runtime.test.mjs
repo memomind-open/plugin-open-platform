@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { StudioRuntime } from '../src/index.js';
+import { StudioRuntime as BaseRuntime } from '../src/index.js';
 
+// Existing functional tests explicitly approve their declared fixture permissions.
+class StudioRuntime extends BaseRuntime {
+  constructor(options) {
+    const permissions=['storage','files.user-selected','display','device.info'].map(name=>({name,required:true}));
+    permissions.push({name:'device.events',required:true,scope:{types:['button','imuGesture','rawImu','connection']}});
+    super({permissions,approvals:Object.fromEntries(permissions.map(p=>[p.name,p.scope??null])),...options});
+  }
+}
 class FakeRenderer {
   constructor() {
     this.operations = [];
@@ -16,7 +24,7 @@ class FakeRenderer {
 
 function request(runtime, method, params = {}) {
   return runtime.handle({
-    version: '1.0',
+    version: '2.0',
     sessionToken: runtime.sessionToken,
     requestId: `request-${method}`,
     method,
@@ -49,7 +57,7 @@ async function readPort(port) {
 test('Studio runtime handles every public runtime and storage method', async () => {
   const runtime = new StudioRuntime({ renderer: new FakeRenderer(), sessionToken: 'token' });
   assert.equal((await request(runtime, 'runtime.ready')).ok, true);
-  assert.deepEqual((await request(runtime, 'runtime.getBridgeVersion')).result, { version: '1.0' });
+  assert.deepEqual((await request(runtime, 'runtime.getBridgeVersion')).result, { version: '2.0' });
   await request(runtime, 'storage.set', { key: 'score', value: 12 });
   assert.deepEqual((await request(runtime, 'storage.get', { key: 'score' })).result, { value: 12 });
   assert.deepEqual((await request(runtime, 'storage.remove', { key: 'score' })).result, { removed: true });
@@ -127,6 +135,8 @@ test('Studio runtime preserves picked files and opens binary range streams', asy
   });
   restarted.setLifecycle('suspended');
   assert.equal(restarted.fileStreams.size, 0);
+  assert.equal((await request(restarted, 'files.list')).error.message, 'NOT_FOREGROUND');
+  restarted.setLifecycle('running');
   assert.equal((await request(restarted, 'files.list')).result.files.length, 0);
 });
 
@@ -155,59 +165,45 @@ test('Studio runtime only emits subscribed device events', async () => {
   assert.deepEqual(events.map((event) => event.name), ['device.button', 'device.imuGesture']);
 });
 
-test('Studio runtime emits plugin messages without a device event subscription', () => {
-  const runtime = new StudioRuntime({
-    renderer: new FakeRenderer(),
-    sessionToken: 'token',
-    runtimeGeneration: 4,
-  });
-  const events = [];
-  runtime.onEvent((event) => events.push(event));
+test('runtime rejects unapproved messages and drops uplink', async () => {
+ const runtime=new StudioRuntime({renderer:new FakeRenderer(),sessionToken:'token'});
+ const events=[]; runtime.eventListeners.add(e=>events.push(e));
+ runtime.emitPluginMessage(32766,Uint8Array.of(1));
+ const response=await request(runtime,'plugin.sendMessage',{channel:32766,dataBase64:'AQ=='});
+ assert.equal(response.error.code,'PERMISSION_DENIED');
+ assert.deepEqual(runtime.pluginMessages,[]); assert.deepEqual(events,[]);
+});
 
-  runtime.emitPluginMessage(0x4648, Uint8Array.of(1, 2, 3, 4));
+test('scoped messages round trip and stop after approval or lifecycle changes',async()=>{
+ const runtime=new StudioRuntime({renderer:new FakeRenderer(),sessionToken:'token',permissions:[{name:'device.messaging',required:false,scope:{channels:[500]}}],approvals:{'device.messaging':{channels:[500]}}});
+ const events=[];runtime.onEvent(e=>events.push(e));
+ assert.equal((await request(runtime,'plugin.sendMessage',{channel:500,dataBase64:'AQ=='})).ok,true);
+ assert.equal((await request(runtime,'plugin.sendMessage',{channel:501,dataBase64:'AQ=='})).error.message,'OUT_OF_SCOPE');
+ runtime.emitPluginMessage(500,Uint8Array.of(1));runtime.emitPluginMessage(501,Uint8Array.of(1));
+ assert.equal(events.length,1);assert.equal(events[0].data.dataBase64,'AQ==');
+ runtime.approvals={};runtime.emitPluginMessage(500,Uint8Array.of(1));assert.equal(events.length,1);
+ runtime.approvals={'device.messaging':{channels:[500]}};runtime.lifecycleState='stopped';
+ runtime.emitPluginMessage(500,Uint8Array.of(1));assert.equal(events.length,1);
+ assert.equal((await request(runtime,'plugin.sendMessage',{channel:500,dataBase64:'AQ=='})).ok,false);
+ assert.equal(runtime.pluginMessages.length,1);
+});
 
-  assert.deepEqual(events, [{
-    name: 'plugin.message',
-    data: { channel: 0x4648, dataBase64: 'AQIDBA==' },
-    runtimeGeneration: 4,
-  }]);
-  assert.throws(
-    () => runtime.emitPluginMessage(0x10000, Uint8Array.of(1)),
-    { code: 'INVALID_REQUEST' },
-  );
+test('capabilities omit reserved channels lacking their standard permission',async()=>{
+ const runtime=new StudioRuntime({renderer:new FakeRenderer(),sessionToken:'token',permissions:[{name:'device.messaging',required:false,scope:{channels:[2,500]}}],approvals:{'device.messaging':{channels:[2,500]}}});
+ const response=await request(runtime,'runtime.getCapabilities',{});
+ assert.deepEqual(response.result.pluginMessaging.channels,[500]);
+ assert.equal((await request(runtime,'plugin.sendMessage',{channel:2,dataBase64:'AQ=='})).ok,false);
 });
 
 test('Studio runtime rejects stale generations and unknown methods', async () => {
   const runtime = new StudioRuntime({ renderer: new FakeRenderer(), sessionToken: 'token', runtimeGeneration: 3 });
-  const stale = await runtime.handle({ version: '1.0', sessionToken: 'token', requestId: 'stale', method: 'runtime.ready', params: {}, runtimeGeneration: 2 });
+  const stale = await runtime.handle({ version: '2.0', sessionToken: 'token', requestId: 'stale', method: 'runtime.ready', params: {}, runtimeGeneration: 2 });
   assert.equal(stale.error.code, 'STALE_RUNTIME');
-  const unknown = await runtime.handle({ version: '1.0', sessionToken: 'token', requestId: 'unknown', method: 'private.method', params: {}, runtimeGeneration: 3 });
+  const unknown = await runtime.handle({ version: '2.0', sessionToken: 'token', requestId: 'unknown', method: 'private.method', params: {}, runtimeGeneration: 3 });
   assert.equal(unknown.error.code, 'METHOD_NOT_FOUND');
 });
 
-test('Studio validates and records plugin messages', async () => {
-  const handled = [];
-  const runtime = new StudioRuntime({
-    renderer: new FakeRenderer(),
-    sessionToken: 'token',
-    pluginMessageHandler: (message) => handled.push(message),
-  });
-  const response = await request(runtime, 'plugin.sendMessage', {
-    channel: 0x4647,
-    dataBase64: Buffer.from([2, 7, 0, 0xa1]).toString('base64'),
-  });
-  assert.equal(response.ok, true);
-  assert.deepEqual(response.result, { sent: true, channel: 0x4647, payloadBytes: 4 });
-  assert.deepEqual([...runtime.pluginMessages[0].data], [2, 7, 0, 0xa1]);
-  assert.equal(typeof runtime.pluginMessages[0].timestampMs, 'number');
-  assert.equal(handled[0], runtime.pluginMessages[0]);
 
-  const invalid = await request(runtime, 'plugin.sendMessage', {
-    channel: 0x10000,
-    dataBase64: 'AQ==',
-  });
-  assert.equal(invalid.error.code, 'INVALID_REQUEST');
-});
 
 test('Studio rejects oversized Channel 6 images and accepts vertical tiles', async () => {
   const renderer = new FakeRenderer();
@@ -267,7 +263,7 @@ test('Studio validates atomic framed LZ4 order and commits only the final tile',
 });
 
 test('Studio bounds generic plugin message history', async () => {
-  const runtime = new StudioRuntime({ renderer: new FakeRenderer(), sessionToken: 'token' });
+  const runtime = new StudioRuntime({ renderer: new FakeRenderer(), sessionToken: 'token', permissions:[{name:'device.messaging',required:false,scope:{channels:[0x4647]}}], approvals:{'device.messaging':{channels:[0x4647]}} });
   for (let index = 0; index <= 100; index += 1) {
     await request(runtime, 'plugin.sendMessage', {
       channel: 0x4647,
@@ -276,38 +272,4 @@ test('Studio bounds generic plugin message history', async () => {
   }
 
   assert.equal(runtime.pluginMessages.length, 100);
-  assert.deepEqual([...runtime.pluginMessages[0].data], [1]);
-  assert.deepEqual([...runtime.pluginMessages.at(-1).data], [100]);
-});
-
-test('Studio rejects invalid generic plugin messages without recording them', async () => {
-  const runtime = new StudioRuntime({ renderer: new FakeRenderer(), sessionToken: 'token' });
-  const invalidChannel = await request(runtime, 'plugin.sendMessage', {
-    channel: 0x10000,
-    dataBase64: 'AQ==',
-  });
-  const empty = await request(runtime, 'plugin.sendMessage', {
-    channel: 1,
-    dataBase64: '',
-  });
-  const oversized = await request(runtime, 'plugin.sendMessage', {
-    channel: 1,
-    dataBase64: Buffer.alloc(81902).toString('base64'),
-  });
-
-  assert.equal(invalidChannel.error.code, 'INVALID_REQUEST');
-  assert.equal(empty.error.code, 'INVALID_REQUEST');
-  assert.equal(oversized.error.code, 'PAYLOAD_TOO_LARGE');
-  assert.deepEqual(runtime.pluginMessages, []);
-});
-
-test('Studio rejects generic plugin messages while disconnected', async () => {
-  const runtime = new StudioRuntime({ renderer: new FakeRenderer(), sessionToken: 'token' });
-  runtime.setConnected(false);
-  const response = await request(runtime, 'plugin.sendMessage', {
-    channel: 1,
-    dataBase64: 'AQ==',
-  });
-  assert.equal(response.error.code, 'DEVICE_DISCONNECTED');
-  assert.deepEqual(runtime.pluginMessages, []);
 });

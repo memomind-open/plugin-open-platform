@@ -3,13 +3,46 @@
   "name": "Memo Plugin Counter Demo",
   "version": "0.1.0",
   "entry": "index.html",
-  "bridgeVersion": "1.0",
-  "permissions": ["display", "device.events", "storage"],
+  "bridgeVersion": "2.0",
+  "permissions": [
+    {
+      "name": "display",
+      "required": true
+    },
+    {
+      "name": "device.events",
+      "required": true,
+      "scope": {
+        "types": [
+          "button",
+          "imuGesture",
+          "rawImu",
+          "connection"
+        ]
+      }
+    },
+    {
+      "name": "storage",
+      "required": true
+    },
+    {
+      "name": "device.info",
+      "required": false
+    }
+  ],
   "deviceRequirements": {
     "preferredPluginId": "com.gm.example.web-bridge",
     "protocols": [
-      { "id": "gm.scene", "minVersion": "1.0" },
-      { "id": "gm.device-events", "minVersion": "1.0" }
+      {
+        "id": "gm.scene",
+        "minVersion": "1.0"
+      },
+      {
+        "id": "gm.device-events",
+        "minVersion": "1.0"
+      }
     ]
-  }
+  },
+  "schemaVersion": 2,
+  "permissionPolicyVersion": 1
 }

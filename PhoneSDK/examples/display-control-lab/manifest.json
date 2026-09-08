@@ -3,8 +3,27 @@
   "name": "Display Control Lab",
   "version": "0.1.1",
   "entry": "index.html",
-  "bridgeVersion": "1.0",
-  "permissions": ["device.events"],
+  "bridgeVersion": "2.0",
+  "permissions": [
+    {
+      "name": "device.events",
+      "required": true,
+      "scope": {
+        "types": ["connection"]
+      }
+    },
+    {
+      "name": "device.info",
+      "required": false
+    },
+    {
+      "name": "device.messaging",
+      "required": true,
+      "scope": {
+        "channels": [17475]
+      }
+    }
+  ],
   "deviceRequirements": {
     "preferredPluginId": "com.memomind.demo.display-control-lab",
     "requiredPluginId": "com.memomind.demo.display-control-lab",
@@ -12,5 +31,7 @@
     "protocols": [
       { "id": "gm.display-control-lab", "minVersion": "1.0" }
     ]
-  }
+  },
+  "schemaVersion": 2,
+  "permissionPolicyVersion": 1
 }

@@ -1,6 +1,6 @@
 export type BridgeErrorCode =
   | 'INVALID_REQUEST' | 'PAYLOAD_TOO_LARGE' | 'UNAUTHORIZED' | 'PERMISSION_DENIED'
-  | 'FILE_NOT_FOUND'
+  | 'FILE_NOT_FOUND' | 'SYSTEM_PERMISSION_DENIED' | 'LOCATION_SERVICE_DISABLED' | 'POSITION_UNAVAILABLE'
   | 'STALE_RUNTIME' | 'METHOD_NOT_FOUND' | 'RATE_LIMITED' | 'BUSY' | 'QUOTA_EXCEEDED'
   | 'AUDIO_BUSY' | 'NO_AUDIO' | 'BUFFER_OVERFLOW'
   | 'TIMEOUT' | 'DEVICE_DISCONNECTED' | 'CAPABILITY_UNAVAILABLE'
@@ -32,16 +32,8 @@ export interface ImageOptions {
   dataBase64: string;
 }
 
-export interface PluginMessageResult {
-  sent: boolean;
-  channel: number;
-  payloadBytes: number;
-}
-
-export interface PluginMessage {
-  channel: number;
-  data: Uint8Array;
-}
+export interface PluginMessageResult { sent: boolean; channel: number; payloadBytes: number; }
+export interface PluginMessage { channel: number; data: Uint8Array; }
 
 export interface UserFile {
   fileId: string;
@@ -74,7 +66,6 @@ export interface FileUsage {
 export type AudioPickupMode =
   | 'unchanged' | 'frontFixed' | 'meetingAuto' | 'nonWearerFocus'
   | 'frontBalanced' | 'frontFocus';
-export type AudioVoice = 'original' | 'cute' | 'deep' | 'overlord';
 export type AudioCaptureMode = 'recording' | 'stream';
 export type AudioCaptureProfile = 'interactive' | 'balanced' | 'reliable' | 'custom';
 export type AudioOverflowStrategy = 'drop-oldest' | 'drop-newest' | 'error';
@@ -110,6 +101,11 @@ export interface ResolvedAudioRecordingCaptureOptions {
   sampleRate: 16000;
   channels: 1;
   maxDurationMs: number;
+  delivery: {
+    chunkDurationMs: number;
+    maxQueueMs: number;
+    overflowStrategy: 'error';
+  };
 }
 
 export interface ResolvedAudioStreamCaptureOptions {
@@ -139,13 +135,19 @@ export interface AudioChunk {
   data: Uint8Array;
 }
 
-export interface AudioRecordingCaptureResult {
+export interface AudioRecordingStopResult {
   mode: 'recording';
   sessionId: string;
-  recordingId: string;
   durationMs: number;
   frameCount: number;
   opusBytes: number;
+  deliveredFrameCount: number;
+  droppedFrameCount: number;
+}
+
+export interface AudioRecordingCaptureResult extends AudioRecordingStopResult {
+  data: Uint8Array;
+  frameLengths: number[];
 }
 
 export interface AudioStreamCaptureResult {
@@ -157,6 +159,7 @@ export interface AudioStreamCaptureResult {
 }
 
 export type AudioCaptureResult = AudioRecordingCaptureResult | AudioStreamCaptureResult;
+export type AudioCaptureStopResult = AudioRecordingStopResult | AudioStreamCaptureResult;
 
 export interface AudioRecordingCaptureSession {
   mode: 'recording';
@@ -180,14 +183,7 @@ export interface AudioCaptureState {
   state: 'starting' | 'capturing' | 'stopping' | 'stopped' | 'error';
   mode: AudioCaptureMode;
   sessionId: string;
-  result?: AudioCaptureResult;
-  errorCode?: BridgeErrorCode;
-  message?: string;
-}
-
-export interface AudioPlaybackState {
-  state: 'preparing' | 'playing' | 'stopped' | 'completed' | 'error';
-  playbackId: string;
+  result?: AudioCaptureStopResult;
   errorCode?: BridgeErrorCode;
   message?: string;
 }
@@ -206,6 +202,8 @@ export interface FrameImageOptions extends ImageOptions {
 export class GMPluginError extends Error {
   code: BridgeErrorCode;
 }
+
+export function opusRecordingToOgg(recording: AudioRecordingCaptureResult): Blob;
 
 export class ParentFrameTransport implements BridgeTransport {
   constructor(options?: { windowObject?: Window; timeoutMs?: number; parentOrigin?: string });
@@ -254,11 +252,19 @@ export function createGMPlugin(options?: {
   audio: {
     openCapture(options: AudioRecordingCaptureOptions): Promise<AudioRecordingCaptureSession>;
     openCapture(options: AudioStreamCaptureOptions): Promise<AudioStreamCaptureSession>;
-    stopCapture(sessionId: string): Promise<AudioCaptureResult>;
-    playRecording(options: { recordingId: string; voice?: AudioVoice }): Promise<unknown>;
-    stopPlayback(): Promise<unknown>;
+    stopCapture(sessionId: string): Promise<AudioCaptureStopResult>;
     onCaptureState(listener: (state: AudioCaptureState, event: PluginEvent) => void): () => void;
-    onPlaybackState(listener: (state: AudioPlaybackState, event: PluginEvent) => void): () => void;
+  };
+  location: {
+    getCurrentPosition(options?: {timeoutMs?: number}): Promise<PluginPosition>;
+    watchPosition(options?: {timeoutMs?: number}): Promise<{watchId: string}>;
+    clearWatch(watchId: string): Promise<{released: true}>;
+    onPosition(listener: (position: PluginPosition & {watchId: string}, event: PluginEvent) => void): () => void;
+    onError(listener: (data: {watchId: string; error: {code: string; message: string}}, event: PluginEvent) => void): () => void;
   };
   close(): void;
 };
+export interface PluginPosition {
+  latitude: number; longitude: number; accuracy: number; timestamp: number;
+  coordinateSystem: 'WGS84'; precision: 'precise' | 'reduced' | 'unknown';
+}

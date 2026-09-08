@@ -1,3 +1,5 @@
+import {authorize, normalizePermissions, validateApprovals, grantedMethods} from '../../bridge-contract/src/permission-policy.js';
+import {SimulatedLocation} from '../../bridge-contract/src/simulated-location.js';
 import {
   BRIDGE_VERSION,
   CAPABILITIES,
@@ -23,6 +25,8 @@ export class StudioBridgeError extends Error {
 export class StudioRuntime {
   constructor({
     renderer,
+    permissions = [],
+    approvals = {},
     sessionToken = randomToken(),
     runtimeGeneration = 1,
     pluginMessageHandler,
@@ -32,6 +36,9 @@ export class StudioRuntime {
     fileStreamFactory = createMessagePortResource,
   } = {}) {
     if (!renderer) throw new TypeError('renderer is required');
+    this.permissions = normalizePermissions(permissions);
+    this.approvals = validateApprovals(this.permissions, structuredClone(approvals));
+    this.location = new SimulatedLocation((name,data)=>this.emit(name,data),()=>this.lifecycleState==='running');
     this.renderer = renderer;
     this.sessionToken = sessionToken;
     this.runtimeGeneration = runtimeGeneration;
@@ -74,15 +81,17 @@ export class StudioRuntime {
   }
 
   validateEnvelope(request) {
-    if (!request || typeof request !== 'object' || request.version !== BRIDGE_VERSION || typeof request.requestId !== 'string' || request.requestId.length === 0 || request.requestId.length > 128 || typeof request.method !== 'string' || typeof request.params !== 'object' || request.params === null) {
+    if (!request || typeof request !== 'object' || request.version !== BRIDGE_VERSION || typeof request.requestId !== 'string' || request.requestId.length === 0 || request.requestId.length > 128 || typeof request.method !== 'string' || typeof request.params !== 'object' || request.params === null || Array.isArray(request.params) || request.method.length < 1 || request.method.length > 128 || new TextEncoder().encode(JSON.stringify(request)).length > 128 * 1024) {
       throw new StudioBridgeError('INVALID_REQUEST', 'Bridge request fields are invalid');
     }
     if (request.sessionToken !== this.sessionToken) throw new StudioBridgeError('UNAUTHORIZED', 'Session token does not match');
     if (request.runtimeGeneration !== this.runtimeGeneration) throw new StudioBridgeError('STALE_RUNTIME', 'Runtime generation is stale');
-    if (!isMethodName(request.method)) throw new StudioBridgeError('METHOD_NOT_FOUND', 'Bridge method is not supported');
+    if (!isMethodName(request.method)) throw new StudioBridgeError('METHOD_NOT_FOUND', 'METHOD_NOT_FOUND');
   }
 
   async dispatch(method, params) {
+    authorize(method, params, this.permissions, this.approvals);
+    if(this.lifecycleState !== 'running' && !method.startsWith('runtime.')) throw new StudioBridgeError('PERMISSION_DENIED','NOT_FOREGROUND');
     switch (method) {
       case 'runtime.ready':
       case 'runtime.ping':
@@ -90,7 +99,19 @@ export class StudioRuntime {
       case 'runtime.getBridgeVersion':
         return { version: BRIDGE_VERSION };
       case 'runtime.getCapabilities':
-        return CAPABILITIES;
+        return {
+          methods: grantedMethods(this.permissions,this.approvals).filter(m=>!m.startsWith('audio.')),
+          storage: 'storage' in this.approvals,
+          display: 'display' in this.approvals ? CAPABILITIES.display : [],
+          events: this.approvals['device.events']?.types ?? [],
+          rawImuDefaultEnabled:false, audioPlayback:false,
+          ...('device.messaging' in this.approvals ? {pluginMessaging:{...PLUGIN_MESSAGE_PROFILE,channels:this.approvals['device.messaging'].channels.filter(channel=>{try{authorize('plugin.sendMessage',{channel},this.permissions,this.approvals);return true;}catch(_){return false;}})}}:{}),
+          ...('files.user-selected' in this.approvals ? {files:FILE_PROFILE}:{}),
+          ...('location.foreground' in this.approvals ? {location:{simulated:true,coordinateSystem:'WGS84'}}:{}),
+        };
+      case 'location.getCurrentPosition': return this.location.current(params);
+      case 'location.watchPosition': return this.location.watch(params);
+      case 'location.clearWatch': return this.location.clear(params);
       case 'runtime.getLifecycleState':
         return { state: this.lifecycleState };
       case 'storage.get':
@@ -169,8 +190,6 @@ export class StudioRuntime {
         return this.sendPluginMessage(params);
       case 'audio.openCapture':
       case 'audio.stopCapture':
-      case 'audio.playRecording':
-      case 'audio.stopPlayback':
         throw new StudioBridgeError(
           'CAPABILITY_UNAVAILABLE',
           'Native glasses audio is unavailable in Studio',
@@ -208,6 +227,8 @@ export class StudioRuntime {
     }
     if (!this.filePicker) return { files: [] };
     const selected = await this.filePicker({ extensions, allowMultiple });
+    authorize('files.pick',params,this.permissions,this.approvals);
+    if(this.lifecycleState !== 'running') throw new StudioBridgeError('PERMISSION_DENIED','NOT_FOREGROUND');
     if (!Array.isArray(selected)) {
       throw new StudioBridgeError('INTERNAL_ERROR', 'Studio file picker returned invalid data');
     }
@@ -344,7 +365,8 @@ export class StudioRuntime {
     const subscriptionIds = [...this.subscriptions]
       .filter(([, types]) => types.has(capability))
       .map(([id]) => id);
-    if (name !== 'runtime.lifecycleChanged' && subscriptionIds.length === 0) return;
+    if (name.startsWith('device.') && subscriptionIds.length === 0) return;
+    if (name !== 'runtime.lifecycleChanged' && this.lifecycleState !== 'running') return;
     const event = { name, subscriptionIds, data: { sequence: ++this.eventSequence, timestampMs: Date.now(), ...data }, runtimeGeneration: this.runtimeGeneration };
     for (const listener of this.eventListeners) listener(event);
   }
@@ -359,6 +381,7 @@ export class StudioRuntime {
   }
 
   setLifecycle(state) {
+    if(state !== 'running') {this.location.dispose();this.invalidateFileStreams();}
     const allowed = new Set(['starting', 'running', 'suspended', 'stopped', 'failed']);
     if (!allowed.has(state)) throw new RangeError(`Unknown lifecycle state: ${state}`);
     this.lifecycleState = state;
@@ -379,25 +402,11 @@ export class StudioRuntime {
   }
 
   emitPluginMessage(channel, data) {
-    this.requireConnection();
-    if (!Number.isInteger(channel) || channel < 0 || channel > 0xffff) {
-      throw new StudioBridgeError('INVALID_REQUEST', 'channel must be uint16');
-    }
-    if (!(data instanceof Uint8Array) || data.length === 0) {
-      throw new StudioBridgeError('INVALID_REQUEST', 'data must be a non-empty Uint8Array');
-    }
-    if (data.length > PLUGIN_MESSAGE_PROFILE.maxPayloadBytes) {
-      throw new StudioBridgeError(
-        'PAYLOAD_TOO_LARGE',
-        `plugin message payload is ${data.length} bytes; max ${PLUGIN_MESSAGE_PROFILE.maxPayloadBytes}`,
-      );
-    }
-    const event = {
-      name: 'plugin.message',
-      data: { channel, dataBase64: encodeBytes(data) },
-      runtimeGeneration: this.runtimeGeneration,
-    };
-    for (const listener of this.eventListeners) listener(event);
+    if (this.lifecycleState !== 'running' || !this.connected) return;
+    try { authorize('plugin.sendMessage',{channel},this.permissions,this.approvals); } catch (_) { return; }
+    if (!(data instanceof Uint8Array) || !data.length || data.length > PLUGIN_MESSAGE_PROFILE.maxPayloadBytes) return;
+    let binary=''; for(const byte of data) binary+=String.fromCharCode(byte);
+    this.emit('plugin.message',{channel,dataBase64:btoa(binary)});
   }
 
   requireConnection() {
@@ -697,6 +706,7 @@ function transportSummary(channel, codec, payloadBytes, decodedBytes) {
 
 function normalizeError(error) {
   if (error instanceof StudioBridgeError) return error;
+  if (typeof error?.code === 'string') return new StudioBridgeError(error.code,error.message);
   if (error instanceof RangeError || error instanceof TypeError) return new StudioBridgeError('INVALID_REQUEST', error.message);
   return new StudioBridgeError('INTERNAL_ERROR', 'Studio operation failed');
 }

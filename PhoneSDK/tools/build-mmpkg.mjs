@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { validateManifestPolicy } from '../packages/bridge-contract/src/permission-policy.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
@@ -65,7 +66,7 @@ export async function buildMmpkg(sourceDirectory, outputPath) {
   }
   const finalManifest = {
     ...sourceManifest,
-    schemaVersion: 1,
+    schemaVersion: 2,
     files: hashes,
   };
   const manifestBytes = Buffer.from(`${JSON.stringify(finalManifest, null, 2)}\n`);
@@ -126,15 +127,7 @@ function validateManifest(manifest) {
   if (!SEMVER.test(manifest.version)) throw new Error('Plugin version must use semantic versioning');
   requireSafePath(manifest.entry, 'entry');
   if (!manifest.entry.toLowerCase().endsWith('.html')) throw new Error('entry must point to an HTML file');
-  if (manifest.bridgeVersion !== '1.0') throw new Error(`Unsupported bridgeVersion=${manifest.bridgeVersion}`);
-  if (!Array.isArray(manifest.permissions) || manifest.permissions.length > 16) throw new Error('permissions must be a bounded array');
-  const seen = new Set();
-  for (const item of manifest.permissions) {
-    const permission = typeof item === 'string' ? item : item?.name;
-    if (typeof permission !== 'string' || !SUPPORTED_PERMISSIONS.has(permission)) throw new Error(`Unsupported plugin permission: ${String(permission)}`);
-    if (seen.has(permission)) throw new Error(`Duplicate plugin permission: ${permission}`);
-    seen.add(permission);
-  }
+  manifest.permissions = validateManifestPolicy(manifest);
   validateDeviceRequirements(manifest.deviceRequirements);
 }
 

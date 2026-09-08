@@ -1,4 +1,4 @@
-import { createGMPlugin } from './vendor/gm-plugin-web-sdk.esm.js';
+import { createGMPlugin, opusRecordingToOgg } from './vendor/gm-plugin-web-sdk.esm.js';
 import { encodePetState, PET_STATE_CHANNEL } from './device-protocol.js';
 
 const gm = createGMPlugin();
@@ -89,22 +89,14 @@ let nativeCapture;
 let nativeStartRequestInFlight = false;
 let nativePressGeneration = 0;
 
+// Bridge 2.0 capture data uses the native binary stream, not JSON audio.frames.
 gm.audio.onCaptureState((audioState) => {
   nativeAudioState = audioState.state;
   if (audioState.state === 'capturing') {
     showListeningState();
     if (!talkInputActive) requestNativeRecordingStop();
   } else if (audioState.state === 'stopped') {
-    nativeCapture = undefined;
-    const recordingId = audioState.result?.mode === 'recording'
-      ? audioState.result.recordingId
-      : undefined;
-    if (recordingId) {
-      showProcessingState();
-      void gm.audio.playRecording({ recordingId, voice: 'cute' }).catch(showNativeAudioError);
-    } else {
-      resetTalkButton();
-    }
+    if (nativeCapture) requestNativeRecordingStop();
   } else if (audioState.state === 'error') {
     nativeCapture = undefined;
     resetTalkButton();
@@ -113,28 +105,6 @@ gm.audio.onCaptureState((audioState) => {
       ? 'No audio was captured. Please try again.'
       : `Glasses recording failed: ${audioState.message ?? audioState.errorCode ?? 'Unknown error'}`;
     say(detail);
-  }
-});
-
-gm.audio.onPlaybackState((playback) => {
-  if (playback.state === 'preparing') {
-    showProcessingState();
-  } else if (playback.state === 'playing') {
-    resetTalkButton();
-    say('Memo heard you through the glasses and says:');
-    startMouthAnimation();
-    // Playback completion is authoritative. Keep a generous timeout only as
-    // a fallback in case the native host cannot deliver the terminal event.
-    setDeviceMood('talking', 15000);
-    burst('♪', 9, 'note');
-    change({ happy: 10, energy: -2 }, 15);
-  } else if (playback.state === 'completed' || playback.state === 'stopped') {
-    stopMouthAnimation();
-    resetDeviceMood();
-  } else if (playback.state === 'error') {
-    stopMouthAnimation();
-    resetDeviceMood();
-    showNativeAudioError(playback);
   }
 });
 
@@ -174,11 +144,34 @@ function requestNativeRecordingStop() {
   const capture = nativeCapture;
   if (!capture || nativeAudioState === 'stopping') return;
   nativeAudioState = 'stopping';
-  void capture.stop().catch((error) => {
+  void capture.stop().then((recording) => {
+    nativeCapture = undefined;
+    return playGlassesRecording(recording);
+  }).catch((error) => {
     nativeAudioState = 'error';
     nativeCapture = undefined;
     showNativeAudioError(error);
   });
+}
+
+async function playGlassesRecording(recording) {
+  showProcessingState();
+  const audioUrl = URL.createObjectURL(opusRecordingToOgg(recording));
+  const audio = new Audio(audioUrl);
+  audio.playbackRate = 1.3;
+  audio.preservesPitch = false;
+  audio.addEventListener('play', () => {
+    resetTalkButton();
+    say('Memo heard you through the glasses and says:');
+    startMouthAnimation();
+    setDeviceMood('talking', 15000);
+    burst('♪', 9, 'note');
+    change({ happy: 10, energy: -2 }, 15);
+  });
+  audio.addEventListener('ended', () => {
+    stopMouthAnimation(); resetDeviceMood(); URL.revokeObjectURL(audioUrl);
+  }, { once: true });
+  try { await audio.play(); } catch (error) { URL.revokeObjectURL(audioUrl); throw error; }
 }
 
 function setPetVisual(stateName) {
@@ -606,16 +599,16 @@ async function startRecording(event) {
   if (nativeAudioAvailable) {
     if (nativeAudioState !== 'idle' && nativeAudioState !== 'stopped' && nativeAudioState !== 'error') return;
     const pressGeneration = ++nativePressGeneration;
-    try {
-      nativeAudioState = 'starting';
-      nativeStartRequestInFlight = true;
-      const capture = await gm.audio.openCapture({
-        mode: 'recording',
-        pickupMode: 'frontFocus',
-        noiseReduction: true,
-        maxDurationMs: 5000,
-      });
-      nativeCapture = capture;
+      try {
+        nativeAudioState = 'starting';
+        nativeStartRequestInFlight = true;
+        const capture = await gm.audio.openCapture({
+          mode: 'recording',
+          pickupMode: 'frontFocus',
+          noiseReduction: true,
+          maxDurationMs: 5000,
+        });
+        nativeCapture = capture;
       nativeStartRequestInFlight = false;
       if (!talkInputActive || pressGeneration !== nativePressGeneration) requestNativeRecordingStop();
     } catch (error) {
@@ -783,7 +776,6 @@ window.addEventListener('pagehide', () => {
   idleBlinkGeneration += 1;
   stopMouthAnimation();
   stopRecording();
-  if (nativeAudioAvailable) void gm.audio.stopPlayback();
   recordingStream?.getTracks().forEach((track) => track.stop());
 });
 

@@ -12,6 +12,8 @@ ABI_CHECK(gm_abi_initial_value,
           GM_PLUGIN_ABI_MIN_VERSION == UINT16_C(0x0100));
 ABI_CHECK(gm_lvgl_initial_version,
           GM_PLUGIN_LVGL_API_MIN_VERSION == UINT16_C(0x0100));
+ABI_CHECK(gm_lvgl_current_version,
+          GM_PLUGIN_LVGL_API_VERSION == UINT16_C(0x0101));
 ABI_CHECK(gm_lvgl_selector_indicator,
           GM_PLUGIN_LVGL_SELECTOR_INDICATOR == UINT32_C(0x020000));
 ABI_CHECK(gm_lvgl_selector_knob,
@@ -88,3 +90,20 @@ ABI_CHECK(gm_host_initial_size, GM_PLUGIN_HOST_API_MIN_SIZE == 112U);
 ABI_CHECK(gm_descriptor_initial_size,
           GM_PLUGIN_DESCRIPTOR_MIN_SIZE == 40U);
 ABI_CHECK(gm_lvgl_initial_size, GM_PLUGIN_LVGL_API_MIN_SIZE == 116U);
+ABI_CHECK(gm_lvgl_image_format_is_compact,
+          sizeof(gm_plugin_lvgl_image_format_t) == 1U);
+ABI_CHECK(gm_lvgl_image_indexed_4bit_value,
+          GM_PLUGIN_LVGL_IMAGE_INDEXED_4BIT == 1);
+ABI_CHECK(gm_lvgl_image_descriptor_size,
+          sizeof(gm_plugin_lvgl_image_dsc_t) == 16U);
+ABI_CHECK(gm_lvgl_image_descriptor_data_offset,
+          offsetof(gm_plugin_lvgl_image_dsc_t, data) == 8U);
+ABI_CHECK(gm_lvgl_image_descriptor_data_size_offset,
+          offsetof(gm_plugin_lvgl_image_dsc_t, data_size) == 12U);
+ABI_CHECK(gm_lvgl_image_descriptor_min_size,
+          GM_PLUGIN_LVGL_IMAGE_DSC_MIN_SIZE == 16U);
+ABI_CHECK(gm_lvgl_anim_frame_limit,
+          GM_PLUGIN_LVGL_ANIM_IMAGE_MAX_FRAMES == 127U);
+ABI_CHECK(gm_lvgl_anim_repeat_infinite,
+          GM_PLUGIN_LVGL_ANIM_REPEAT_INFINITE == UINT16_MAX);
+ABI_CHECK(gm_lvgl_1_1_size, GM_PLUGIN_LVGL_API_1_1_SIZE == 148U);

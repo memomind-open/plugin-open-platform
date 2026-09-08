@@ -58,7 +58,22 @@ test('Display Control Lab pairs one Web plugin with one GMP protocol', async () 
     `${root}/examples/display-control-lab/manifest.json`, 'utf8'));
   const glassManifest = JSON.parse(await readFile(
     `${root}/../GlassSDK/examples/display_control_lab/manifest.json`, 'utf8'));
-  assert.deepEqual(manifest.permissions, ['device.events']);
+  assert.deepEqual(manifest.permissions, [
+    {
+      name: 'device.events',
+      required: true,
+      scope: { types: ['connection'] },
+    },
+    {
+      name: 'device.info',
+      required: false,
+    },
+    {
+      name: 'device.messaging',
+      required: true,
+      scope: { channels: [DISPLAY_CONTROL_COMMAND_CHANNEL] },
+    },
+  ]);
   assert.equal(manifest.version, '0.1.1');
   assert.equal(manifest.deviceRequirements.requiredPluginId, manifest.id);
   assert.equal(manifest.deviceRequirements.minPluginVersion, '2');
