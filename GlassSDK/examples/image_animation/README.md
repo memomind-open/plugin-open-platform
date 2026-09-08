@@ -4,12 +4,15 @@ This example demonstrates the LVGL 1.1 image API with two compact objects built
 from the original ZEN fighter art in `game/fighter_arena`:
 
 - a 75 x 65 static fighter image on the left; and
-- a 75 x 65 Host-driven four-pose fighter animation on the right.
+- a 75 x 65 Host-driven four-pose animation that moves across the right panel.
 
 Each fighter is created after a fixed panel containing labels and status bars.
 The later-created fighter stays above those components: opaque sprite pixels
 cover the panel content, while transparent palette index 0 reveals it. This
 makes image transparency and LVGL sibling stacking order visible in one demo.
+The Host advances the image frames, while the plugin's `on_loop` moves the
+animation object every 50 ms. Both actions pause with the plugin lifecycle,
+and the movement does not allocate another image or frame buffer.
 
 Build it from the GlassSDK directory:
 

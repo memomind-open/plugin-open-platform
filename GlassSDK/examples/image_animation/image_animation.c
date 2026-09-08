@@ -9,6 +9,11 @@
 #define FRAME_COUNT 4U
 #define PANEL_WIDTH 276
 #define PANEL_HEIGHT 230
+#define MOVE_INTERVAL_MS 50U
+#define MOVE_STEP_PIXELS 3
+#define ANIMATION_MIN_X 326
+#define ANIMATION_MAX_X 500
+#define ANIMATION_Y 178
 
 static const uint8_t s_fighter_frame_indexes[FRAME_COUNT] = {0U, 5U, 8U, 1U};
 static const gm_plugin_lvgl_api_t *s_ui;
@@ -16,6 +21,9 @@ static gm_plugin_lvgl_obj_t *s_static_image;
 static gm_plugin_lvgl_obj_t *s_animation;
 static uint8_t s_frame_data[FRAME_COUNT][IMAGE_DATA_SIZE];
 static gm_plugin_lvgl_image_dsc_t s_frame_descriptors[FRAME_COUNT];
+static uint32_t s_move_elapsed_ms;
+static int16_t s_animation_x;
+static int8_t s_move_direction;
 
 static void set_pixel(uint8_t *data, uint16_t x, uint16_t y, uint8_t index)
 {
@@ -204,7 +212,7 @@ static gm_plugin_result_t plugin_start(void *context)
      * while transparent palette index 0 reveals the components underneath. */
     static_background = create_background_panel(root, 12, "STATIC / READY");
     animation_background = create_background_panel(
-        root, 312, "ANIMATION / RUNNING");
+        root, 312, "ANIMATION / MOVING");
     s_static_image = s_ui->image_create(root, frames[1]);
     s_animation = s_ui->anim_image_create(
         root, frames, FRAME_COUNT, 400U, 0U);
@@ -215,7 +223,10 @@ static gm_plugin_result_t plugin_start(void *context)
         goto no_memory;
 
     s_ui->obj_align(s_static_image, GM_PLUGIN_LVGL_ALIGN_CENTER, -150, 35);
-    s_ui->obj_align(s_animation, GM_PLUGIN_LVGL_ALIGN_CENTER, 150, 35);
+    s_animation_x = ANIMATION_MIN_X;
+    s_move_direction = 1;
+    s_move_elapsed_ms = 0U;
+    s_ui->obj_set_pos(s_animation, s_animation_x, ANIMATION_Y);
     if (s_ui->image_set_source(s_static_image, frames[0]) != GM_PLUGIN_OK ||
         s_ui->anim_image_set_sources(s_animation, frames, FRAME_COUNT) !=
             GM_PLUGIN_OK ||
@@ -234,6 +245,33 @@ no_memory:
     return GM_PLUGIN_ENOMEM;
 }
 
+static void plugin_loop(void *context, uint32_t elapsed_ms)
+{
+    uint32_t steps;
+    (void)context;
+    if (s_animation == 0) return;
+    if (elapsed_ms > 250U) elapsed_ms = 250U;
+    s_move_elapsed_ms += elapsed_ms;
+    steps = s_move_elapsed_ms / MOVE_INTERVAL_MS;
+    s_move_elapsed_ms %= MOVE_INTERVAL_MS;
+    if (steps == 0U) return;
+
+    while (steps-- > 0U) {
+        int16_t next_x = (int16_t)(s_animation_x +
+            s_move_direction * MOVE_STEP_PIXELS);
+        if (next_x >= ANIMATION_MAX_X) {
+            s_animation_x = ANIMATION_MAX_X;
+            s_move_direction = -1;
+        } else if (next_x <= ANIMATION_MIN_X) {
+            s_animation_x = ANIMATION_MIN_X;
+            s_move_direction = 1;
+        } else {
+            s_animation_x = next_x;
+        }
+    }
+    s_ui->obj_set_pos(s_animation, s_animation_x, ANIMATION_Y);
+}
+
 static void plugin_stop(void *context)
 {
     gm_plugin_lvgl_obj_t *root;
@@ -243,6 +281,7 @@ static void plugin_stop(void *context)
     if (root != 0) s_ui->obj_clean(root);
     s_static_image = 0;
     s_animation = 0;
+    s_move_elapsed_ms = 0U;
 }
 
 gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
@@ -267,6 +306,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
 
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->on_start = plugin_start;
+    plugin->on_loop = plugin_loop;
     plugin->on_stop = plugin_stop;
     return GM_PLUGIN_OK;
 }
