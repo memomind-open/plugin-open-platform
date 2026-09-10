@@ -82,19 +82,26 @@ let idleBlinkGeneration = 0;
 let nativeAudioAvailable = false;
 let nativeAudioState = 'idle';
 let nativeCapture;
+let nativeStopPromise;
 let nativeStartRequestInFlight = false;
 let nativePressGeneration = 0;
 
 // Bridge 2.0 capture data uses the native binary stream, not JSON audio.frames.
 gm.audio.onCaptureState((audioState) => {
+  if (audioState.sessionId && nativeCapture?.sessionId &&
+      audioState.sessionId !== nativeCapture.sessionId) return;
+  if (audioState.state === 'stopped' && nativeStopPromise) return;
   nativeAudioState = audioState.state;
   if (audioState.state === 'capturing') {
     showListeningState();
     if (!talkInputActive) requestNativeRecordingStop();
   } else if (audioState.state === 'stopped') {
-    if (nativeCapture) requestNativeRecordingStop();
+    // A timeout can stop the Host before the page asks for the result. Manual
+    // stops already have a shared promise and must not be issued a second time.
+    if (nativeCapture && !nativeStopPromise) requestNativeRecordingStop();
   } else if (audioState.state === 'error') {
     nativeCapture = undefined;
+    nativeStopPromise = undefined;
     resetTalkButton();
     stopMouthAnimation();
     const detail = audioState.errorCode === 'NO_AUDIO'
@@ -138,16 +145,25 @@ function showNativeAudioError(error) {
 
 function requestNativeRecordingStop() {
   const capture = nativeCapture;
-  if (!capture || nativeAudioState === 'stopping') return;
+  if (nativeStopPromise) return nativeStopPromise;
+  if (!capture) {
+    if (nativeAudioState === 'stopping') nativeAudioState = 'stopped';
+    return Promise.resolve();
+  }
   nativeAudioState = 'stopping';
-  void capture.stop().then((recording) => {
-    nativeCapture = undefined;
+  const stopPromise = capture.stop().then((recording) => {
+    if (nativeCapture === capture) nativeCapture = undefined;
+    nativeAudioState = 'stopped';
     return playGlassesRecording(recording);
   }).catch((error) => {
     nativeAudioState = 'error';
-    nativeCapture = undefined;
+    if (nativeCapture === capture) nativeCapture = undefined;
     showNativeAudioError(error);
+  }).finally(() => {
+    if (nativeStopPromise === stopPromise) nativeStopPromise = undefined;
   });
+  nativeStopPromise = stopPromise;
+  return stopPromise;
 }
 
 async function playGlassesRecording(recording) {
@@ -590,15 +606,19 @@ async function syncToGlasses(announce = false) {
 
 async function startRecording(event) {
   event?.preventDefault();
+  if (talkInputActive) return;
   talkInputActive = true;
-  if (event?.pointerId !== undefined) talkButton.setPointerCapture?.(event.pointerId);
+  if (event?.pointerId !== undefined && event.pointerType !== 'touch') {
+    try { talkButton.setPointerCapture?.(event.pointerId); } catch { /* optional enhancement */ }
+  }
   if (!nativeAudioAvailable) {
     talkInputActive = false;
     resetTalkButton();
     say('Glasses audio capture is unavailable. Check the connected device and audio permission.');
     return;
   }
-  if (nativeAudioState !== 'idle' && nativeAudioState !== 'stopped' && nativeAudioState !== 'error') return;
+  if (nativeStartRequestInFlight || nativeCapture || nativeStopPromise ||
+      (nativeAudioState !== 'idle' && nativeAudioState !== 'stopped' && nativeAudioState !== 'error')) return;
   const pressGeneration = ++nativePressGeneration;
   try {
     nativeAudioState = 'starting';
@@ -620,6 +640,7 @@ async function startRecording(event) {
 
 function stopRecording(event) {
   event?.preventDefault();
+  if (!talkInputActive) return;
   talkInputActive = false;
   nativePressGeneration += 1;
   if (!nativeAudioAvailable) {
@@ -645,14 +666,25 @@ document.querySelectorAll('[data-action]:not([data-action="talk"])').forEach((bu
   button.addEventListener('click', () => perform(button.dataset.action));
 });
 
-talkButton.addEventListener('pointerdown', startRecording);
-talkButton.addEventListener('pointerup', stopRecording);
-talkButton.addEventListener('pointercancel', stopRecording);
+talkButton.addEventListener('pointerdown', (event) => {
+  if (event.pointerType !== 'touch') void startRecording(event);
+});
+talkButton.addEventListener('pointerup', (event) => {
+  if (event.pointerType !== 'touch') stopRecording(event);
+});
+talkButton.addEventListener('pointercancel', (event) => {
+  if (event.pointerType !== 'touch') stopRecording(event);
+});
+talkButton.addEventListener('touchstart', (event) => {
+  if (event.touches.length === 1) void startRecording(event);
+}, { passive: false });
+talkButton.addEventListener('touchend', stopRecording, { passive: false });
+talkButton.addEventListener('touchcancel', stopRecording, { passive: false });
 talkButton.addEventListener('contextmenu', (event) => event.preventDefault());
 talkButton.addEventListener('selectstart', (event) => event.preventDefault());
 talkButton.addEventListener('dragstart', (event) => event.preventDefault());
 talkButton.addEventListener('pointerleave', (event) => {
-  if (event.buttons) stopRecording(event);
+  if (event.pointerType !== 'touch' && event.buttons) stopRecording(event);
 });
 talkButton.addEventListener('keydown', (event) => {
   if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) void startRecording(event);
