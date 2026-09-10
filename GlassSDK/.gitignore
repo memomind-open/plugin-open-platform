@@ -4,3 +4,8 @@ __pycache__/
 *.o
 *.elf
 *.gmp
+*.review-source.zip
+*.review.json
+*-review.zip
+*.review-source.tar.xz
+*.review-source.enc

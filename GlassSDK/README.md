@@ -109,22 +109,33 @@ refresh action to display the new plugin automatically.
 
 ## Build commands
 
+Install the source encryption dependency once (`py -m pip` on Windows):
+
+```sh
+python3 -m pip install -r build-host/tools/requirements-review.txt
+```
+
+The public key is bundled with the SDK. Building does not require a private key.
+
 | Command | Description |
 | --- | --- |
 | `python3 build.py` | Rebuild all affected plugins |
 | `python3 build.py build --example bluetooth` | Build one example |
 | `python3 build.py build --example game/2048` | Build one nested example |
+| `python3 build.py build --project /path/to/my_plugin` | Build a project outside `examples` and capture its review inputs |
 | `python3 build.py all` | Build all maintained examples |
 | `python3 build.py inspect --example extension` | Build and inspect the RISC-V ELF |
 | `python3 build.py clean` | Remove temporary build files while keeping prebuilt GMP packages |
 | `python3 build.py toolchain` | Display the selected compiler |
 
 Use `py build.py` on Windows PowerShell and `python3 build.py` on macOS/Linux. Outputs are
-stored under `build-host/.build/<example>/`.
+stored under `build-host/.build/<example>/` for examples, or
+`<project>/.build/<project-name>/` when using `--project`.
 
 ## Preview and delivery
 
-The build command only creates `.gmp` packages and exits. Open MemoMind Plugin
+The build command creates `.gmp` packages and matching review source snapshots,
+then exits. Open MemoMind Plugin
 Studio, refresh the workspace, and select the generated package for simulation.
 Studio owns developer-app ZIP assembly, sharing, and QR generation for the
 current phone/glasses selection, including glasses-only plugins.
@@ -209,6 +220,7 @@ included in the published SDK.
 | [PROTOCOL_COMPATIBILITY.md](docs/PROTOCOL_COMPATIBILITY.md) | Declare Web/device protocol requirements and compatibility |
 | [CAPABILITY_MATRIX.md](docs/CAPABILITY_MATRIX.md) | Mapping from applications to low-level Host services |
 | [examples/README.md](examples/README.md) | Maintained examples and build instructions |
+| [REVIEW_PACKAGES.md](docs/REVIEW_PACKAGES.md) | Source review bundles, external headers, collection boundaries, and rebuild instructions |
 
 The public headers under `include/` are the canonical API definition.
 
@@ -245,3 +257,28 @@ a framebuffer lock. See [GRAPHICS.md](docs/GRAPHICS.md).
 
 No. The current function table is an ABI boundary, not a security sandbox. Only
 install packages from trusted sources; see [SECURITY.md](docs/SECURITY.md).
+
+### Review inputs for external projects
+
+See [Source Review Packages and External Headers](docs/REVIEW_PACKAGES.md) for complete examples,
+the default source root, dependency boundary errors, and extraction instructions.
+
+`python3 build.py build --project /path/to/my_plugin` builds C sources and
+`manifest.json` outside `examples`. Outputs go to
+`/path/to/my_plugin/.build/my_plugin/`: GMP, `.review.json`, and
+`.review-source.enc`. Studio packages these three matching build artifacts.
+
+For shared dependencies, pass `--source-root /path/to/workspace` and repeat
+`--include-dir /path/to/workspace/shared/include` as needed. All supplied relative
+paths are relative to the current directory. The snapshot records actual GCC
+dependencies and portable rebuild arguments in `build.json`; unused shared files
+are omitted. Extraction preserves the project/shared layout and empty include
+directories. GCC dependencies, including system headers, are embedded verbatim.
+Use Studio `scripts/extract_review.py` to extract without a local header copy,
+then review and run the recorded `rebuild` arguments from the extracted `source`
+directory. Rebuild uses bundled system headers with `-nostdinc`; the matching
+compiler/linker is still required. Header contents are not pruned.
+
+This uses the SDK C build rules; it does not import arbitrary project-specific
+CMake/Make settings. Moving build artifacts requires keeping the GMP and both
+review sidecars together. Rebuild after editing source.

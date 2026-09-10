@@ -16,6 +16,10 @@ endif()
 
 add_library(gm_plugin_flags INTERFACE)
 target_include_directories(gm_plugin_flags INTERFACE "${GM_SDK_ROOT}/include")
+if(GM_REVIEW_SYSTEM_INCLUDE_DIRS)
+  target_compile_options(gm_plugin_flags INTERFACE -nostdinc)
+  target_include_directories(gm_plugin_flags SYSTEM INTERFACE ${GM_REVIEW_SYSTEM_INCLUDE_DIRS})
+endif()
 target_compile_options(gm_plugin_flags INTERFACE
   -march=rv32imafc
   -mabi=ilp32f
@@ -44,10 +48,24 @@ target_link_libraries(gm_abi_check PRIVATE gm_plugin_flags)
 
 function(gm_add_plugin manifest)
   get_filename_component(example_dir "${manifest}" DIRECTORY)
-  file(RELATIVE_PATH example "${GM_EXAMPLES_ROOT}" "${example_dir}")
   get_filename_component(plugin_name "${example_dir}" NAME)
+  if(GM_PROJECT_DIR)
+    set(example "${plugin_name}")
+  else()
+    file(RELATIVE_PATH example "${GM_EXAMPLES_ROOT}" "${example_dir}")
+  endif()
   file(GLOB_RECURSE sources CONFIGURE_DEPENDS "${example_dir}/*.c")
+  # Match the source snapshot's excluded build/cache directories.
+  foreach(source IN LISTS sources)
+    file(RELATIVE_PATH relative_source "${example_dir}" "${source}")
+    if(relative_source MATCHES "(^|/)(\\.git|\\.build|build|__pycache__)/")
+      list(REMOVE_ITEM sources "${source}")
+    endif()
+  endforeach()
   if(NOT sources)
+    if(GM_PROJECT_DIR)
+      message(FATAL_ERROR "No C sources in ${example_dir}")
+    endif()
     return()
   endif()
 
@@ -61,6 +79,9 @@ function(gm_add_plugin manifest)
 
   add_library("${object_target}" OBJECT ${sources})
   target_link_libraries("${object_target}" PRIVATE gm_plugin_flags)
+  if(GM_PROJECT_DIR)
+    target_include_directories("${object_target}" PRIVATE ${GM_PROJECT_INCLUDE_DIRS})
+  endif()
 
   add_custom_command(
     OUTPUT "${gmp}"
@@ -82,7 +103,11 @@ function(gm_add_plugin manifest)
   add_custom_target("${target}" ALL DEPENDS "${gmp}")
 endfunction()
 
-file(GLOB_RECURSE manifests CONFIGURE_DEPENDS "${GM_EXAMPLES_ROOT}/*/manifest.json")
-foreach(manifest IN LISTS manifests)
-  gm_add_plugin("${manifest}")
-endforeach()
+if(GM_PROJECT_DIR)
+  gm_add_plugin("${GM_PROJECT_DIR}/manifest.json")
+else()
+  file(GLOB_RECURSE manifests CONFIGURE_DEPENDS "${GM_EXAMPLES_ROOT}/*/manifest.json")
+  foreach(manifest IN LISTS manifests)
+    gm_add_plugin("${manifest}")
+  endforeach()
+endif()
