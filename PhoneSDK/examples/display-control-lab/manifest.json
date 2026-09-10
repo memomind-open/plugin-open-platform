@@ -1,7 +1,7 @@
 {
   "id": "com.memomind.demo.display-control-lab",
   "name": "Display Control Lab",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "entry": "index.html",
   "bridgeVersion": "2.0",
   "permissions": [

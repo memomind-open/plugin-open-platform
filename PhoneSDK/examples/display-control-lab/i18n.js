@@ -86,10 +86,7 @@ const translations = Object.freeze({
 });
 
 export function createI18n(environment = globalThis) {
-  const saved = environment.localStorage?.getItem?.('display-control-lab.language');
-  let language = saved === 'en' || saved === 'zh'
-    ? saved
-    : /^zh\b/iu.test(environment.navigator?.language ?? '') ? 'zh' : 'en';
+  let language = /^zh\b/iu.test(environment.navigator?.language ?? '') ? 'zh' : 'en';
 
   const t = (key, variables = {}) => {
     const template = translations[language][key] ?? translations.en[key] ?? key;
@@ -113,7 +110,6 @@ export function createI18n(environment = globalThis) {
     apply,
     toggle() {
       language = language === 'en' ? 'zh' : 'en';
-      environment.localStorage?.setItem?.('display-control-lab.language', language);
       apply();
       return language;
     },
