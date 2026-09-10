@@ -1,5 +1,9 @@
 import { createGMPlugin, opusRecordingToOgg } from './vendor/gm-plugin-web-sdk.esm.js';
 import { encodePetState, PET_STATE_CHANNEL } from './device-protocol.js';
+import {
+  createOpeningCaptureTerminalTracker,
+  openedCaptureDisposition,
+} from './recording-lifecycle.js';
 
 const gm = createGMPlugin();
 const pet = document.querySelector('#pet');
@@ -85,9 +89,14 @@ let nativeCapture;
 let nativeStopPromise;
 let nativeStartRequestInFlight = false;
 let nativePressGeneration = 0;
+const openingCaptureTerminals = createOpeningCaptureTerminalTracker();
 
 // Bridge 2.0 capture data uses the native binary stream, not JSON audio.frames.
 gm.audio.onCaptureState((audioState) => {
+  if (nativeStartRequestInFlight && !nativeCapture &&
+      openingCaptureTerminals.remember(audioState)) {
+    return;
+  }
   if (audioState.sessionId && nativeCapture?.sessionId &&
       audioState.sessionId !== nativeCapture.sessionId) return;
   if (audioState.state === 'stopped' && nativeStopPromise) return;
@@ -100,8 +109,7 @@ gm.audio.onCaptureState((audioState) => {
     // stops already have a shared promise and must not be issued a second time.
     if (nativeCapture && !nativeStopPromise) requestNativeRecordingStop();
   } else if (audioState.state === 'error') {
-    nativeCapture = undefined;
-    nativeStopPromise = undefined;
+    if (nativeCapture && !nativeStopPromise) discardNativeCapture(nativeCapture);
     resetTalkButton();
     stopMouthAnimation();
     const detail = audioState.errorCode === 'NO_AUDIO'
@@ -164,6 +172,16 @@ function requestNativeRecordingStop() {
   });
   nativeStopPromise = stopPromise;
   return stopPromise;
+}
+
+function discardNativeCapture(capture) {
+  if (nativeCapture === capture) nativeCapture = undefined;
+  if (nativeStopPromise) return nativeStopPromise;
+  const discardPromise = capture.stop().catch(() => undefined).finally(() => {
+    if (nativeStopPromise === discardPromise) nativeStopPromise = undefined;
+  });
+  nativeStopPromise = discardPromise;
+  return discardPromise;
 }
 
 async function playGlassesRecording(recording) {
@@ -628,9 +646,21 @@ async function startRecording(event) {
       noiseReduction: true,
       maxDurationMs: 5000,
     });
-    nativeCapture = capture;
     nativeStartRequestInFlight = false;
-    if (!talkInputActive || pressGeneration !== nativePressGeneration) requestNativeRecordingStop();
+    const terminal = openingCaptureTerminals.take(capture.sessionId);
+    const disposition = openedCaptureDisposition({
+      terminal,
+      inputActive: talkInputActive,
+      generationMatches: pressGeneration === nativePressGeneration,
+    });
+    if (disposition === 'discard') {
+      nativeAudioState = 'error';
+      showNativeAudioError(terminal);
+      discardNativeCapture(capture);
+      return;
+    }
+    nativeCapture = capture;
+    if (disposition === 'stop') requestNativeRecordingStop();
   } catch (error) {
     nativeStartRequestInFlight = false;
     nativeAudioState = 'error';
