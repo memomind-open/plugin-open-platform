@@ -1,9 +1,9 @@
 > 2026-09-08 恢复受控配对通信：共 10 类权限、32 个 Bridge 方法。自定义 H5/设备配对插件声明 device.messaging 和 channels，授权后通过 gm.plugin.sendMessage/onMessage 双向通信；未授权、越界、失效运行态拒绝。标准显示/事件通道仍叠加相应权限。权限实验室只测试九类标准能力，不提供任意消息按钮。通信权限不代表设备插件内部敏感行为已被 App 隔离；真机配对验收待完成。
 
-# Plugin Capability Lab 0.2.7
+# Plugin Capability Lab 0.2.8
 
 这是实际功能插件，不是日志展示页。宿主仍使用既有 Bridge 2.0，不升级 WebView。
-在当前权限开发版 Desktop Studio 刷新手机插件列表，选择「Plugin Capability Lab · Bridge 2.0 0.2.7」。
+在当前权限开发版 Desktop Studio 刷新手机插件列表，选择「Plugin Capability Lab · Bridge 2.0 0.2.8」。
 显示测试配对 GM Web Bridge；不提供通用消息发送功能。
 
 九种权限都声明为 optional，方便启动时全拒绝、部分同意、全部同意，比较真实操作结果。
@@ -24,6 +24,10 @@
 所有文件预览限 1 MiB、网络正文限 64 KiB；位置和文件不上传。
 测试音为 2 秒低幅度 PCM WAV。锁屏/页面隐藏时保留正在播放的音频和录音会话，但取消网络、定位和事件订阅；真正卸载页面时才全量清理。
 不保存权限审批结果，不使用 H5 localStorage 替代 storage Bridge。
+
+## 0.2.8 变更
+
+- 短录音改用 Web SDK 的 `openRecording()` 便利封装；Host 仅保留统一二进制流接口。
 
 ## 0.2.7 变更
 
@@ -48,7 +52,7 @@
 
 ```sh
 npm run dev:permissions -- --port 4187
-npm run pack:plugin -- examples/permission-debug dist/permission-debug-0.2.7.mmpkg
+npm run pack:plugin -- examples/permission-debug dist/permission-debug-0.2.8.mmpkg
 ```
 
 若端口上已有此工作区的预览，直接刷新即可。

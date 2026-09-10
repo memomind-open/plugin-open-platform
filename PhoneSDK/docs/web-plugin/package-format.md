@@ -58,7 +58,7 @@ Permission meanings:
 | `storage` | Use App key-value storage isolated to the current plugin |
 | `files.user-selected` | Import user-selected files into App-managed private storage and access them through `files.*` |
 | `network` | Declare that the plugin needs network access; the current Debug App does not yet enforce a domain sandbox |
-| `audio.capture` | Capture Opus audio from the glasses after native user consent, as a Host-retained recording or real-time binary stream, and use local playback effects |
+| `audio.capture` | Capture 16 kHz mono Opus from the glasses after native user consent through the binary stream API; short recording is a bounded Web SDK helper |
 
 The App checks `display`, `device.events`, `storage`, `files.user-selected`, and
 `audio.capture` permissions for the corresponding Bridge calls. Do not declare

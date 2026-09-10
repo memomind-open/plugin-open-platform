@@ -128,7 +128,7 @@ const actions={
   if(state.capture||state.captureSession||state.captureStarting)throw new Error('录音已经开始或正在启动');
   const revision=state.revision;state.captureStarting=true;
   try{
-   const r=await gm.audio.openCapture({mode:'recording',noiseReduction:true,pickupMode:'frontBalanced',maxDurationMs:15000});
+   const r=await gm.audio.openRecording({noiseReduction:true,pickupMode:'frontBalanced',maxDurationMs:15000});
    if(revision!==state.revision){await gm.audio.stopCapture(r.sessionId);return;}
    state.recording=null;state.captureSession=r;
    // captureState can arrive before this response; never overwrite its terminal state.

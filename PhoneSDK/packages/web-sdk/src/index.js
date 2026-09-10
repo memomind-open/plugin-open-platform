@@ -11,6 +11,11 @@ import {
 const MAX_PLUGIN_MESSAGE_BASE64_CHARACTERS =
   Math.ceil(PLUGIN_MESSAGE_PROFILE.maxPayloadBytes / 3) * 4;
 const USER_FILE_PICK_TIMEOUT_MS = 10 * 60 * 1000;
+const SHORT_RECORDING_LIMITS = Object.freeze({
+  maxDurationMs: 15_000,
+  maxFrames: 750,
+  maxOpusBytes: 64 * 1024,
+});
 
 function requestTimeoutMs(method, defaultTimeoutMs, params = {}) {
   if (method === 'location.getCurrentPosition') return Math.max(defaultTimeoutMs, (params.timeoutMs ?? 15000) + 1000);
@@ -246,8 +251,7 @@ export class AppWebViewTransport {
       return;
     }
     const result = response.result;
-    if (pending.request.method !== 'audio.openCapture' ||
-        !['recording', 'stream'].includes(result?.mode)) {
+    if (pending.request.method !== 'audio.openCapture') {
       this.#complete(response.requestId, pending, result);
       return;
     }
@@ -429,6 +433,83 @@ export function createGMPlugin({
     return () => eventListeners.get(eventName).delete(listener);
   };
 
+  const openCapture = async ({ signal, ...options } = {}) => {
+    validateCaptureSignal(signal);
+    if (Object.prototype.hasOwnProperty.call(options, 'mode')) {
+      throw new GMPluginError('INVALID_REQUEST', 'audio capture mode was removed; openCapture always returns a stream');
+    }
+    if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+    const ticket = await call('audio.openCapture', options);
+    if (signal?.aborted) {
+      try {
+        ticket?.streamPort?.postMessage?.(JSON.stringify({
+          type: 'cancel', reason: 'capture aborted while opening',
+        }));
+        ticket?.streamPort?.close?.();
+      } finally {
+        void call('audio.stopCapture', { sessionId: ticket?.sessionId }).catch(() => {});
+      }
+      throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+    }
+    return openAudioCapture(ticket, call, signal);
+  };
+
+  const openRecording = async ({ signal, maxDurationMs = SHORT_RECORDING_LIMITS.maxDurationMs, ...options } = {}) => {
+    validateCaptureSignal(signal);
+    if (!Number.isInteger(maxDurationMs) || maxDurationMs < 1000 ||
+        maxDurationMs > SHORT_RECORDING_LIMITS.maxDurationMs) {
+      throw new GMPluginError(
+        'INVALID_REQUEST',
+        `short recording maxDurationMs must be between 1000 and ${SHORT_RECORDING_LIMITS.maxDurationMs}`,
+      );
+    }
+    const unsupported = ['mode', 'profile', 'chunkDurationMs', 'maxQueueMs', 'overflowStrategy']
+      .find((key) => Object.prototype.hasOwnProperty.call(options, key));
+    if (unsupported) {
+      throw new GMPluginError('INVALID_REQUEST', `short recording does not accept ${unsupported}`);
+    }
+    const capture = await openCapture({
+      ...options,
+      profile: 'reliable',
+      maxDurationMs,
+      signal,
+    });
+    let recordingError;
+    const recording = collectRecording(capture.stream, SHORT_RECORDING_LIMITS).catch((error) => {
+      recordingError = error;
+      void capture.stop().catch(() => {});
+      return null;
+    });
+    let stopPromise;
+    const session = {
+      sessionId: capture.sessionId,
+      resolvedOptions: capture.resolvedOptions,
+      stop() {
+        if (!stopPromise) {
+          stopPromise = capture.stop().then(async (result) => {
+            const captured = await recording;
+            if (recordingError) throw recordingError;
+            if (!captured || captured.frameLengths.length !== result.frameCount ||
+                captured.data.byteLength !== result.opusBytes) {
+              throw new GMPluginError(
+                'INTERNAL_ERROR',
+                'Host audio capture totals do not match the transferred Opus data',
+              );
+            }
+            return { ...result, ...captured };
+          }).finally(() => signal?.removeEventListener('abort', abortRecording));
+        }
+        return stopPromise;
+      },
+    };
+    signal?.addEventListener('abort', abortRecording, { once: true });
+    return session;
+
+    function abortRecording() {
+      void session.stop().catch(() => {});
+    }
+  };
+
   return {
     ready: async () => {
       await ensureBootstrap();
@@ -522,25 +603,8 @@ export function createGMPlugin({
       },
     },
     audio: {
-      openCapture: async ({ signal, ...options } = {}) => {
-        if (signal !== undefined && !isAbortSignal(signal)) {
-          throw new GMPluginError('INVALID_REQUEST', 'signal must be an AbortSignal');
-        }
-        if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
-        const ticket = await call('audio.openCapture', options);
-        if (signal?.aborted) {
-          try {
-            ticket?.streamPort?.postMessage?.(JSON.stringify({
-              type: 'cancel', reason: 'capture aborted while opening',
-            }));
-            ticket?.streamPort?.close?.();
-          } finally {
-            void call('audio.stopCapture', { sessionId: ticket?.sessionId }).catch(() => {});
-          }
-          throw signal.reason ?? new DOMException('Aborted', 'AbortError');
-        }
-        return openAudioCapture(ticket, call, signal);
-      },
+      openCapture,
+      openRecording,
       stopCapture: async (sessionId) => {
         if (typeof sessionId !== 'string' || !sessionId.trim()) {
           throw new GMPluginError('INVALID_REQUEST', 'audio capture sessionId is required');
@@ -577,53 +641,40 @@ export function createGMPlugin({
 
 function openAudioCapture(ticket, call, signal) {
   const sessionId = ticket?.sessionId;
-  const mode = ticket?.mode;
   const resolvedOptions = ticket?.resolvedOptions;
   const port = ticket?.streamPort;
-  const validTicket = typeof sessionId === 'string' && sessionId.length > 0 &&
-    isResolvedAudioCaptureOptions(resolvedOptions, mode) &&
+  const validTicket = ticket && !Object.prototype.hasOwnProperty.call(ticket, 'mode') &&
+    typeof sessionId === 'string' && sessionId.length > 0 &&
+    isResolvedAudioCaptureOptions(resolvedOptions) &&
     typeof port?.postMessage === 'function';
   if (!validTicket) {
+    port?.close?.();
+    if (typeof sessionId === 'string' && sessionId.length > 0) {
+      void call('audio.stopCapture', { sessionId }).catch(() => {});
+    }
     throw new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid audio capture ticket');
   }
-  const localCapture = createAudioCaptureStream(port, sessionId, mode === 'stream' ? signal : undefined);
-  const recording = mode === 'recording' ? collectRecording(localCapture.stream) : null;
+  const localCapture = createAudioCaptureStream(port, sessionId, signal);
   let stopPromise;
   const session = {
-    mode,
     sessionId,
     resolvedOptions,
-    stream: mode === 'stream' ? localCapture.stream : null,
+    stream: localCapture.stream,
     stop() {
       if (!stopPromise) {
-        stopPromise = call('audio.stopCapture', { sessionId }).then(async (result) => {
-          const validated = validateAudioCaptureResult(result, sessionId, mode);
-          if (!recording) return validated;
-          const captured = await recording;
-          if (captured.frameLengths.length !== validated.frameCount ||
-              captured.data.byteLength !== validated.opusBytes) {
-            throw new GMPluginError('INTERNAL_ERROR', 'Host audio capture totals do not match the transferred Opus data');
-          }
-          return { ...validated, ...captured };
-        }).catch((error) => {
+        stopPromise = call('audio.stopCapture', { sessionId }).then((result) =>
+          validateAudioCaptureResult(result, sessionId)).catch((error) => {
           localCapture.close(false);
           throw error;
-        }).finally(() => {
-          if (mode === 'recording') signal?.removeEventListener('abort', abortRecording);
         });
       }
       return stopPromise;
     },
   };
-  if (mode === 'recording') signal?.addEventListener('abort', abortRecording, { once: true });
   return session;
-
-  function abortRecording() {
-    void session.stop().catch(() => {});
-  }
 }
 
-async function collectRecording(stream) {
+async function collectRecording(stream, limits) {
   const reader = stream.getReader();
   const chunks = [];
   const frameLengths = [];
@@ -632,6 +683,12 @@ async function collectRecording(stream) {
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
+      if (frameLengths.length + value.frameLengths.length > limits.maxFrames ||
+          byteLength + value.data.byteLength > limits.maxOpusBytes) {
+        const error = new GMPluginError('BUFFER_OVERFLOW', 'short recording exceeds the Web SDK buffer limit');
+        await reader.cancel(error);
+        throw error;
+      }
       chunks.push(value.data.slice());
       frameLengths.push(...value.frameLengths);
       byteLength += value.data.byteLength;
@@ -804,35 +861,25 @@ function parseAudioPortControl(value) {
   }
 }
 
-function validateAudioCaptureResult(value, sessionId, expectedMode) {
-  const validBase = value && typeof value === 'object' && value.sessionId === sessionId &&
-    ['recording', 'stream'].includes(value.mode) && (!expectedMode || value.mode === expectedMode) &&
-    Number.isSafeInteger(value.durationMs) && value.durationMs >= 0;
-  const validRecording = value?.mode === 'recording' &&
-    Number.isSafeInteger(value.frameCount) && value.frameCount > 0 &&
-    Number.isSafeInteger(value.opusBytes) && value.opusBytes > 0 &&
+function validateAudioCaptureResult(value, sessionId) {
+  const validBase = value && typeof value === 'object' &&
+    !Object.prototype.hasOwnProperty.call(value, 'mode') && value.sessionId === sessionId &&
+    Number.isSafeInteger(value.durationMs) && value.durationMs >= 0 &&
+    Number.isSafeInteger(value.frameCount) && value.frameCount >= 0 &&
+    Number.isSafeInteger(value.opusBytes) && value.opusBytes >= 0 &&
     Number.isSafeInteger(value.deliveredFrameCount) && value.deliveredFrameCount >= 0 &&
     Number.isSafeInteger(value.droppedFrameCount) && value.droppedFrameCount >= 0;
-  const validStream = value?.mode === 'stream' && Number.isSafeInteger(value.deliveredFrameCount) &&
-    value.deliveredFrameCount >= 0 && Number.isSafeInteger(value.droppedFrameCount) && value.droppedFrameCount >= 0;
-  if (!validBase || (!validRecording && !validStream)) {
+  if (!validBase) {
     throw new GMPluginError('INTERNAL_ERROR', 'Host returned an invalid audio capture result');
   }
   return value;
 }
 
-function isResolvedAudioCaptureOptions(value, mode) {
-  if (!value || typeof value !== 'object' || value.mode !== mode ||
+function isResolvedAudioCaptureOptions(value) {
+  if (!value || typeof value !== 'object' || Object.prototype.hasOwnProperty.call(value, 'mode') ||
       value.codec !== 'opus' || value.sampleRate !== 16000 || value.channels !== 1 ||
       !AUDIO_PROFILE.pickupModes.includes(value.pickupMode) || typeof value.noiseReduction !== 'boolean') return false;
-  if (mode === 'recording') {
-    const delivery = value.delivery;
-    return Number.isInteger(value.maxDurationMs) && value.maxDurationMs >= 1000 &&
-      value.maxDurationMs <= AUDIO_PROFILE.modes.recording.maxDurationMs && delivery &&
-      Number.isInteger(delivery.chunkDurationMs) && Number.isInteger(delivery.maxQueueMs) &&
-      delivery.overflowStrategy === 'error';
-  }
-  return mode === 'stream' && ['interactive', 'balanced', 'reliable', 'custom'].includes(value.profile) &&
+  return ['interactive', 'balanced', 'reliable', 'custom'].includes(value.profile) &&
     Number.isInteger(value.chunkDurationMs) && value.chunkDurationMs >= 20 && value.chunkDurationMs <= 200 &&
     value.chunkDurationMs % 20 === 0 && Number.isInteger(value.maxQueueMs) && value.maxQueueMs >= 100 &&
     value.maxQueueMs <= 5000 && value.maxQueueMs >= value.chunkDurationMs &&
@@ -844,6 +891,12 @@ function isResolvedAudioCaptureOptions(value, mode) {
 function isAbortSignal(value) {
   return value && typeof value === 'object' && typeof value.aborted === 'boolean' &&
     typeof value.addEventListener === 'function' && typeof value.removeEventListener === 'function';
+}
+
+function validateCaptureSignal(signal) {
+  if (signal !== undefined && !isAbortSignal(signal)) {
+    throw new GMPluginError('INVALID_REQUEST', 'signal must be an AbortSignal');
+  }
 }
 
 async function openUserFileStream(ticket, requestedFileId, fetchImpl, signal) {

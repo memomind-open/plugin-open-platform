@@ -66,7 +66,6 @@ export interface FileUsage {
 export type AudioPickupMode =
   | 'unchanged' | 'frontFixed' | 'meetingAuto' | 'nonWearerFocus'
   | 'frontBalanced' | 'frontFocus';
-export type AudioCaptureMode = 'recording' | 'stream';
 export type AudioCaptureProfile = 'interactive' | 'balanced' | 'reliable' | 'custom';
 export type AudioOverflowStrategy = 'drop-oldest' | 'drop-newest' | 'error';
 
@@ -79,13 +78,7 @@ export interface AudioCaptureCommonOptions {
   signal?: AbortSignal;
 }
 
-export interface AudioRecordingCaptureOptions extends AudioCaptureCommonOptions {
-  mode: 'recording';
-  maxDurationMs?: number;
-}
-
-export interface AudioStreamCaptureOptions extends AudioCaptureCommonOptions {
-  mode: 'stream';
+export interface AudioCaptureOptions extends AudioCaptureCommonOptions {
   profile?: AudioCaptureProfile;
   chunkDurationMs?: number;
   maxQueueMs?: number;
@@ -93,23 +86,11 @@ export interface AudioStreamCaptureOptions extends AudioCaptureCommonOptions {
   maxDurationMs?: number | null;
 }
 
-export interface ResolvedAudioRecordingCaptureOptions {
-  mode: 'recording';
-  pickupMode: AudioPickupMode;
-  noiseReduction: boolean;
-  codec: 'opus';
-  sampleRate: 16000;
-  channels: 1;
-  maxDurationMs: number;
-  delivery: {
-    chunkDurationMs: number;
-    maxQueueMs: number;
-    overflowStrategy: 'error';
-  };
+export interface AudioRecordingOptions extends AudioCaptureCommonOptions {
+  maxDurationMs?: number;
 }
 
-export interface ResolvedAudioStreamCaptureOptions {
-  mode: 'stream';
+export interface ResolvedAudioCaptureOptions {
   profile: AudioCaptureProfile;
   chunkDurationMs: number;
   maxQueueMs: number;
@@ -135,8 +116,7 @@ export interface AudioChunk {
   data: Uint8Array;
 }
 
-export interface AudioRecordingStopResult {
-  mode: 'recording';
+export interface AudioCaptureStopResult {
   sessionId: string;
   durationMs: number;
   frameCount: number;
@@ -145,43 +125,26 @@ export interface AudioRecordingStopResult {
   droppedFrameCount: number;
 }
 
-export interface AudioRecordingCaptureResult extends AudioRecordingStopResult {
+export interface AudioRecordingResult extends AudioCaptureStopResult {
   data: Uint8Array;
   frameLengths: number[];
 }
 
-export interface AudioStreamCaptureResult {
-  mode: 'stream';
+export interface AudioRecordingSession {
   sessionId: string;
-  durationMs: number;
-  deliveredFrameCount: number;
-  droppedFrameCount: number;
+  resolvedOptions: ResolvedAudioCaptureOptions;
+  stop(): Promise<AudioRecordingResult>;
 }
 
-export type AudioCaptureResult = AudioRecordingCaptureResult | AudioStreamCaptureResult;
-export type AudioCaptureStopResult = AudioRecordingStopResult | AudioStreamCaptureResult;
-
-export interface AudioRecordingCaptureSession {
-  mode: 'recording';
+export interface AudioCaptureSession {
   sessionId: string;
-  resolvedOptions: ResolvedAudioRecordingCaptureOptions;
-  stream: null;
-  stop(): Promise<AudioRecordingCaptureResult>;
-}
-
-export interface AudioStreamCaptureSession {
-  mode: 'stream';
-  sessionId: string;
-  resolvedOptions: ResolvedAudioStreamCaptureOptions;
+  resolvedOptions: ResolvedAudioCaptureOptions;
   stream: ReadableStream<AudioChunk>;
-  stop(): Promise<AudioStreamCaptureResult>;
+  stop(): Promise<AudioCaptureStopResult>;
 }
-
-export type AudioCaptureSession = AudioRecordingCaptureSession | AudioStreamCaptureSession;
 
 export interface AudioCaptureState {
   state: 'starting' | 'capturing' | 'stopping' | 'stopped' | 'error';
-  mode: AudioCaptureMode;
   sessionId: string;
   result?: AudioCaptureStopResult;
   errorCode?: BridgeErrorCode;
@@ -203,7 +166,7 @@ export class GMPluginError extends Error {
   code: BridgeErrorCode;
 }
 
-export function opusRecordingToOgg(recording: AudioRecordingCaptureResult): Blob;
+export function opusRecordingToOgg(recording: AudioRecordingResult): Blob;
 
 export class ParentFrameTransport implements BridgeTransport {
   constructor(options?: { windowObject?: Window; timeoutMs?: number; parentOrigin?: string });
@@ -250,8 +213,8 @@ export function createGMPlugin(options?: {
     onMessage(listener: (message: PluginMessage, event: PluginEvent) => void): () => void;
   };
   audio: {
-    openCapture(options: AudioRecordingCaptureOptions): Promise<AudioRecordingCaptureSession>;
-    openCapture(options: AudioStreamCaptureOptions): Promise<AudioStreamCaptureSession>;
+    openCapture(options?: AudioCaptureOptions): Promise<AudioCaptureSession>;
+    openRecording(options?: AudioRecordingOptions): Promise<AudioRecordingSession>;
     stopCapture(sessionId: string): Promise<AudioCaptureStopResult>;
     onCaptureState(listener: (state: AudioCaptureState, event: PluginEvent) => void): () => void;
   };

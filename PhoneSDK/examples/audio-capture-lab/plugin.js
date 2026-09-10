@@ -51,6 +51,7 @@ let audioCapability;
 let audioAvailable = false;
 let deviceConnected = false;
 let currentCapture;
+let currentCaptureMode;
 let captureOpening = false;
 let captureAbortController;
 let consumePromise;
@@ -125,7 +126,7 @@ function logEvent(kind, data = {}) {
 }
 
 function renderRecordingMetrics(result) {
-  const active = selectedMode === 'recording' && (captureOpening || currentCapture?.mode === 'recording');
+  const active = selectedMode === 'recording' && (captureOpening || currentCaptureMode === 'recording');
   const durationMs = result?.durationMs ?? (active ? currentElapsedMs() : 0);
   ui.recordingMetricDuration.textContent = formatElapsed(durationMs);
   ui.recordingMetricFrames.textContent = Number.isSafeInteger(result?.frameCount)
@@ -157,7 +158,7 @@ function deviceStateModel() {
   const snapshot = metrics.snapshot();
   return {
     state: deviceConnected ? currentState : 'unavailable',
-    mode: currentCapture?.mode ?? selectedMode,
+    mode: currentCaptureMode ?? selectedMode,
     pickupMode: ui.pickupMode.value,
     profile: selectedMode === 'stream' ? ui.streamProfile.value : 'none',
     noiseReduction: ui.noiseReduction.checked,
@@ -237,7 +238,6 @@ function updateControls() {
 
 function buildCaptureOptions(signal) {
   const common = {
-    mode: selectedMode,
     pickupMode: ui.pickupMode.value,
     noiseReduction: ui.noiseReduction.checked,
     codec: 'opus',
@@ -267,14 +267,14 @@ function buildCaptureOptions(signal) {
   return options;
 }
 
-function applyFinalResult(result) {
+function applyFinalResult(result, mode) {
   if (!result) return;
   ui.finalResult.textContent = asJson(result);
-  if (result.mode === 'recording' && result.data instanceof Uint8Array) {
+  if (mode === 'recording' && result.data instanceof Uint8Array) {
     recordingResult = result;
     renderRecordingMetrics(result);
   }
-  if (result.mode === 'stream') {
+  if (mode === 'stream') {
     const snapshot = metrics.snapshot();
     renderStreamMetrics(snapshot);
   }
@@ -346,7 +346,10 @@ async function startCapture() {
     ? 'notice.openingRecording' : 'notice.openingStream'));
   logEvent('capture.request', requestForDisplay);
   try {
-    const session = await gm.audio.openCapture(options);
+    const mode = selectedMode;
+    const session = mode === 'recording'
+      ? await gm.audio.openRecording(options)
+      : await gm.audio.openCapture(options);
     if (generation !== captureGeneration || abortController.signal.aborted
         || document.visibilityState === 'hidden') {
       captureOpening = false;
@@ -357,15 +360,17 @@ async function startCapture() {
       return;
     }
     currentCapture = session;
+    currentCaptureMode = mode;
     captureOpening = false;
     ui.resolvedOptions.textContent = asJson(session.resolvedOptions);
-    const activeState = session.mode === 'recording' ? 'recording' : 'streaming';
-    setLabState(activeState, t(session.mode === 'recording'
+    const activeState = mode === 'recording' ? 'recording' : 'streaming';
+    setLabState(activeState, t(mode === 'recording'
       ? 'notice.recording' : 'notice.streaming'));
-    if (session.mode === 'stream') consumePromise = consumeStream(session, generation);
+    if (mode === 'stream') consumePromise = consumeStream(session, generation);
   } catch (error) {
     captureOpening = false;
     currentCapture = undefined;
+    currentCaptureMode = undefined;
     if (abortController.signal.aborted) {
       operationStartedAt = 0;
       setLabState('ready', t('notice.aborted'));
@@ -384,18 +389,21 @@ async function startCapture() {
 async function stopCapture(reason = 'user') {
   const session = currentCapture;
   if (!session) return;
+  const mode = currentCaptureMode;
   setLabState('stopping', t('notice.stopping'));
   logEvent('capture.stop', { sessionId: session.sessionId, reason });
   try {
     const result = await session.stop();
-    applyFinalResult(result);
-    if (session.mode === 'stream') await consumePromise;
+    applyFinalResult(result, mode);
+    if (mode === 'stream') await consumePromise;
     if (currentCapture === session) currentCapture = undefined;
+    currentCaptureMode = undefined;
     operationStartedAt = 0;
-    setLabState('ready', t(session.mode === 'recording'
+    setLabState('ready', t(mode === 'recording'
       ? 'notice.recordingDone' : 'notice.streamDone'));
   } catch (error) {
     if (currentCapture === session) currentCapture = undefined;
+    currentCaptureMode = undefined;
     operationStartedAt = 0;
     logEvent('capture.error', { code: errorCode(error), message: error.message });
     setLabState('error', t('notice.stopFailed', { message: error.message }), errorCode(error));
@@ -451,7 +459,7 @@ gm.audio.onCaptureState((event) => {
   if (event.state === 'starting') setLabState('starting');
   if (event.state === 'capturing') {
     operationStartedAt ||= performance.now();
-    setLabState(event.mode === 'recording' ? 'recording' : 'streaming');
+    setLabState((currentCaptureMode ?? selectedMode) === 'recording' ? 'recording' : 'streaming');
   }
   if (event.state === 'stopping') setLabState('stopping');
   if (event.state === 'stopped') {
@@ -459,6 +467,7 @@ gm.audio.onCaptureState((event) => {
   }
   if (event.state === 'error') {
     currentCapture = undefined;
+    currentCaptureMode = undefined;
     captureOpening = false;
     captureAbortController = undefined;
     operationStartedAt = 0;
@@ -528,7 +537,8 @@ async function initialize() {
     const capabilities = await gm.runtime.getCapabilities();
     audioCapability = capabilities.audio;
     ui.capabilityJson.textContent = audioCapability ? asJson(audioCapability) : t('empty.noCapability');
-    audioAvailable = Boolean(audioCapability?.modes?.recording && audioCapability?.modes?.stream);
+    audioAvailable = Boolean(audioCapability?.transport === 'message-port'
+      && audioCapability?.payload === 'binary-envelope-v1');
     ui.capabilityStatus.textContent = t(audioAvailable ? 'runtime.available' : 'runtime.unavailable');
     if (audioCapability) {
       ui.formatStatus.textContent = `${audioCapability.codec} · ${audioCapability.sampleRate / 1000} kHz · ${audioCapability.channels === 1 ? 'Mono' : `${audioCapability.channels} ch`}`;
@@ -559,7 +569,7 @@ async function initialize() {
 
 const telemetryTimer = window.setInterval(() => {
   if (!currentCapture) return;
-  if (currentCapture.mode === 'recording') renderRecordingMetrics();
+  if (currentCaptureMode === 'recording') renderRecordingMetrics();
   else renderStreamMetrics();
   if (performance.now() - lastDeviceMetricSync >= 1000) {
     lastDeviceMetricSync = performance.now();

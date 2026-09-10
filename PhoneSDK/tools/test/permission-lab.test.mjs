@@ -7,7 +7,7 @@ import vm from 'node:vm';
 test('lab declares all nine permissions optionally, reserving out-of-scope probes',async()=>{
  const manifest=JSON.parse(await readFile(new URL('../../examples/permission-debug/manifest.json',import.meta.url)));
  assert.equal(manifest.name,'Plugin Capability Lab · Bridge 2.0');
- assert.equal(manifest.version,'0.2.7');
+ assert.equal(manifest.version,'0.2.8');
  const p=validateManifestPolicy(manifest);assert.equal(p.length,9);assert.ok(p.every(x=>!x.required));
  assert.ok(!p.find(x=>x.name==='device.events').scope.types.includes('rawImu'));
  assert.ok(!p.some(x=>x.name==='device.messaging'));
@@ -40,28 +40,29 @@ test('stream previews truncate and cancel instead of loading an entire file',asy
  const stream=new ReadableStream({start(c){c.enqueue(new Uint8Array([1,2,3,4,5]));},cancel(){cancelled=true;}});
  assert.deepEqual(await readBounded(stream,3),new Uint8Array([1,2,3]));assert.ok(cancelled);
 });
-test('all UI actions are wired and recording requests use the App recording mode',async()=>{
+test('all UI actions are wired and short recording uses the Web SDK helper',async()=>{
  const source=await readFile(new URL('../../examples/permission-debug/plugin.js',import.meta.url),'utf8');
  const html=await readFile(new URL('../../examples/permission-debug/index.html',import.meta.url),'utf8');
  const actions=[...html.matchAll(/data-action="([^"]+)"/g)].map(m=>m[1]);
  assert.equal(new Set(actions).size,actions.length);
  for(const name of actions)assert.ok(source.includes(name+':')||source.includes(name+'(')||source.includes(name+','),name);
- assert.ok(source.includes("mode:'recording'"));
+ assert.ok(source.includes('gm.audio.openRecording'));
+ assert.ok(!source.includes("mode:'recording'"));
  assert.ok(source.includes("pickupMode:'frontBalanced'"));
  assert.ok(!source.includes('getUserMedia'));
  assert.ok(source.includes("credentials:'omit'"));
 });
 
 test('lab receives Opus bytes through capture sessions and plays them in H5',async()=>{
- const source=(await readFile(new URL('../../examples/permission-debug/plugin.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
+ const source=(await readFile(new URL('../../examples/permission-debug/plugin.js',import.meta.url),'utf8')).replace(/^import .*;\r?\n/gm,'');
  const nodes=new Map(),stops=[],domListeners=new Map();let listener,runtimeListener,resolveStart,failStop=false,pauseCount=0;
  const context2d={createImageData:()=>({data:new Uint8ClampedArray(4)}),putImageData(){}};
  const element=()=>({value:'',textContent:'',dataset:{},getContext:()=>context2d,addEventListener(){},pause(){pauseCount++;},play:async()=>{},querySelectorAll:()=>[]});
  const buttons=['playCapturedAudio','playTone','delayTone','stopAudio'].map(action=>({...element(),dataset:{action}}));
  const document={hidden:false,getElementById:id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);},querySelectorAll:()=>buttons,addEventListener:(name,fn)=>domListeners.set('document:'+name,fn)};
- const recording={sessionId:'capture-A',mode:'recording',frameCount:2,opusBytes:5,durationMs:40,data:new Uint8Array([1,2,3,4,5]),frameLengths:[2,3]};
+ const recording={sessionId:'capture-A',frameCount:2,opusBytes:5,durationMs:40,data:new Uint8Array([1,2,3,4,5]),frameLengths:[2,3]};
  const makeSession=id=>({sessionId:id,state:'starting',stop:async()=>{stops.push(id);if(failStop)throw Error('failed');return {...recording,sessionId:id};}});
- const noop=()=>{},gm={audio:{openCapture:()=>new Promise(r=>resolveStart=r),stopCapture:async id=>{stops.push(id);return {...recording,sessionId:id};},onCaptureState:fn=>listener=fn},device:{onButton:noop,onGesture:noop,onConnection:noop},plugin:{onMessage:noop},location:{onPosition:noop,onError:noop},on:(name,fn)=>{if(name==='runtime.lifecycleChanged')runtimeListener=fn;},ready:()=>new Promise(()=>{})};
+ const noop=()=>{},gm={audio:{openRecording:()=>new Promise(r=>resolveStart=r),stopCapture:async id=>{stops.push(id);return {...recording,sessionId:id};},onCaptureState:fn=>listener=fn},device:{onButton:noop,onGesture:noop,onConnection:noop},plugin:{onMessage:noop},location:{onPosition:noop,onError:noop},on:(name,fn)=>{if(name==='runtime.lifecycleChanged')runtimeListener=fn;},ready:()=>new Promise(()=>{})};
  const context=vm.createContext({createGMPlugin:()=>gm,opusRecordingToOgg:()=>new Blob(),document,window:{addEventListener:(name,fn)=>domListeners.set('window:'+name,fn)},gray4Pattern:()=>({width:1,height:1,bytes:new Uint8Array([0])}),setTimeout,clearTimeout,URL,Blob,console});
  vm.runInContext(source+'\nglobalThis.lab={actions,state,cleanup,suspendCleanup};',context);
  const {actions,state,cleanup}=context.lab;state.ready=true;

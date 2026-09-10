@@ -43,10 +43,11 @@ test('audio uses one capture session API and never exposes Base64 frame events',
   assert.equal(EVENT_NAMES.includes('audio.frames'), false);
   assert.equal(EVENT_NAMES.includes('audio.captureState'), true);
   assert.equal(ERROR_CODES.includes('BUFFER_OVERFLOW'), true);
-  assert.equal(AUDIO_PROFILE.modes.recording.exposesAudioToWeb, true);
-  assert.equal(AUDIO_PROFILE.modes.recording.transport, 'message-port');
-  assert.equal(AUDIO_PROFILE.modes.stream.payload, 'binary-envelope-v1');
-  assert.equal(AUDIO_PROFILE.modes.stream.envelope, AUDIO_STREAM_ENVELOPE);
+  assert.equal('modes' in AUDIO_PROFILE, false);
+  assert.equal(AUDIO_PROFILE.transport, 'message-port');
+  assert.equal(AUDIO_PROFILE.payload, 'binary-envelope-v1');
+  assert.equal(AUDIO_PROFILE.envelope, AUDIO_STREAM_ENVELOPE);
+  assert.equal(AUDIO_PROFILE.defaultProfile, 'interactive');
   assert.equal(STREAM_PORT_MESSAGE_TYPE, 'gm-plugin:stream-port');
   assert.equal(AUDIO_STREAM_PORT_KIND, 'audio.capture');
   assert.deepEqual(AUDIO_STREAM_ENVELOPE, {
@@ -59,7 +60,7 @@ test('audio uses one capture session API and never exposes Base64 frame events',
     maxFramesPerChunk: 10,
     byteOrder: 'big-endian',
   });
-  assert.deepEqual(AUDIO_PROFILE.modes.stream.profiles.interactive, {
+  assert.deepEqual(AUDIO_PROFILE.profiles.interactive, {
     chunkDurationMs: 40,
     maxQueueMs: 200,
     overflowStrategy: 'drop-oldest',

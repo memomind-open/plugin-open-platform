@@ -134,34 +134,10 @@ permission.
 Plugins declaring `audio.capture` can use the glasses microphone when
 `(await gm.runtime.getCapabilities()).audio` is present:
 
-### Short recording delivered to H5
+### Primary capture API: real-time binary stream
 
 ```js
 const capture = await gm.audio.openCapture({
-  mode: 'recording',
-  pickupMode: 'frontFocus',
-  noiseReduction: true,
-  maxDurationMs: 5000,
-});
-
-// Later, after an explicit user action or when maxDurationMs is reached:
-const result = await capture.stop();
-const audio = new Audio(URL.createObjectURL(opusRecordingToOgg(result)));
-await audio.play();
-```
-
-In `recording` mode, the SDK receives the encoded Opus frames through a binary
-MessagePort and returns `data: Uint8Array` plus `frameLengths` from
-`capture.stop()`. The Host limits a recording to 15 seconds, 750 Opus frames,
-and 64 KiB. The plugin can decode, transform, upload, or play this data subject
-to its other granted permissions. `opusRecordingToOgg(result)` is a convenience
-helper for direct H5 `<audio>` playback.
-
-### Real-time binary stream
-
-```js
-const capture = await gm.audio.openCapture({
-  mode: 'stream',
   profile: 'interactive',
   pickupMode: 'frontFocus',
   noiseReduction: true,
@@ -194,6 +170,32 @@ the chunk. Every public chunk includes `sequence`, `timestampUs`,
 under backpressure and the remote decoder or protocol should be informed.
 On a normal stop, the Host flushes the already bounded queue before ending the
 stream; it does not discard the final audio tail.
+
+`audio.openCapture` is the only native capture primitive. It has no `mode`
+parameter and the Host never retains a complete recording. The stop result
+contains `sessionId`, `durationMs`, `frameCount`, `opusBytes`,
+`deliveredFrameCount`, and `droppedFrameCount`.
+
+### Short recording convenience helper
+
+```js
+const recording = await gm.audio.openRecording({
+  pickupMode: 'frontFocus',
+  noiseReduction: true,
+  maxDurationMs: 5000,
+});
+
+const result = await recording.stop();
+const audio = new Audio(URL.createObjectURL(opusRecordingToOgg(result)));
+await audio.play();
+```
+
+`openRecording()` is implemented entirely by the Web SDK on top of
+`openCapture()`. It immediately consumes the same binary stream using the
+`reliable` profile, then returns `data: Uint8Array` and `frameLengths` from
+`stop()`. Its in-page buffer is limited to 15 seconds, 750 Opus frames, and
+64 KiB. Exceeding a bound cancels the stream with `BUFFER_OVERFLOW`. The Host
+does not expose a separate recording mode and does not cache the whole result.
 
 #### Android WebView MessagePort handoff
 
@@ -278,6 +280,8 @@ Use `profile: 'custom'` to set `chunkDurationMs` (20-200 ms in 20 ms steps),
 `maxQueueMs` (100-5000 ms), and `overflowStrategy` (`drop-oldest`,
 `drop-newest`, or `error`). A stream is unlimited by default; set
 `maxDurationMs` to a value from 1000 through 3600000 when a hard stop is needed.
+The default profile is `interactive`, the default pickup mode is
+`frontBalanced`, and noise reduction is enabled by default.
 
 Capture is always Opus, 16 kHz, mono, with 20 ms frames. Only one native capture
 operation can own the glasses audio channel at a time. Playback is owned by H5.
@@ -288,12 +292,13 @@ operation can own the glasses audio channel at a time. Playback is owned by H5.
 const offCapture = gm.audio.onCaptureState(console.log);
 ```
 
-The native control methods are `audio.openCapture` and `audio.stopCapture`.
-Prefer the capture session's `stop()` method because recording sessions return
-their transferred Opus data there. Capture state is reported through
+The only native control methods are `audio.openCapture` and `audio.stopCapture`.
+Prefer the capture session's `stop()` method. `gm.audio.openRecording()` is a
+Web SDK convenience helper rather than another Host method. Capture state is reported through
 `audio.captureState`. `audio.playback` has no Bridge methods; it controls whether
 the WebView may use H5 media playback. Supported pickup modes, limits, and
-stream profiles are advertised in the audio capability object.
+stream profiles are advertised directly in the audio capability object; it has
+no `modes` branch.
 
 The App shows native consent and a recording indicator outside the WebView.
 Hiding, suspending, reloading, or closing the plugin stops audio and closes any
