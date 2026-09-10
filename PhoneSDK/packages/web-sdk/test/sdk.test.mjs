@@ -103,18 +103,18 @@ function recordingFixture(sessionId) {
   };
   return {
     ticket: {
-      mode: 'recording', sessionId, streamPort: channel.port2,
+      sessionId, streamPort: channel.port2,
       resolvedOptions: {
-        mode: 'recording', pickupMode: 'frontFocus', noiseReduction: true,
+        profile: 'reliable', chunkDurationMs: 100, maxQueueMs: 3000,
+        overflowStrategy: 'error', pickupMode: 'frontFocus', noiseReduction: true,
         codec: 'opus', sampleRate: 16000, channels: 1, maxDurationMs: 5000,
-        delivery: { chunkDurationMs: 100, maxQueueMs: 3000, overflowStrategy: 'error' },
       },
     },
     finish() {
       finished = true;
       if (sent) channel.port1.postMessage(JSON.stringify({ type: 'end' }));
       return {
-        mode: 'recording', sessionId, durationMs: 40, frameCount: 2, opusBytes: 5,
+        sessionId, durationMs: 40, frameCount: 2, opusBytes: 5,
         deliveredFrameCount: 2, droppedFrameCount: 0,
       };
     },
@@ -465,7 +465,7 @@ test('App WebView bridge joins an audio descriptor with event.ports[0]', async (
   globalObject.__memoPluginResolve({
     requestId: 'request-audio-1', ok: true,
     runtimeGeneration: 3,
-    result: { mode: 'stream', sessionId: 'capture-app-1', streamDescriptor: descriptor },
+    result: { sessionId: 'capture-app-1', streamDescriptor: descriptor },
   });
   const channel = new MessageChannel();
   receiveWindowMessage({
@@ -496,7 +496,7 @@ test('App WebView bridge joins an audio descriptor with event.ports[0]', async (
   globalObject.__memoPluginResolve({
     requestId: 'request-audio-2', ok: true,
     runtimeGeneration: 3,
-    result: { mode: 'stream', sessionId: 'capture-app-2', streamDescriptor: earlyDescriptor },
+    result: { sessionId: 'capture-app-2', streamDescriptor: earlyDescriptor },
   });
   const earlyResult = await earlyResponsePromise;
   assert.equal(earlyResult.streamPort, earlyChannel.port2);
@@ -661,8 +661,8 @@ test('SDK exposes Bridge 2.0 capture and foreground location without old aliases
   };
   const gm=createGMPlugin({transport}); const states=[];
   gm.audio.onCaptureState(s=>states.push(s));
-  await gm.audio.openCapture({
-    mode:'recording',noiseReduction:true,pickupMode:'frontFocus',maxDurationMs:5000,
+  await gm.audio.openRecording({
+    noiseReduction:true,pickupMode:'frontFocus',maxDurationMs:5000,
   });
   await gm.audio.stopCapture('capture-7-1');
   assert.deepEqual(transport.requests.at(-1).params,{sessionId:'capture-7-1'});
@@ -683,12 +683,20 @@ test('SDK ignores old audio frames and stale generation location events',async()
   assert.equal(positions.length,0);
 });
 
+test('SDK rejects removed Host capture modes before sending', async () => {
+  const transport = new FakeTransport();
+  const gm = createGMPlugin({ transport });
+  await assert.rejects(gm.audio.openCapture({ mode: 'stream' }), { code: 'INVALID_REQUEST' });
+  await assert.rejects(gm.audio.openRecording({ mode: 'recording' }), { code: 'INVALID_REQUEST' });
+  assert.equal(transport.requests.length, 0);
+});
+
 test('stopCapture requires an explicit capture ID before sending',async()=>{
  const transport=new FakeTransport();
  transport.send=async function(request){
   this.requests.push(request);
   return {
-   mode:'recording',sessionId:'capture-7-2',durationMs:20,frameCount:1,opusBytes:40,
+   sessionId:'capture-7-2',durationMs:20,frameCount:1,opusBytes:40,
    deliveredFrameCount:1,droppedFrameCount:0,
   };
  };
@@ -708,16 +716,16 @@ test('SDK returns H5-owned Opus bytes through the unified recording session', as
     throw new Error(`unexpected method ${request.method}`);
   };
   const gm = createGMPlugin({ transport });
-  const capture = await gm.audio.openCapture({
-    mode: 'recording', pickupMode: 'frontFocus', noiseReduction: true, maxDurationMs: 5000,
+  const capture = await gm.audio.openRecording({
+    pickupMode: 'frontFocus', noiseReduction: true, maxDurationMs: 5000,
   });
   const result = await capture.stop();
 
-  assert.equal(capture.mode, 'recording');
-  assert.equal(capture.stream, null);
+  assert.equal('mode' in capture, false);
+  assert.equal('stream' in capture, false);
   assert.equal(transport.requests[0].method, 'audio.openCapture');
   assert.deepEqual(transport.requests[0].params, {
-    mode: 'recording', pickupMode: 'frontFocus', noiseReduction: true, maxDurationMs: 5000,
+    pickupMode: 'frontFocus', noiseReduction: true, profile: 'reliable', maxDurationMs: 5000,
   });
   assert.equal(transport.requests[1].method, 'audio.stopCapture');
   assert.deepEqual([...result.data], [1, 2, 3, 4, 5]);
@@ -739,11 +747,10 @@ test('aborting an H5-owned recording stops its capture session', async () => {
   };
   const controller = new AbortController();
   const gm = createGMPlugin({ transport });
-  const capture = await gm.audio.openCapture({ mode: 'recording', signal: controller.signal });
+  const capture = await gm.audio.openRecording({ signal: controller.signal });
   controller.abort();
-  const result = await capture.stop();
+  await assert.rejects(capture.stop(), { name: 'AbortError' });
 
-  assert.equal(result.data.byteLength, 5);
   assert.deepEqual(transport.requests.map(({ method }) => method), [
     'audio.openCapture', 'audio.stopCapture',
   ]);
@@ -763,10 +770,9 @@ test('SDK exposes real-time audio only as a backpressured transferable binary st
         hostPort.postMessage(buffer, [buffer]);
       };
       return {
-        mode: 'stream',
         sessionId: 'capture-stream-1',
         resolvedOptions: {
-          mode: 'stream', profile: 'interactive', chunkDurationMs: 40, maxQueueMs: 200,
+          profile: 'interactive', chunkDurationMs: 40, maxQueueMs: 200,
           overflowStrategy: 'drop-oldest', pickupMode: 'unchanged', noiseReduction: true,
           codec: 'opus', sampleRate: 16000, channels: 1, maxDurationMs: null,
         },
@@ -777,7 +783,7 @@ test('SDK exposes real-time audio only as a backpressured transferable binary st
       hostPort.onmessage = null;
       hostPort.postMessage(JSON.stringify({ type: 'end' }));
       return {
-        mode: 'stream', sessionId: 'capture-stream-1', durationMs: 40,
+        sessionId: 'capture-stream-1', durationMs: 40, frameCount: 2, opusBytes: 5,
         deliveredFrameCount: 2, droppedFrameCount: 0,
       };
     }
@@ -786,7 +792,7 @@ test('SDK exposes real-time audio only as a backpressured transferable binary st
   const gm = createGMPlugin({ transport });
   const states = [];
   gm.audio.onCaptureState((state) => states.push(state.state));
-  const capture = await gm.audio.openCapture({ mode: 'stream', profile: 'interactive' });
+  const capture = await gm.audio.openCapture({ profile: 'interactive' });
   const reader = capture.stream.getReader();
   const chunk = (await reader.read()).value;
 
@@ -794,7 +800,7 @@ test('SDK exposes real-time audio only as a backpressured transferable binary st
   assert.deepEqual(chunk.frameLengths, [2, 3]);
   transport.emit({
     name: 'audio.captureState',
-    data: { state: 'capturing', mode: 'stream', sessionId: capture.sessionId },
+    data: { state: 'capturing', sessionId: capture.sessionId },
     runtimeGeneration: 7,
   });
   assert.deepEqual(states, ['capturing']);
@@ -818,9 +824,9 @@ test('SDK rejects a malformed native audio binary envelope', async () => {
       hostPort.postMessage(invalid, [invalid]);
     };
     return {
-      mode: 'stream', sessionId: 'capture-invalid-1',
+      sessionId: 'capture-invalid-1',
       resolvedOptions: {
-        mode: 'stream', profile: 'interactive', chunkDurationMs: 40, maxQueueMs: 200,
+        profile: 'interactive', chunkDurationMs: 40, maxQueueMs: 200,
         overflowStrategy: 'drop-oldest', pickupMode: 'unchanged', noiseReduction: true,
         codec: 'opus', sampleRate: 16000, channels: 1, maxDurationMs: null,
       },
@@ -828,7 +834,7 @@ test('SDK rejects a malformed native audio binary envelope', async () => {
     };
   };
   const gm = createGMPlugin({ transport });
-  const capture = await gm.audio.openCapture({ mode: 'stream', profile: 'interactive' });
+  const capture = await gm.audio.openCapture({ profile: 'interactive' });
   await assert.rejects(() => capture.stream.getReader().read(), {
     name: 'GMPluginError', code: 'INTERNAL_ERROR',
   });

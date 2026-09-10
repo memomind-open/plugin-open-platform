@@ -1,4 +1,4 @@
-> 2026-09-10 Plugin Capability Lab 0.2.7 将插件清单和页面名称统一为英文；0.2.6 的锁屏/后台验证行为保持不变。
+> 2026-09-10 Plugin Capability Lab 0.2.8 将短录音迁移到 Web SDK 的 `openRecording()` 便利封装，Host 仅保留统一二进制流；0.2.7 的名称调整保持不变。
 >
 > 2026-09-10 权限实验室 0.2.6 将锁屏/后台暂停与真正页面卸载拆分：`document.hidden`、`pagehide` 和 Runtime `suspended` 不再主动暂停 H5 音频或停止录音，用于验证宿主的真实锁屏能力。
 
@@ -21,7 +21,7 @@ npm run dev:permissions
 
 浏览器打开终端显示的地址（默认 http://127.0.0.1:4173）。当前会话的预览地址是 http://127.0.0.1:4187。
 
-当前 Plugin Capability Lab 0.2.7 的九项权限均为 optional。只批准 storage 时可写入便签，未批准的定位、录音应被拒绝。批准 device.events 后，负向 rawImu 探针仍因范围不符被拒绝。
+当前 Plugin Capability Lab 0.2.8 的九项权限均为 optional。只批准 storage 时可写入便签，未批准的定位、录音应被拒绝。批准 device.events 后，负向 rawImu 探针仍因范围不符被拒绝。
 消息权限需另选 Novel Reader / Fighter Controller / Talking Pet 等自定义配对插件，并选择其匹配设备插件；权限实验室不提供消息按钮。每次启动重新授权。
 
 ## Desktop Studio
@@ -42,7 +42,7 @@ Phone 插件下拉选择“Plugin Capability Lab · Bridge 2.0”，完成宿主
 
 ```sh
 npm run sync:example-sdk
-npm run pack:plugin -- examples/permission-debug dist/permission-debug-0.2.7.mmpkg
+npm run pack:plugin -- examples/permission-debug dist/permission-debug-0.2.8.mmpkg
 ```
 
 包内 schemaVersion=2、permissionPolicyVersion=1、bridgeVersion="2.0"，权限为严格对象数组。
@@ -84,7 +84,7 @@ cargo test --offline --manifest-path desktop/src-tauri/Cargo.toml
 - Desktop：118/118 UI 单测、6/6 工具单测、27/27 Rust 测试通过；macOS Universal 2 DMG 构建成功。
 - Browser Studio：实际页面完成必需拒绝、最小授权、成功调用、三类权限拒绝、定位事件/停止与撤销重授权。
 - macOS Desktop：实际新编译窗口发现并加载“权限调试台”，完成 Bridge 2.0 握手、storage 写入、OUT_OF_SCOPE 与模拟定位返回。
-- 当前锁屏验证包：PhoneSDK/dist/permission-debug-0.2.7.mmpkg，SHA-256 `3dc08b2e8999f7a209de27b625eebc0ac46f989440ed6d2b6e1ea3874ad586d5`；0.2.6 历史包 SHA-256 为 `33bb72d63be4f7dd5dfd10e84a30842e7f2aade5b8f6bc5159f2b30c6442f6a6`。
+- 当前验证包：PhoneSDK/dist/permission-debug-0.2.8.mmpkg，SHA-256 `f88741fe13852b2533f7dd9aa0a982371c32ab32ca237603a3e7b25b19e8d420`。
 - 0.2.5 历史包 SHA-256 为 `8815cfafdb2353f2e19592da66169dd10ddcb3b8b87ccedd68746c521a1e7ba3`，会在页面隐藏时主动暂停播放并停止录音，不得用于锁屏验收。
 - 未升级 WebView/Tauri 依赖；当前版本的业务示例包已使用 Bridge 2.0 权限声明重新生成。
 - 未验证：真实手机/眼镜、系统定位权限、原生网络和音频隔离、实际文件选择器手工交互。独立 Tic-Tac-Toe 工程的构建与测试尚未执行。

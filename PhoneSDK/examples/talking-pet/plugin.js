@@ -65,10 +65,6 @@ const ACTION_TIMING = Object.freeze({
   sleep: 3000,
 });
 
-let recorder;
-let recordingStream;
-let recordingChunks = [];
-let recordingTimer;
 let decayTimer;
 let talkInputActive = false;
 let glassesConnected = false;
@@ -596,114 +592,52 @@ async function startRecording(event) {
   event?.preventDefault();
   talkInputActive = true;
   if (event?.pointerId !== undefined) talkButton.setPointerCapture?.(event.pointerId);
-  if (nativeAudioAvailable) {
-    if (nativeAudioState !== 'idle' && nativeAudioState !== 'stopped' && nativeAudioState !== 'error') return;
-    const pressGeneration = ++nativePressGeneration;
-      try {
-        nativeAudioState = 'starting';
-        nativeStartRequestInFlight = true;
-        const capture = await gm.audio.openCapture({
-          mode: 'recording',
-          pickupMode: 'frontFocus',
-          noiseReduction: true,
-          maxDurationMs: 5000,
-        });
-        nativeCapture = capture;
-      nativeStartRequestInFlight = false;
-      if (!talkInputActive || pressGeneration !== nativePressGeneration) requestNativeRecordingStop();
-    } catch (error) {
-      nativeStartRequestInFlight = false;
-      nativeAudioState = 'error';
-      showNativeAudioError(error);
-    }
+  if (!nativeAudioAvailable) {
+    talkInputActive = false;
+    resetTalkButton();
+    say('Glasses audio capture is unavailable. Check the connected device and audio permission.');
     return;
   }
-  if (recorder?.state === 'recording') return;
-  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-    say('This browser cannot record audio, but you can still pet me!');
-    return;
-  }
+  if (nativeAudioState !== 'idle' && nativeAudioState !== 'stopped' && nativeAudioState !== 'error') return;
+  const pressGeneration = ++nativePressGeneration;
   try {
-    recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    if (!talkInputActive) {
-      recordingStream.getTracks().forEach((track) => track.stop());
-      return;
-    }
-    recordingChunks = [];
-    recorder = new MediaRecorder(recordingStream);
-    recorder.addEventListener('dataavailable', (chunk) => {
-      if (chunk.data.size) recordingChunks.push(chunk.data);
+    nativeAudioState = 'starting';
+    nativeStartRequestInFlight = true;
+    const capture = await gm.audio.openRecording({
+      pickupMode: 'frontFocus',
+      noiseReduction: true,
+      maxDurationMs: 5000,
     });
-    recorder.addEventListener('stop', repeatRecording, { once: true });
-    recorder.start();
-    showListeningState();
-    setDeviceMood('listening', 6000);
-    say('My ears are up. I am listening…');
-    recordingTimer = window.setTimeout(stopRecording, 5000);
+    nativeCapture = capture;
+    nativeStartRequestInFlight = false;
+    if (!talkInputActive || pressGeneration !== nativePressGeneration) requestNativeRecordingStop();
   } catch (error) {
-    stopMouthAnimation();
-    say(error.name === 'NotAllowedError' ? 'Microphone permission is required so I can repeat you.' : 'The microphone is temporarily unavailable.');
+    nativeStartRequestInFlight = false;
+    nativeAudioState = 'error';
+    showNativeAudioError(error);
   }
 }
 
 function stopRecording(event) {
   event?.preventDefault();
   talkInputActive = false;
-  window.clearTimeout(recordingTimer);
-  if (nativeAudioAvailable) {
-    nativePressGeneration += 1;
-    if (nativeAudioState === 'capturing') {
-      showProcessingState();
-      requestNativeRecordingStop();
-    } else if (nativeAudioState === 'starting') {
-      showProcessingState();
-      // If the descriptor is already available, stop now. Otherwise
-      // startRecording() observes talkInputActive=false when openCapture()
-      // resolves and performs the same stop.
-      if (!nativeStartRequestInFlight && nativeCapture) requestNativeRecordingStop();
-    } else {
-      resetTalkButton();
-    }
+  nativePressGeneration += 1;
+  if (!nativeAudioAvailable) {
+    resetTalkButton();
     return;
   }
-  if (recorder?.state === 'recording') {
+  if (nativeAudioState === 'capturing') {
     showProcessingState();
-    recorder.stop();
+    requestNativeRecordingStop();
+  } else if (nativeAudioState === 'starting') {
+    showProcessingState();
+    // If the descriptor is already available, stop now. Otherwise
+    // startRecording() observes talkInputActive=false when openRecording()
+    // resolves and performs the same stop.
+    if (!nativeStartRequestInFlight && nativeCapture) requestNativeRecordingStop();
   } else {
     resetTalkButton();
   }
-}
-
-function repeatRecording() {
-  recordingStream?.getTracks().forEach((track) => track.stop());
-  if (!recordingChunks.length) {
-    resetTalkButton();
-    stopMouthAnimation();
-    return;
-  }
-  const audioUrl = URL.createObjectURL(new Blob(recordingChunks, { type: recorder.mimeType }));
-  const audio = new Audio(audioUrl);
-  audio.playbackRate = 1.3;
-  audio.preservesPitch = false;
-  audio.addEventListener('play', () => {
-    resetTalkButton();
-    say('Memo repeats:');
-    startMouthAnimation();
-    animate('talking', Math.max(800, (audio.duration || 2) * 770));
-    setDeviceMood('talking', Math.max(800, (audio.duration || 2) * 770));
-    burst('♪', 9, 'note');
-  });
-  audio.addEventListener('ended', () => {
-    stopMouthAnimation();
-    resetDeviceMood();
-    URL.revokeObjectURL(audioUrl);
-  }, { once: true });
-  audio.play().catch(() => {
-    stopMouthAnimation();
-    resetDeviceMood();
-    say('Tap the screen once, then let me repeat you.');
-  });
-  change({ happy: 10, energy: -2 }, 15);
 }
 
 pet.addEventListener('click', () => perform('pet'));
@@ -733,7 +667,11 @@ async function initialize() {
   try {
     await gm.ready();
     const capabilities = await gm.runtime.getCapabilities();
-    nativeAudioAvailable = Boolean(capabilities?.audio?.modes?.recording);
+    nativeAudioAvailable = Boolean(
+      capabilities?.audio
+      && capabilities?.methods?.includes('audio.openCapture')
+      && capabilities?.methods?.includes('audio.stopCapture'),
+    );
     const saved = await gm.storage.get('talking-pet-state');
     if (saved.value && typeof saved.value === 'object') Object.assign(state, saved.value);
     render();
@@ -752,7 +690,7 @@ async function initialize() {
     const deviceInfo = await gm.device.getInfo();
     glassesConnected = deviceInfo.connected;
     connectionDot.classList.toggle('connected', glassesConnected);
-    const audioMode = nativeAudioAvailable ? 'Glasses microphone ready' : 'Using phone microphone';
+    const audioMode = nativeAudioAvailable ? 'Glasses microphone ready' : 'Glasses microphone unavailable';
     status.textContent = glassesConnected
       ? `Audio Talking Pet plugin ready · ${audioMode}`
       : `Audio Talking Pet plugin ready · ${audioMode} · Waiting for glasses`;
@@ -776,7 +714,6 @@ window.addEventListener('pagehide', () => {
   idleBlinkGeneration += 1;
   stopMouthAnimation();
   stopRecording();
-  recordingStream?.getTracks().forEach((track) => track.stop());
 });
 
 initialize();

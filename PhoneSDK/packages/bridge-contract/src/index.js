@@ -47,56 +47,36 @@ export const AUDIO_PROFILE = Object.freeze({
   sampleRate: 16000,
   channels: 1,
   noiseReduction: true,
-  maxDurationMs: 15000,
-  maxFrames: 750,
-  maxOpusBytes: 64 * 1024,
   pickupModes: Object.freeze([
     'unchanged', 'frontFixed', 'meetingAuto', 'nonWearerFocus',
     'frontBalanced', 'frontFocus',
   ]),
-  modes: Object.freeze({
-    recording: Object.freeze({
-      maxDurationMs: 15000,
-      maxFrames: 750,
-      maxOpusBytes: 64 * 1024,
-      transport: 'message-port',
-      payload: 'binary-envelope-v1',
-      envelope: AUDIO_STREAM_ENVELOPE,
-      exposesAudioToWeb: true,
-      delivery: Object.freeze({
-        chunkDurationMs: 100,
-        maxQueueMs: 3000,
-        overflowStrategy: 'error',
-      }),
+  transport: 'message-port',
+  payload: 'binary-envelope-v1',
+  envelope: AUDIO_STREAM_ENVELOPE,
+  frameDurationMs: 20,
+  chunkDurationMs: Object.freeze({ min: 20, max: 200 }),
+  maxQueueMs: Object.freeze({ min: 100, max: 5000 }),
+  maxDurationMs: Object.freeze({ min: 1000, max: 60 * 60 * 1000, unlimited: true }),
+  defaultProfile: 'interactive',
+  profiles: Object.freeze({
+    interactive: Object.freeze({
+      chunkDurationMs: 40,
+      maxQueueMs: 200,
+      overflowStrategy: 'drop-oldest',
     }),
-    stream: Object.freeze({
-      transport: 'message-port',
-      payload: 'binary-envelope-v1',
-      envelope: AUDIO_STREAM_ENVELOPE,
-      frameDurationMs: 20,
-      chunkDurationMs: Object.freeze({ min: 20, max: 200 }),
-      maxQueueMs: Object.freeze({ min: 100, max: 5000 }),
-      maxDurationMs: Object.freeze({ min: 1000, max: 60 * 60 * 1000, unlimited: true }),
-      profiles: Object.freeze({
-        interactive: Object.freeze({
-          chunkDurationMs: 40,
-          maxQueueMs: 200,
-          overflowStrategy: 'drop-oldest',
-        }),
-        balanced: Object.freeze({
-          chunkDurationMs: 100,
-          maxQueueMs: 500,
-          overflowStrategy: 'drop-oldest',
-        }),
-        reliable: Object.freeze({
-          chunkDurationMs: 100,
-          maxQueueMs: 3000,
-          overflowStrategy: 'error',
-        }),
-      }),
-      overflowStrategies: Object.freeze(['drop-oldest', 'drop-newest', 'error']),
+    balanced: Object.freeze({
+      chunkDurationMs: 100,
+      maxQueueMs: 500,
+      overflowStrategy: 'drop-oldest',
+    }),
+    reliable: Object.freeze({
+      chunkDurationMs: 100,
+      maxQueueMs: 3000,
+      overflowStrategy: 'error',
     }),
   }),
+  overflowStrategies: Object.freeze(['drop-oldest', 'drop-newest', 'error']),
 });
 
 export const FILE_PROFILE = Object.freeze({

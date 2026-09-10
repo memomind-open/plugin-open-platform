@@ -193,7 +193,7 @@ Supported permissions:
 | `storage` | Use App key-value storage isolated to the current plugin |
 | `files.user-selected` | Import user-selected files into App-managed private storage and access them through `files.*` |
 | `network` | Declare that the plugin needs network access |
-| `audio.capture` | Capture Opus audio from the glasses in Host-retained recording or real-time binary stream mode, and play an allowlisted local voice effect |
+| `audio.capture` | Capture 16 kHz mono Opus from the glasses through the binary stream API; short recording is a bounded Web SDK helper over the same stream |
 
 The App checks `display`, `device.events`, `storage`, `files.user-selected`, and
 `audio.capture` at the corresponding Bridge calls. `device.getInfo()` and

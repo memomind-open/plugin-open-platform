@@ -6,7 +6,7 @@ An original talking-pet game built as a static GM Web Plugin example. Memo can
 be petted, fed, played with, and put to sleep. Hold the microphone button to
 record a short phrase; Memo repeats it with a playful voice effect. In the App,
 the example uses the glasses microphone through `gm.audio`, including native
-noise reduction, Host-retained bounded recording, and playback.
+noise reduction, the Web SDK's bounded short-recording helper, and H5 playback.
 The phone scene combines character motion, props, particles, lighting, and
 listening or speaking effects so every interaction has a distinct response.
 Feeding, playing, and sleeping use dedicated high-resolution poses. Feeding
@@ -21,16 +21,14 @@ From `PhoneSDK`:
 node tools/run-browser-studio.mjs --plugin examples/talking-pet
 ```
 
-Open `http://127.0.0.1:4173`. Microphone access requires browser permission and
-a secure context; `localhost` and `127.0.0.1` are treated as secure contexts by
-modern browsers.
+Open `http://127.0.0.1:4173`. Audio capture always goes through the Host's
+glasses-audio API. Desktop Studio supplies its selected computer microphone as
+the simulated glasses source; the plugin page never requests browser microphone
+permission and never falls back to `getUserMedia` or `MediaRecorder`.
 
-When the Host does not advertise native glasses audio, this example falls back
-to browser `MediaRecorder`. It never falls back after a native audio failure:
-the user sees the actual device or permission error instead.
-
-The native flow registers `gm.audio.onCaptureState`, then opens
-`mode: 'recording'` with `frontFocus` pickup and noise reduction. Stopping
+The native flow registers `gm.audio.onCaptureState`, then calls
+`gm.audio.openRecording()` with `frontFocus` pickup and noise reduction. This
+Web SDK convenience helper consumes the Host's unified stream immediately. Stopping
 returns Opus bytes and frame boundaries to H5. The page wraps those packets in
 Ogg and plays them with `<audio>` at a higher playback rate for the pet effect.
 This simple pet example intentionally does not consume the real-time stream API.

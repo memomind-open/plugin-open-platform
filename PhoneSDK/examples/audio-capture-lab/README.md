@@ -8,10 +8,11 @@ the audio channel.
 The example intentionally provides no browser-microphone fallback and sends no
 audio to a server. It exists to expose the exact Host contract:
 
-- `recording` transfers bounded Opus frames to H5 and returns `Uint8Array` data
-  plus frame boundaries, duration, frame count, and encoded byte count;
-- `stream` exposes `ReadableStream<AudioChunk>` over the SDK's transferable
+- the Host exposes only `openCapture()` and always returns
+  `ReadableStream<AudioChunk>` over the SDK's transferable
   binary MessagePort path, never Bridge JSON or Base64;
+- the short-recording tab uses the Web SDK-only `openRecording()` helper, which
+  immediately consumes that same stream and returns bounded Opus bytes to H5;
 - `captureState` drives native capture UI; playback is ordinary H5 `<audio>`;
 - a single click on the glasses asks the Web plugin to stop active audio, while
   a long press exits the GMP and lets the Host release the paired runtime.
@@ -22,8 +23,8 @@ and event data remain available in collapsed advanced and diagnostics panels.
 Recording mode presents only duration, Opus frame count, and encoded size;
 stream-only chunk, queue, drop, and discontinuity metrics stay hidden until
 real-time streaming is selected.
-English and Chinese are selected from the header; the first run follows the
-phone language and the selection is remembered.
+English and Chinese are selected from the header; each run initially follows
+the phone language and a manual switch lasts only for that run.
 
 ## Parameters demonstrated
 
@@ -34,10 +35,11 @@ Common capture options:
 - fixed Opus, 16 kHz, mono format;
 - `AbortSignal` cancellation.
 
-Recording mode demonstrates a 1-15 second limit and H5 playback of the
-transferred Opus recording.
+Short recording demonstrates the Web SDK's 1-15 second, 750-frame, and 64 KiB
+in-page limits plus H5 playback of the transferred Opus recording. These are
+not Host capture modes or Host-side recording buffers.
 
-Stream mode demonstrates `interactive`, `balanced`, `reliable`, and `custom`
+Real-time capture demonstrates `interactive`, `balanced`, `reliable`, and `custom`
 profiles. Custom mode exposes 20-200 ms chunks, a 100-5000 ms Host queue,
 `drop-oldest`, `drop-newest`, or `error` overflow behavior, and an optional
 1 second to 1 hour duration. A diagnostic consumer delay deliberately applies
