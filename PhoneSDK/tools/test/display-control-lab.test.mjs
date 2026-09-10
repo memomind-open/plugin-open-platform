@@ -76,7 +76,7 @@ test('Display Control Lab pairs one Web plugin with one GMP protocol', async () 
       },
     },
   ]);
-  assert.equal(manifest.version, '0.1.2');
+  assert.equal(manifest.version, '0.1.3');
   assert.equal(manifest.deviceRequirements.requiredPluginId, manifest.id);
   assert.equal(manifest.deviceRequirements.minPluginVersion, '2');
   assert.equal(glassManifest.id, manifest.id);
@@ -89,7 +89,6 @@ test('Display Control Lab covers visible copy in English and Chinese', async () 
   const keys = [...html.matchAll(/data-i18n="([^"]+)"/g)].map((match) => match[1]);
   const environment = (language) => ({
     navigator: { language },
-    localStorage: { getItem: () => null, setItem() {} },
   });
   const english = createI18n(environment('en-US'));
   const chinese = createI18n(environment('zh-CN'));
@@ -98,6 +97,17 @@ test('Display Control Lab covers visible copy in English and Chinese', async () 
     assert.notEqual(english.t(key), key, `missing English translation: ${key}`);
     assert.notEqual(chinese.t(key), key, `missing Chinese translation: ${key}`);
   }
+});
+
+test('Display Control Lab language selection works without localStorage', () => {
+  const environment = { navigator: { language: 'zh-CN' } };
+  Object.defineProperty(environment, 'localStorage', {
+    get() { throw new Error('localStorage is unavailable in an opaque sandbox'); },
+  });
+  const i18n = createI18n(environment);
+  assert.equal(i18n.language, 'zh');
+  assert.equal(i18n.toggle(), 'en');
+  assert.equal(i18n.language, 'en');
 });
 
 test('Display Control Lab preserves the Studio display and physical recovery path', async () => {
