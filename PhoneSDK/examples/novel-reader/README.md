@@ -2,7 +2,7 @@
 
 # Novel Reader Web plugin
 
-Version 0.4.0 imports user-selected TXT and reflowable EPUB novels through the Host Bridge and
+Version 0.4.1 imports user-selected TXT and reflowable EPUB novels through the Host Bridge and
 stores the selected source files in the App's private plugin directory. The
 phone plugin normalizes book text to UTF-8 and serves bounded text windows to
 the paired `novel_reader.gmp`. For EPUB, JPEG and PNG resources referenced by
@@ -93,5 +93,5 @@ controls, and privacy cleanup.
 Build the Web plugin package from `PhoneSDK`:
 
 ```sh
-node tools/build-mmpkg.mjs examples/novel-reader dist/memo-novel-reader-0.4.0.mmpkg
+node tools/build-mmpkg.mjs examples/novel-reader dist/novel-reader-0.4.1.mmpkg
 ```

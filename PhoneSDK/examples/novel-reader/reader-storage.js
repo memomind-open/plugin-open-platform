@@ -46,8 +46,20 @@ export class ReaderStorage {
     const file = result?.files?.[0];
     if (!file) return null;
     const normalized = normalizeFile(file);
+    const sameFile = this.filesById.get(normalized.fileId);
+    if (sameFile) return { file: sameFile, duplicate: true };
+    const duplicate = [...this.filesById.values()].find(
+      (existing) => bookImportKey(existing) === bookImportKey(normalized),
+    );
+    if (duplicate) {
+      const deleted = await this.gm.files.delete(normalized.fileId);
+      if (deleted?.deleted !== true) {
+        throw new Error('Host failed to remove the duplicate imported file');
+      }
+      return { file: duplicate, duplicate: true };
+    }
     this.filesById.set(normalized.fileId, normalized);
-    return normalized;
+    return { file: normalized, duplicate: false };
   }
 
   async getBook(fileId) {
@@ -196,6 +208,10 @@ function isBookFile(file) {
 function fileFormat(file) {
   const extension = String(file?.extension ?? '').replace(/^\./u, '').toLowerCase();
   return extension === 'epub' || /\.epub$/iu.test(file?.name ?? '') ? 'epub' : 'txt';
+}
+
+function bookImportKey(file) {
+  return `${fileFormat(file)}\u0000${file.name.trim().normalize('NFC').toLowerCase()}\u0000${file.size}`;
 }
 
 function isBookMetadata(value, fileId) {
