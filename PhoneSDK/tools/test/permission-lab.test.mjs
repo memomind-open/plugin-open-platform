@@ -6,9 +6,16 @@ import {validateManifestPolicy} from '../../packages/bridge-contract/src/permiss
 import vm from 'node:vm';
 test('lab declares all nine permissions optionally, reserving out-of-scope probes',async()=>{
  const manifest=JSON.parse(await readFile(new URL('../../examples/permission-debug/manifest.json',import.meta.url)));
+ assert.equal(manifest.name,'Plugin Capability Lab · Bridge 2.0');
+ assert.equal(manifest.version,'0.2.7');
  const p=validateManifestPolicy(manifest);assert.equal(p.length,9);assert.ok(p.every(x=>!x.required));
  assert.ok(!p.find(x=>x.name==='device.events').scope.types.includes('rawImu'));
  assert.ok(!p.some(x=>x.name==='device.messaging'));
+});
+test('lab displays its English product name',async()=>{
+ const html=await readFile(new URL('../../examples/permission-debug/index.html',import.meta.url),'utf8');
+ assert.match(html,/<title>Plugin Capability Lab<\/title>/);
+ assert.match(html,/<h1>Plugin Capability Lab<\/h1>/);
 });
 test('WAV test sound has a valid 2-second PCM payload and nonzero samples',()=>{
  const bytes=makeToneWav(),view=new DataView(bytes.buffer);
@@ -47,16 +54,16 @@ test('all UI actions are wired and recording requests use the App recording mode
 
 test('lab receives Opus bytes through capture sessions and plays them in H5',async()=>{
  const source=(await readFile(new URL('../../examples/permission-debug/plugin.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
- const nodes=new Map(),stops=[];let listener,resolveStart,failStop=false;
+ const nodes=new Map(),stops=[],domListeners=new Map();let listener,runtimeListener,resolveStart,failStop=false,pauseCount=0;
  const context2d={createImageData:()=>({data:new Uint8ClampedArray(4)}),putImageData(){}};
- const element=()=>({value:'',textContent:'',dataset:{},getContext:()=>context2d,addEventListener(){},pause(){},play:async()=>{},querySelectorAll:()=>[]});
+ const element=()=>({value:'',textContent:'',dataset:{},getContext:()=>context2d,addEventListener(){},pause(){pauseCount++;},play:async()=>{},querySelectorAll:()=>[]});
  const buttons=['playCapturedAudio','playTone','delayTone','stopAudio'].map(action=>({...element(),dataset:{action}}));
- const document={getElementById:id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);},querySelectorAll:()=>buttons,addEventListener(){}};
+ const document={hidden:false,getElementById:id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);},querySelectorAll:()=>buttons,addEventListener:(name,fn)=>domListeners.set('document:'+name,fn)};
  const recording={sessionId:'capture-A',mode:'recording',frameCount:2,opusBytes:5,durationMs:40,data:new Uint8Array([1,2,3,4,5]),frameLengths:[2,3]};
  const makeSession=id=>({sessionId:id,state:'starting',stop:async()=>{stops.push(id);if(failStop)throw Error('failed');return {...recording,sessionId:id};}});
- const noop=()=>{},gm={audio:{openCapture:()=>new Promise(r=>resolveStart=r),stopCapture:async id=>{stops.push(id);return {...recording,sessionId:id};},onCaptureState:fn=>listener=fn},device:{onButton:noop,onGesture:noop,onConnection:noop},plugin:{onMessage:noop},location:{onPosition:noop,onError:noop},on:noop,ready:()=>new Promise(()=>{})};
- const context=vm.createContext({createGMPlugin:()=>gm,opusRecordingToOgg:()=>new Blob(),document,window:{addEventListener(){}},gray4Pattern:()=>({width:1,height:1,bytes:new Uint8Array([0])}),setTimeout,clearTimeout,URL,Blob,console});
- vm.runInContext(source+'\nglobalThis.lab={actions,state,cleanup};',context);
+ const noop=()=>{},gm={audio:{openCapture:()=>new Promise(r=>resolveStart=r),stopCapture:async id=>{stops.push(id);return {...recording,sessionId:id};},onCaptureState:fn=>listener=fn},device:{onButton:noop,onGesture:noop,onConnection:noop},plugin:{onMessage:noop},location:{onPosition:noop,onError:noop},on:(name,fn)=>{if(name==='runtime.lifecycleChanged')runtimeListener=fn;},ready:()=>new Promise(()=>{})};
+ const context=vm.createContext({createGMPlugin:()=>gm,opusRecordingToOgg:()=>new Blob(),document,window:{addEventListener:(name,fn)=>domListeners.set('window:'+name,fn)},gray4Pattern:()=>({width:1,height:1,bytes:new Uint8Array([0])}),setTimeout,clearTimeout,URL,Blob,console});
+ vm.runInContext(source+'\nglobalThis.lab={actions,state,cleanup,suspendCleanup};',context);
  const {actions,state,cleanup}=context.lab;state.ready=true;
  const pending=actions.startCapture();
  listener({state:'starting',sessionId:'capture-A'});
@@ -67,6 +74,14 @@ test('lab receives Opus bytes through capture sessions and plays them in H5',asy
  assert.equal(state.captureSession,null);assert.equal(state.capture,false);
  assert.match(nodes.get('capture-result').textContent,/2 帧.*5 B.*40 ms/);
  await actions.playCapturedAudio();assert.equal(state.playbackBusy,true);
+ const active=actions.startCapture();resolveStart(makeSession('capture-C'));await active;
+ listener({state:'capturing',sessionId:'capture-C'});assert.equal(state.capture,true);
+ const stopsBeforeSuspend=stops.length,pausesBeforeSuspend=pauseCount;
+ document.hidden=true;domListeners.get('document:visibilitychange')();
+ runtimeListener({state:'suspended'});domListeners.get('window:pagehide')();
+ assert.equal(stops.length,stopsBeforeSuspend);assert.equal(pauseCount,pausesBeforeSuspend);
+ assert.equal(state.captureSession.sessionId,'capture-C');assert.equal(state.capture,true);assert.equal(state.playbackBusy,true);
+ await actions.stopCapture();assert.equal(state.captureSession,null);
  const late=actions.startCapture();cleanup();resolveStart(makeSession('capture-B'));await late;
  assert.equal(stops.at(-1),'capture-B');
 });

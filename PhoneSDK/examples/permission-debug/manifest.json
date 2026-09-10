@@ -1,7 +1,7 @@
 {
   "id": "com.memomind.debug.permissions",
-  "name": "插件能力实验室 · Bridge 2.0",
-  "version": "0.2.5",
+  "name": "Plugin Capability Lab · Bridge 2.0",
+  "version": "0.2.7",
   "entry": "index.html",
   "schemaVersion": 2,
   "permissionPolicyVersion": 1,
