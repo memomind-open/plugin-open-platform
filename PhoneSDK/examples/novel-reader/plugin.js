@@ -272,22 +272,30 @@ async function openBook(fileId, push = true, requestedEncoding) {
 
 async function importNovel() {
   if (!database) return;
-  let file;
+  let importedFile;
   try {
     setStatus('Opening the app file picker…');
-    file = await database.pickBook();
-    if (!file) {
+    const picked = await database.pickBook();
+    if (!picked) {
       setStatus('Import cancelled.');
       return;
     }
+    const { file, duplicate } = picked;
+    if (!duplicate) importedFile = file;
     await reloadBooks();
-    await openBook(file.fileId, true,
-      file.extension === 'epub' || /\.epub$/iu.test(file.name) ? undefined : encodingSelect.value);
-    setStatus(current.format === 'epub'
-      ? `EPUB imported successfully with ${current.epubImages.length} supported illustrations.`
-      : `TXT imported successfully. Detected encoding: ${current.encoding}.`);
+    const requestedEncoding = duplicate || file.extension === 'epub' || /\.epub$/iu.test(file.name)
+      ? undefined
+      : encodingSelect.value;
+    await openBook(file.fileId, true, requestedEncoding);
+    if (duplicate) {
+      setStatus(`"${current.title}" is already in the library. Opened the existing copy.`);
+    } else {
+      setStatus(current.format === 'epub'
+        ? `EPUB imported successfully with ${current.epubImages.length} supported illustrations.`
+        : `TXT imported successfully. Detected encoding: ${current.encoding}.`);
+    }
   } catch (error) {
-    if (file?.fileId) await database.deleteBook(file.fileId).catch(() => undefined);
+    if (importedFile?.fileId) await database.deleteBook(importedFile.fileId).catch(() => undefined);
     await reloadBooks().catch(() => undefined);
     setStatus(`Import failed: ${error.message}`, true);
   }

@@ -350,6 +350,45 @@ test('restores metadata by stable fileId and deletes file state together', async
   assert.equal(state.size, 0);
 });
 
+test('reuses an existing book and removes a repeated imported file', async () => {
+  const existing = {
+    fileId: 'd'.repeat(32),
+    name: '回到明朝当王爷_月关.txt',
+    size: 9_900_000,
+    importedAt: '2026-09-01T00:00:00.000Z',
+    extension: 'txt',
+  };
+  const repeated = {
+    ...existing,
+    fileId: 'e'.repeat(32),
+    importedAt: '2026-09-10T00:00:00.000Z',
+  };
+  const files = new Map([[existing.fileId, existing]]);
+  const deleted = [];
+  const gm = {
+    files: {
+      list: async () => ({ files: [...files.values()] }),
+      pick: async () => {
+        files.set(repeated.fileId, repeated);
+        return { files: [repeated] };
+      },
+      delete: async (fileId) => {
+        deleted.push(fileId);
+        return { deleted: files.delete(fileId) };
+      },
+    },
+    storage: {},
+  };
+
+  const reader = await new ReaderStorage(gm).open();
+  const picked = await reader.pickBook();
+  assert.equal(picked.duplicate, true);
+  assert.equal(picked.file.fileId, existing.fileId);
+  assert.deepEqual(deleted, [repeated.fileId]);
+  assert.deepEqual([...files.keys()], [existing.fileId]);
+  assert.equal(reader.filesById.has(repeated.fileId), false);
+});
+
 function memoryFileStorage(source) {
   return {
     async openRead(fileId, { offset = 0, length = source.length - offset } = {}) {
