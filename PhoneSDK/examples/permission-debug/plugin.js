@@ -198,18 +198,23 @@ player.addEventListener('ended',()=>{state.playbackBusy=false;updateAudioButtons
 player.addEventListener('playing',()=>log('audio.playing',{duration:player.duration,currentTime:player.currentTime,volume:player.volume,muted:player.muted,readyState:player.readyState}));
 player.addEventListener('error',()=>{const e=player.error??new Error('HTML audio playback failed');state.playbackBusy=false;updateAudioButtons();result('playback-result',describe(e),true);reportFailure('audio.player.error',e);});
 player.addEventListener('stalled',()=>log('audio.player.stalled',{currentTime:player.currentTime,readyState:player.readyState}));
-function cleanup(){
- ++state.revision;clearTimeout(state.timer);state.request?.abort();state.previewAbort?.abort();player.pause();
- for(const audio of $('file-preview').querySelectorAll('audio'))audio.pause();
+function suspendCleanup(){
+ clearTimeout(state.timer);state.request?.abort();state.previewAbort?.abort();
  if(!state.ready)return;
  if(state.watch)void gm.location.clearWatch(state.watch).catch(()=>{});
  if(state.subscription)void gm.device.unsubscribeEvents(state.subscription).catch(()=>{});
- if(state.capture&&state.captureSession)void state.captureSession.stop().catch(()=>{});
- state.watch=null;state.subscription=null;state.capture=false;releaseUrls();
+ state.watch=null;state.subscription=null;
 }
-document.addEventListener('visibilitychange',()=>{if(document.hidden)cleanup();});
-window.addEventListener('pagehide',cleanup);
-gm.on('runtime.lifecycleChanged',data=>{if(data.state!=='running')cleanup();});
+function cleanup(){
+ ++state.revision;suspendCleanup();player.pause();
+ for(const audio of $('file-preview').querySelectorAll('audio'))audio.pause();
+ if(state.ready&&state.capture&&state.captureSession)void state.captureSession.stop().catch(()=>{});
+ state.capture=false;releaseUrls();
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)suspendCleanup();});
+window.addEventListener('pagehide',suspendCleanup);
+window.addEventListener('beforeunload',cleanup);
+gm.on('runtime.lifecycleChanged',data=>{if(data.state!=='running')suspendCleanup();});
 drawPattern();
 gm.ready().then(async()=>{
  const version=await gm.runtime.getBridgeVersion();state.capabilities=await gm.runtime.getCapabilities();state.ready=true;

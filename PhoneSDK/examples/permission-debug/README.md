@@ -1,9 +1,9 @@
-> 2026-09-08 恢复受控配对通信：共 10 类权限、32 个 Bridge 方法。自定义 H5/设备配对插件声明 device.messaging 和 channels，授权后通过 gm.plugin.sendMessage/onMessage 双向通信；未授权、越界、失效运行态拒绝。标准显示/事件通道仍叠加相应权限。权限实验室 0.2.5 只测试九类标准能力，不提供任意消息按钮。通信权限不代表设备插件内部敏感行为已被 App 隔离；真机配对验收待完成。
+> 2026-09-08 恢复受控配对通信：共 10 类权限、32 个 Bridge 方法。自定义 H5/设备配对插件声明 device.messaging 和 channels，授权后通过 gm.plugin.sendMessage/onMessage 双向通信；未授权、越界、失效运行态拒绝。标准显示/事件通道仍叠加相应权限。权限实验室只测试九类标准能力，不提供任意消息按钮。通信权限不代表设备插件内部敏感行为已被 App 隔离；真机配对验收待完成。
 
-# 插件能力实验室 0.2.5
+# Plugin Capability Lab 0.2.7
 
 这是实际功能插件，不是日志展示页。宿主仍使用既有 Bridge 2.0，不升级 WebView。
-在当前权限开发版 Desktop Studio 刷新手机插件列表，选择「插件能力实验室 · Bridge 2.0 0.2.5」。
+在当前权限开发版 Desktop Studio 刷新手机插件列表，选择「Plugin Capability Lab · Bridge 2.0 0.2.7」。
 显示测试配对 GM Web Bridge；不提供通用消息发送功能。
 
 九种权限都声明为 optional，方便启动时全拒绝、部分同意、全部同意，比较真实操作结果。
@@ -22,14 +22,23 @@
 | location.foreground | 原生单次/监听/取消，坐标、精度、采样时间及离线轨迹图 |
 
 所有文件预览限 1 MiB、网络正文限 64 KiB；位置和文件不上传。
-测试音为 2 秒低幅度 PCM WAV。页面隐藏时停止播放、取消网络和定位/事件订阅，关闭录音。
+测试音为 2 秒低幅度 PCM WAV。锁屏/页面隐藏时保留正在播放的音频和录音会话，但取消网络、定位和事件订阅；真正卸载页面时才全量清理。
 不保存权限审批结果，不使用 H5 localStorage 替代 storage Bridge。
+
+## 0.2.7 变更
+
+- 插件清单名称、页面标题和主标题统一改为英文 `Plugin Capability Lab`。
+
+## 0.2.6 修复
+
+- 锁屏、`document.hidden`、`pagehide` 和 Runtime `suspended` 不再主动暂停 H5 音频或调用 `audio.stopCapture`。
+- 锁屏时仍取消网络请求、定位和设备事件订阅；`beforeunload` 保留完整释放。
 
 ## 0.2.5 修复
 
 - 展示录音帧数、Opus 字节数和采集时长；这些指标不等于有效人声。
 - 原生回放期间禁用重复播放和测试音按钮，终态恢复；显示并记录完整播放错误。
-- 修正 capturing 状态识别，保留页面隐藏时停止采集。
+- 修正 capturing 状态识别；当时页面隐藏会停止采集，已由 0.2.6 调整。
 - 网络默认使用支持 CORS 的公共测试接口，不代理请求、不绕过跨域限制。
 - App 导出日志同步保留录音数值统计及哈希后的回放 ID，不保存音频内容。
 
@@ -39,7 +48,7 @@
 
 ```sh
 npm run dev:permissions -- --port 4187
-npm run pack:plugin -- examples/permission-debug dist/permission-debug-0.2.5.mmpkg
+npm run pack:plugin -- examples/permission-debug dist/permission-debug-0.2.7.mmpkg
 ```
 
 若端口上已有此工作区的预览，直接刷新即可。

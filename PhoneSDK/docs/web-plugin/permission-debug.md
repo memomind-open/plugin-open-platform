@@ -1,4 +1,8 @@
-> 2026-09-08 恢复受控配对通信：共 10 类权限、32 个 Bridge 方法。自定义 H5/设备配对插件声明 device.messaging 和 channels，授权后通过 gm.plugin.sendMessage/onMessage 双向通信；未授权、越界、失效运行态拒绝。标准显示/事件通道仍叠加相应权限。权限实验室 0.2.5 只测试九类标准能力，不提供任意消息按钮。通信权限不代表设备插件内部敏感行为已被 App 隔离；真机配对验收待完成。以下历史状态以本段和恢复计划为准。
+> 2026-09-10 Plugin Capability Lab 0.2.7 将插件清单和页面名称统一为英文；0.2.6 的锁屏/后台验证行为保持不变。
+>
+> 2026-09-10 权限实验室 0.2.6 将锁屏/后台暂停与真正页面卸载拆分：`document.hidden`、`pagehide` 和 Runtime `suspended` 不再主动暂停 H5 音频或停止录音，用于验证宿主的真实锁屏能力。
+
+> 2026-09-08 恢复受控配对通信：共 10 类权限、32 个 Bridge 方法。自定义 H5/设备配对插件声明 device.messaging 和 channels，授权后通过 gm.plugin.sendMessage/onMessage 双向通信；未授权、越界、失效运行态拒绝。标准显示/事件通道仍叠加相应权限。权限实验室只测试九类标准能力，不提供任意消息按钮。通信权限不代表设备插件内部敏感行为已被 App 隔离；真机配对验收待完成。以下历史状态以本段和恢复计划为准。
 
 > 历史记录（已被 0.2.3 取代）：修复版 **0.2.1**，包为 `PhoneSDK/dist/permission-debug-0.2.1.mmpkg`。SDK现要求 `gm.audio.stopCapture(sessionId)`，必须使用openCapture返回的录音ID；实验室已接正常停止/退出清理，并读取captureState.result.recordingId。重新导入新包后验证；旧0.2.0不会自动更新。rawImu/1001/未知方法按钮预期被拒，百度fetch的CORS错误不代表禁网，测试服务需要允许跨域。
 > 0.2.0引入十种权限的真实操作页面。使用方式及限制见[实验室说明](../../examples/permission-debug/README.md)，下文0.1.0为历史。
@@ -17,7 +21,7 @@ npm run dev:permissions
 
 浏览器打开终端显示的地址（默认 http://127.0.0.1:4173）。当前会话的预览地址是 http://127.0.0.1:4187。
 
-当前权限实验室 0.2.5 的九项权限均为 optional。只批准 storage 时可写入便签，未批准的定位、录音应被拒绝。批准 device.events 后，负向 rawImu 探针仍因范围不符被拒绝。
+当前 Plugin Capability Lab 0.2.7 的九项权限均为 optional。只批准 storage 时可写入便签，未批准的定位、录音应被拒绝。批准 device.events 后，负向 rawImu 探针仍因范围不符被拒绝。
 消息权限需另选 Novel Reader / Fighter Controller / Talking Pet 等自定义配对插件，并选择其匹配设备插件；权限实验室不提供消息按钮。每次启动重新授权。
 
 ## Desktop Studio
@@ -31,14 +35,14 @@ GM_DEVICE_SDK_ROOT=/absolute/path/plugin-open-platform/GlassSDK \
 npm run dev:debug
 ```
 
-Phone 插件下拉选择“插件能力实验室 · Bridge 2.0”，完成宿主授权。专用示例不依赖眼镜插件即可调 storage/定位/拒绝路径；显示和真实插件消息需要选择匹配的 Glass 插件。
+Phone 插件下拉选择“Plugin Capability Lab · Bridge 2.0”，完成宿主授权。专用示例不依赖眼镜插件即可调 storage/定位/拒绝路径；显示和真实插件消息需要选择匹配的 Glass 插件。
 撤销按钮停止插件并失效文件流会话；刷新/重启后重新申请。
 
 ## 打包
 
 ```sh
 npm run sync:example-sdk
-npm run pack:plugin -- examples/permission-debug dist/permission-debug-0.2.5.mmpkg
+npm run pack:plugin -- examples/permission-debug dist/permission-debug-0.2.7.mmpkg
 ```
 
 包内 schemaVersion=2、permissionPolicyVersion=1、bridgeVersion="2.0"，权限为严格对象数组。
@@ -80,6 +84,7 @@ cargo test --offline --manifest-path desktop/src-tauri/Cargo.toml
 - Desktop：118/118 UI 单测、6/6 工具单测、27/27 Rust 测试通过；macOS Universal 2 DMG 构建成功。
 - Browser Studio：实际页面完成必需拒绝、最小授权、成功调用、三类权限拒绝、定位事件/停止与撤销重授权。
 - macOS Desktop：实际新编译窗口发现并加载“权限调试台”，完成 Bridge 2.0 握手、storage 写入、OUT_OF_SCOPE 与模拟定位返回。
-- 调试包：PhoneSDK/dist/permission-debug-0.2.5.mmpkg，SHA-256 8815cfafdb2353f2e19592da66169dd10ddcb3b8b87ccedd68746c521a1e7ba3。
+- 当前锁屏验证包：PhoneSDK/dist/permission-debug-0.2.7.mmpkg，SHA-256 `3dc08b2e8999f7a209de27b625eebc0ac46f989440ed6d2b6e1ea3874ad586d5`；0.2.6 历史包 SHA-256 为 `33bb72d63be4f7dd5dfd10e84a30842e7f2aade5b8f6bc5159f2b30c6442f6a6`。
+- 0.2.5 历史包 SHA-256 为 `8815cfafdb2353f2e19592da66169dd10ddcb3b8b87ccedd68746c521a1e7ba3`，会在页面隐藏时主动暂停播放并停止录音，不得用于锁屏验收。
 - 未升级 WebView/Tauri 依赖；当前版本的业务示例包已使用 Bridge 2.0 权限声明重新生成。
 - 未验证：真实手机/眼镜、系统定位权限、原生网络和音频隔离、实际文件选择器手工交互。独立 Tic-Tac-Toe 工程的构建与测试尚未执行。
