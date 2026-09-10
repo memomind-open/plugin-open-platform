@@ -247,14 +247,17 @@ def package_path(build_root: pathlib.Path, example: str) -> pathlib.Path:
     return build_root.joinpath(*normalized.parts, f"{normalized.name}.gmp")
 
 
-def intermediate_elf_path(example: str) -> pathlib.Path:
+def intermediate_elf_path(example: str, project=None) -> pathlib.Path:
     normalized = pathlib.PurePosixPath(example.replace("\\", "/").strip("/"))
-    return cmake_build_path().joinpath(
+    return cmake_build_path(project).joinpath(
         "artifacts", *normalized.parts, f"{normalized.name}.elf"
     )
 
 
-def cmake_build_path() -> pathlib.Path:
+def cmake_build_path(project=None) -> pathlib.Path:
+    if project is not None:
+        identity = hashlib.sha256(str(project).encode('utf-8')).hexdigest()[:16]
+        return cmake_build_path() / 'projects' / identity
     system, architecture = host()
     if system == "windows":
         local = os.environ.get("LOCALAPPDATA")
@@ -272,9 +275,9 @@ def cmake_build_path() -> pathlib.Path:
 
 def configure_cmake(
     cmake: pathlib.Path, ninja: pathlib.Path, build_root: pathlib.Path,
-    bin_dir: pathlib.Path,
+    bin_dir: pathlib.Path, project=None, include_dirs=(), system_include_dirs=(),
 ) -> None:
-    cmake_build = cmake_build_path()
+    cmake_build = cmake_build_path(project)
     command = [
         cmake, "-S", BUILD_DEFINITION, "-B", cmake_build, "-G", "Ninja",
         f"-DCMAKE_MAKE_PROGRAM={ninja}",
@@ -288,6 +291,9 @@ def configure_cmake(
         f"-DCMAKE_LINKER={tool(bin_dir, 'ld')}",
         f"-DGM_PYTHON_EXECUTABLE={sys.executable}",
         f"-DGM_OUTPUT_ROOT={build_root}",
+        f"-DGM_PROJECT_DIR={project or ''}",
+        '-DGM_PROJECT_INCLUDE_DIRS=' + ';'.join(str(p) for p in include_dirs),
+        '-DGM_REVIEW_SYSTEM_INCLUDE_DIRS=' + ';'.join(str(p) for p in system_include_dirs),
     ]
     try:
         run(command)
@@ -300,9 +306,9 @@ def configure_cmake(
 
 
 def build_cmake(
-    cmake: pathlib.Path, build_root: pathlib.Path, target: str | None = None,
+    cmake: pathlib.Path, build_root: pathlib.Path, target: str | None = None, project=None,
 ) -> None:
-    command: list[object] = [cmake, "--build", cmake_build_path(), "--parallel"]
+    command: list[object] = [cmake, "--build", cmake_build_path(project), "--parallel"]
     if target is not None:
         command.extend(("--target", target))
     run(command)
@@ -317,6 +323,8 @@ def main() -> int:
     python3 build.py all                     Build all maintained examples
     python3 build.py build --example game/2048
                                              Build one example
+    python3 build.py build --project /path/to/my-plugin
+                                             Build an external project
     python3 build.py inspect --example extension
                                              Build and inspect one plugin
 
@@ -338,35 +346,77 @@ Run build.py toolchain to display the selected RISC-V compiler.""",
         help="show this build guide and exit",
     )
     parser.add_argument("command", nargs="?", choices=("build", "all", "clean", "inspect", "toolchain"), default="build")
-    parser.add_argument("--example", help="example path below examples/")
-    parser.add_argument("--build-dir", type=pathlib.Path, default=BUILD_INTERNALS)
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--example", help="example path below examples/")
+    selection.add_argument("--project", type=pathlib.Path, help="plugin directory containing manifest.json and C sources")
+    parser.add_argument("--source-root", type=pathlib.Path, help="portable source root containing project and shared dependencies (default: project)")
+    parser.add_argument("--include-dir", type=pathlib.Path, action='append', default=[], help="additional header search directory; repeatable, relative to current directory")
+    parser.add_argument("--build-dir", type=pathlib.Path, help="output root (default: SDK build-host/.build, or PROJECT/.build)")
     parser.add_argument("--insecure-download", action="store_true", help="disable TLS certificate checks; the pinned SHA-256 is still verified")
     args = parser.parse_args()
-    build_root = args.build_dir.expanduser().resolve()
+    project = args.project.expanduser().resolve() if args.project else None
+    source_root = args.source_root.expanduser().resolve() if args.source_root else project
+    include_dirs = [p.expanduser().resolve() for p in args.include_dir]
+    if (args.source_root or include_dirs) and project is None:
+        parser.error('--source-root and --include-dir require --project')
+    if project is not None:
+        if not (project / 'manifest.json').is_file():
+            parser.error('--project must contain manifest.json')
+        if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]*', project.name):
+            parser.error('project directory name must use letters, digits, underscore, dot or hyphen')
+        if project != source_root and source_root not in project.parents:
+            parser.error('--project must be inside --source-root')
+        for directory in include_dirs:
+            if not directory.is_dir() or (directory != source_root and source_root not in directory.parents):
+                parser.error('--include-dir must be a directory inside --source-root')
+        if any(';' in str(p) for p in [project, source_root] + include_dirs):
+            parser.error('CMake project paths cannot contain semicolons')
+    build_root = (args.build_dir or (project / '.build' if project else BUILD_INTERNALS)).expanduser().resolve()
     if args.command == "clean":
-        shutil.rmtree(cmake_build_path(), ignore_errors=True)
+        shutil.rmtree(cmake_build_path(project), ignore_errors=True)
         print("Removed temporary build files; prebuilt GMP packages were kept")
         return 0
     if args.command == "toolchain":
         bin_dir = ensure_toolchain(args.insecure_download)
         run([tool(bin_dir, "gcc"), "--version"])
         return 0
-    if args.command == "inspect" and args.example is None:
-        parser.error("inspect requires --example")
-    if args.command == "all" and args.example is not None:
-        parser.error("all does not accept --example")
+    if args.command == "inspect" and args.example is None and project is None:
+        parser.error("inspect requires --example or --project")
+    if args.command == "all" and (args.example is not None or project is not None):
+        parser.error("all does not accept --example or --project")
 
     cmake, ninja = ensure_build_tools()
     bin_dir = ensure_toolchain(args.insecure_download)
-    configure_cmake(cmake, ninja, build_root, bin_dir)
+    from review_inputs import capture, verify_review_toolchain, embedded_include_dirs
+    verify_review_toolchain(SDK, bin_dir)
+    configure_cmake(cmake, ninja, build_root, bin_dir, project, include_dirs, embedded_include_dirs(SDK))
+
+    if project is not None:
+        target = cmake_target(project.name)
+        build_cmake(cmake, build_root, target, project)
+        gmp = package_path(build_root, project.name)
+        capture(SDK, project, gmp, cmake_build_path(project), ninja, tool(bin_dir, 'gcc'),
+                project_root=source_root, include_dirs=include_dirs)
+        if args.command == 'inspect':
+            run([tool(bin_dir, 'readelf'), '-h', '-l', '-S', '-r', '-s',
+                 intermediate_elf_path(project.name, project)])
+        print(f'Built {gmp}')
+        return 0
+
     if args.example is None:
         build_cmake(cmake, build_root)
+        for manifest in sorted((SDK / 'examples').rglob('manifest.json')):
+            example = manifest.parent.relative_to(SDK / 'examples').as_posix()
+            gmp = package_path(build_root, example)
+            if gmp.is_file():
+                capture(SDK, manifest.parent, gmp, cmake_build_path(), ninja, tool(bin_dir, 'gcc'))
         print(f"Built plugins under {build_root}")
         return 0
 
     example = args.example.replace("\\", "/").strip("/")
     build_cmake(cmake, build_root, cmake_target(example))
     gmp = package_path(build_root, example)
+    capture(SDK, SDK / 'examples' / example, gmp, cmake_build_path(), ninja, tool(bin_dir, 'gcc'))
     if args.command == "inspect":
         run([
             tool(bin_dir, "readelf"), "-h", "-l", "-S", "-r", "-s",
