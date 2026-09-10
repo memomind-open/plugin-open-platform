@@ -283,8 +283,10 @@ async function importNovel() {
     const { file, duplicate } = picked;
     if (!duplicate) importedFile = file;
     await reloadBooks();
-    await openBook(file.fileId, true,
-      file.extension === 'epub' || /\.epub$/iu.test(file.name) ? undefined : encodingSelect.value);
+    const requestedEncoding = duplicate || file.extension === 'epub' || /\.epub$/iu.test(file.name)
+      ? undefined
+      : encodingSelect.value;
+    await openBook(file.fileId, true, requestedEncoding);
     if (duplicate) {
       setStatus(`"${current.title}" is already in the library. Opened the existing copy.`);
     } else {
