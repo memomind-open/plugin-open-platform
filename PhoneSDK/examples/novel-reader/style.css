@@ -68,6 +68,9 @@ dialog { width: min(560px, calc(100vw - 36px)); max-height: 75vh; padding: 18px;
 dialog::backdrop { background: rgba(0, 0, 0, .72); }
 .dialog-list { display: grid; gap: 7px; max-height: 58vh; margin-top: 16px; overflow: auto; }
 .dialog-list button { text-align: left; }
+.bookmark-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
+.bookmark-open { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dialog-list .bookmark-delete { min-width: 72px; text-align: center; white-space: nowrap; }
 
 @media (max-width: 760px) {
   .topbar { padding: 15px 18px; }

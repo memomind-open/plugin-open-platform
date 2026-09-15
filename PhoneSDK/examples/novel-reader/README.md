@@ -2,7 +2,7 @@
 
 # Novel Reader Web plugin
 
-Version 0.4.1 imports user-selected TXT and reflowable EPUB novels through the Host Bridge and
+Version 0.4.2 imports user-selected TXT and reflowable EPUB novels through the Host Bridge and
 stores the selected source files in the App's private plugin directory. The
 phone plugin normalizes book text to UTF-8 and serves bounded text windows to
 the paired `novel_reader.gmp`. For EPUB, JPEG and PNG resources referenced by
@@ -54,7 +54,9 @@ spine documents to build a logical text/image index. During
 reading it opens only the source range needed for the next glasses text window
 and keeps a small six-window memory cache. Reopening an indexed book does not
 rescan or load the full file. Reading progress is persisted at a throttled
-interval together with its source-window anchor.
+interval together with its source-window anchor. The bookmark dialog can open
+or delete individual saved positions. Deleting a bookmark updates that book's
+metadata immediately without changing the current reading position.
 
 EPUB support intentionally targets reflowable EPUB2/EPUB3 books. It supports
 UTF-8 XHTML content plus JPEG and PNG `<img>` resources. Fixed-layout books,
@@ -93,5 +95,5 @@ controls, and privacy cleanup.
 Build the Web plugin package from `PhoneSDK`:
 
 ```sh
-node tools/build-mmpkg.mjs examples/novel-reader dist/novel-reader-0.4.1.mmpkg
+node tools/build-mmpkg.mjs examples/novel-reader dist/novel-reader-0.4.2.mmpkg
 ```
