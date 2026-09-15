@@ -666,7 +666,31 @@ async function syncChapter(force = false) {
   }
 }
 
-function showList(kind) {
+function bookmarkLabel(bookmark) {
+  const percentage = (bookmark.offset / Math.max(1, current.textBytes) * 100).toFixed(1);
+  const chapter = currentChapters[chapterIndexAt(currentChapters, bookmark.offset)]?.title ?? 'Full Text';
+  return `${percentage}% · ${chapter}`;
+}
+
+async function deleteBookmark(bookmark, row) {
+  const book = current;
+  if (!book || !confirm(`Delete bookmark at ${bookmarkLabel(bookmark)}?`)) return;
+  row.querySelectorAll('button').forEach((button) => { button.disabled = true; });
+  try {
+    const updated = await database.deleteBookmark(book, bookmark.offset);
+    if (current?.fileId !== book.fileId) return;
+    current = updated;
+    renderDialogList('bookmark');
+    setStatus('Bookmark deleted.');
+  } catch (error) {
+    if (row.isConnected) {
+      row.querySelectorAll('button').forEach((button) => { button.disabled = false; });
+    }
+    setStatus(`Bookmark deletion failed: ${error.message}`, true);
+  }
+}
+
+function renderDialogList(kind) {
   if (!current) return;
   dialogList.replaceChildren();
   if (kind === 'directory') {
@@ -690,16 +714,32 @@ function showList(kind) {
       dialogList.append(note);
     }
     for (const bookmark of bookmarks) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.textContent = `${(bookmark.offset / Math.max(1, current.textBytes) * 100).toFixed(1)}% · ${currentChapters[chapterIndexAt(currentChapters, bookmark.offset)]?.title ?? 'Full Text'}`;
-      button.addEventListener('click', () => {
+      const row = document.createElement('div');
+      row.className = 'bookmark-row';
+      const label = bookmarkLabel(bookmark);
+      const openButton = document.createElement('button');
+      openButton.type = 'button';
+      openButton.className = 'bookmark-open';
+      openButton.textContent = label;
+      openButton.addEventListener('click', () => {
         dialog.close();
         void openOnGlasses(bookmark);
       });
-      dialogList.append(button);
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'bookmark-delete danger';
+      deleteButton.textContent = 'Delete';
+      deleteButton.setAttribute('aria-label', `Delete bookmark at ${label}`);
+      deleteButton.addEventListener('click', () => void deleteBookmark(bookmark, row));
+      row.append(openButton, deleteButton);
+      dialogList.append(row);
     }
   }
+}
+
+function showList(kind) {
+  renderDialogList(kind);
+  if (!current) return;
   dialog.showModal();
 }
 

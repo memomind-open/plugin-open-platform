@@ -1,7 +1,7 @@
 {
   "id": "com.memomind.example.novel-reader",
   "name": "Novel Reader",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "entry": "index.html",
   "bridgeVersion": "2.0",
   "permissions": [

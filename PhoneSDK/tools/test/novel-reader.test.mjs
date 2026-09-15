@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
@@ -35,7 +36,10 @@ import {
   readNovelWindow,
   readNovelWindowSpan,
 } from '../../examples/novel-reader/reader-file.js';
-import { ReaderStorage } from '../../examples/novel-reader/reader-storage.js';
+import {
+  ReaderStorage,
+  createDefaultMetadata,
+} from '../../examples/novel-reader/reader-storage.js';
 import { rgbaToGray4 } from '../../examples/novel-reader/reader-image.js';
 
 test('normalizes UTF-8 TXT content and detects chapters', () => {
@@ -348,6 +352,59 @@ test('restores metadata by stable fileId and deletes file state together', async
   assert.equal(await restarted.deleteBook(fileId), true);
   assert.equal(files.size, 0);
   assert.equal(state.size, 0);
+});
+
+test('deletes one bookmark and persists the remaining reading metadata', async () => {
+  const file = {
+    fileId: 'f'.repeat(32),
+    name: 'bookmarks.txt',
+    size: 50_000,
+    importedAt: '2026-09-15T00:00:00.000Z',
+    extension: 'txt',
+  };
+  const state = new Map();
+  const gm = {
+    files: {},
+    storage: {
+      get: async (key) => ({ value: state.get(key) ?? null }),
+      set: async (key, value) => { state.set(key, structuredClone(value)); return { stored: true }; },
+      remove: async (key) => ({ removed: state.delete(key) }),
+    },
+  };
+  const reader = new ReaderStorage(gm);
+  const metadata = {
+    ...createDefaultMetadata(file),
+    progressOffset: 12_345,
+    bookmarks: [
+      { offset: 1_000, sourceOffset: 900, windowOffset: 800, savedAt: 1 },
+      { offset: 12_345, sourceOffset: 12_000, windowOffset: 11_900, savedAt: 2 },
+      { offset: 40_000, sourceOffset: 39_500, windowOffset: 39_000, savedAt: 3 },
+    ],
+  };
+  await reader.putMetadata(metadata);
+
+  const updated = await reader.deleteBookmark(metadata, 12_345);
+  assert.notEqual(updated, metadata);
+  assert.equal(updated.progressOffset, metadata.progressOffset);
+  assert.deepEqual(updated.bookmarks.map((bookmark) => bookmark.offset), [1_000, 40_000]);
+  assert.deepEqual(metadata.bookmarks.map((bookmark) => bookmark.offset), [1_000, 12_345, 40_000]);
+  const restored = await reader.getMetadata(file.fileId, false);
+  assert.deepEqual(restored.bookmarks, updated.bookmarks);
+
+  assert.equal(await reader.deleteBookmark(updated, 12_345), updated);
+  await assert.rejects(() => reader.deleteBookmark(updated, -1), /bookmark offset/u);
+});
+
+test('bookmark dialog exposes a persisted per-bookmark delete action', async () => {
+  const [plugin, css] = await Promise.all([
+    readFile(new URL('../../examples/novel-reader/plugin.js', import.meta.url), 'utf8'),
+    readFile(new URL('../../examples/novel-reader/style.css', import.meta.url), 'utf8'),
+  ]);
+  assert.match(plugin, /database\.deleteBookmark\(book, bookmark\.offset\)/u);
+  assert.match(plugin, /deleteButton\.textContent = 'Delete'/u);
+  assert.match(plugin, /renderDialogList\('bookmark'\)/u);
+  assert.match(css, /\.bookmark-row\s*\{/u);
+  assert.match(css, /\.bookmark-delete\s*\{/u);
 });
 
 test('reuses an existing book and removes a repeated imported file', async () => {

@@ -126,6 +126,23 @@ export class ReaderStorage {
     return result?.deleted === true;
   }
 
+  async deleteBookmark(metadata, offset) {
+    requireFileId(metadata?.fileId);
+    if (!Number.isSafeInteger(offset) || offset < 0) {
+      throw new TypeError('bookmark offset must be a non-negative safe integer');
+    }
+    const bookmarks = Array.isArray(metadata.bookmarks) ? metadata.bookmarks : [];
+    const remaining = bookmarks.filter((bookmark) => bookmark?.offset !== offset);
+    if (remaining.length === bookmarks.length) return metadata;
+    const updated = {
+      ...metadata,
+      bookmarks: remaining,
+      updatedAt: Date.now(),
+    };
+    await this.putMetadata(updated);
+    return updated;
+  }
+
   async openRead(fileId, options) {
     requireFileId(fileId);
     for (let attempt = 0; ; attempt += 1) {
