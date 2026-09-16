@@ -157,7 +157,8 @@ static uint8_t status_code(gm_plugin_result_t result)
 static void read_current_state(display_lab_t *self)
 {
     self->screen_on = self->host->display_control.screen_is_on();
-    self->brightness = (uint8_t)self->host->display_control.brightness_get();
+    if (!self->auto_brightness_blocked)
+        self->brightness = (uint8_t)self->host->display_control.brightness_get();
     self->distance = (uint8_t)self->host->display_control.distance_get();
     self->height = (uint8_t)self->host->display_control.height_get();
     if (!self->preview_only) self->requested_screen_on = self->screen_on;
@@ -349,6 +350,8 @@ static void restore_loop(display_lab_t *self)
             if (self->brightness != self->initial_brightness) {
                 next = self->host->display_control.brightness_set(
                     (gm_plugin_display_brightness_t)self->initial_brightness);
+                if (next == GM_PLUGIN_OK)
+                    self->brightness = self->initial_brightness;
                 called_host = true;
             }
             break;
@@ -446,9 +449,11 @@ static bool receive_command(display_lab_t *self,
             result = self->host->display_control.auto_brightness_block(true);
             if (result == GM_PLUGIN_OK) self->auto_brightness_blocked = true;
         }
-        if (result == GM_PLUGIN_OK)
+        if (result == GM_PLUGIN_OK) {
             result = self->host->display_control.brightness_set(
                 (gm_plugin_display_brightness_t)value);
+            if (result == GM_PLUGIN_OK) self->brightness = value;
+        }
         break;
     case OP_SET_DISTANCE:
         if (value > 8U || preview_only) result = GM_PLUGIN_EINVAL;
