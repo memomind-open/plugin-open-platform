@@ -319,8 +319,7 @@ async function consumeStream(session, generation) {
 }
 
 async function startCapture() {
-  if (!audioAvailable || !deviceConnected || captureOpening || currentCapture || playbackActive
-      || document.visibilityState === 'hidden') return;
+  if (!audioAvailable || !deviceConnected || captureOpening || currentCapture || playbackActive) return;
   const generation = ++captureGeneration;
   recordingResult = undefined;
   metrics.reset();
@@ -350,8 +349,7 @@ async function startCapture() {
     const session = mode === 'recording'
       ? await gm.audio.openRecording(options)
       : await gm.audio.openCapture(options);
-    if (generation !== captureGeneration || abortController.signal.aborted
-        || document.visibilityState === 'hidden') {
+    if (generation !== captureGeneration || abortController.signal.aborted) {
       captureOpening = false;
       await session.stop().catch(() => {});
       if (captureAbortController === abortController) captureAbortController = undefined;
@@ -567,7 +565,7 @@ async function initialize() {
   updateControls();
 }
 
-const telemetryTimer = window.setInterval(() => {
+window.setInterval(() => {
   if (!currentCapture) return;
   if (currentCaptureMode === 'recording') renderRecordingMetrics();
   else renderStreamMetrics();
@@ -576,20 +574,5 @@ const telemetryTimer = window.setInterval(() => {
     scheduleDeviceSync(0);
   }
 }, 500);
-
-async function cleanup() {
-  window.clearInterval(telemetryTimer);
-  window.clearTimeout(deviceSyncTimer);
-  captureGeneration += 1;
-  captureAbortController?.abort('Audio Capture Lab lifecycle ended');
-  if (currentCapture) await currentCapture.stop().catch(() => {});
-  if (playbackActive) ui.recordingPlayer.pause();
-  if (recordingUrl) URL.revokeObjectURL(recordingUrl);
-}
-
-window.addEventListener('pagehide', () => { void cleanup(); }, { once: true });
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') void stopActiveOperation('page-hidden');
-});
 
 void initialize();

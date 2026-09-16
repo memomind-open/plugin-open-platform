@@ -14,6 +14,9 @@ audio to a server. It exists to expose the exact Host contract:
 - the short-recording tab uses the Web SDK-only `openRecording()` helper, which
   immediately consumes that same stream and returns bounded Opus bytes to H5;
 - `captureState` drives native capture UI; playback is ordinary H5 `<audio>`;
+- hiding or backgrounding the Web plugin does not call `stop()` or abort an
+  opening capture; capture continues until the user stops it, a user-selected
+  duration limit is reached, or the Host/system ends the plugin runtime;
 - a single click on the glasses asks the Web plugin to stop active audio, while
   a long press exits the GMP and lets the Host release the paired runtime.
 
