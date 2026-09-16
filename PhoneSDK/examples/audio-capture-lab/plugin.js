@@ -565,7 +565,7 @@ async function initialize() {
   updateControls();
 }
 
-window.setInterval(() => {
+const telemetryTimer = window.setInterval(() => {
   if (!currentCapture) return;
   if (currentCaptureMode === 'recording') renderRecordingMetrics();
   else renderStreamMetrics();
@@ -574,5 +574,20 @@ window.setInterval(() => {
     scheduleDeviceSync(0);
   }
 }, 500);
+
+function cleanup() {
+  window.clearInterval(telemetryTimer);
+  window.clearTimeout(deviceSyncTimer);
+  captureGeneration += 1;
+  captureAbortController?.abort('Audio Capture Lab page unloaded');
+  if (currentCapture) void currentCapture.stop().catch(() => {});
+  if (playbackActive) ui.recordingPlayer.pause();
+  if (recordingUrl) {
+    URL.revokeObjectURL(recordingUrl);
+    recordingUrl = undefined;
+  }
+}
+
+window.addEventListener('beforeunload', cleanup, { once: true });
 
 void initialize();

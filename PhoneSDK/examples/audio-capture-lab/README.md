@@ -16,7 +16,8 @@ audio to a server. It exists to expose the exact Host contract:
 - `captureState` drives native capture UI; playback is ordinary H5 `<audio>`;
 - hiding or backgrounding the Web plugin does not call `stop()` or abort an
   opening capture; capture continues until the user stops it, a user-selected
-  duration limit is reached, or the Host/system ends the plugin runtime;
+  duration limit is reached, the page is actually unloaded, or the Host/system
+  ends the plugin runtime;
 - a single click on the glasses asks the Web plugin to stop active audio, while
   a long press exits the GMP and lets the Host release the paired runtime.
 

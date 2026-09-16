@@ -172,6 +172,12 @@ test('Audio Capture Lab does not stop capture when the page becomes hidden', asy
   assert.doesNotMatch(plugin, /visibilitychange/);
   assert.doesNotMatch(plugin, /pagehide/);
   assert.doesNotMatch(plugin, /Audio Capture Lab lifecycle ended/);
+  assert.match(plugin, /const telemetryTimer = window\.setInterval/);
+  assert.match(plugin, /window\.addEventListener\('beforeunload', cleanup, \{ once: true \}\)/);
+  assert.match(plugin, /window\.clearInterval\(telemetryTimer\)/);
+  assert.match(plugin, /captureAbortController\?\.abort\('Audio Capture Lab page unloaded'\)/);
+  assert.match(plugin, /if \(currentCapture\) void currentCapture\.stop\(\)\.catch\(\(\) => \{\}\)/);
+  assert.match(plugin, /URL\.revokeObjectURL\(recordingUrl\)/);
   assert.match(plugin, /ui\.stopCapture\.addEventListener\('click', \(\) => void stopCapture\('phone-button'\)\)/);
   assert.match(plugin, /event\.action === 'single'\) void stopActiveOperation\('glasses-button'\)/);
 });
