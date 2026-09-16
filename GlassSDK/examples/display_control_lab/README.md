@@ -8,6 +8,9 @@ values captured during `on_start`.
 Manual brightness temporarily blocks automatic brightness. The block is
 released by Restore, long-press recovery, and `on_stop`. The Host remains
 responsible for restoring every control changed by the plugin when it stops.
+While automatic brightness is blocked, the plugin reports the last fixed level
+accepted by `brightness_set()` instead of immediately replacing it with a
+possibly stale `brightness_get()` result.
 Restore runs incrementally from `on_loop`, performs at most one Host control
 call per iteration, and reports progress after each step. A failed automatic
 brightness release remains marked as blocked so a later cleanup path can retry.

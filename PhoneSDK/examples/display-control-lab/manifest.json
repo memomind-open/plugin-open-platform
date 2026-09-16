@@ -1,7 +1,7 @@
 {
   "id": "com.memomind.demo.display-control-lab",
   "name": "Display Control Lab",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "entry": "index.html",
   "bridgeVersion": "2.0",
   "permissions": [
@@ -27,7 +27,7 @@
   "deviceRequirements": {
     "preferredPluginId": "com.memomind.demo.display-control-lab",
     "requiredPluginId": "com.memomind.demo.display-control-lab",
-    "minPluginVersion": "2",
+    "minPluginVersion": "3",
     "protocols": [
       { "id": "gm.display-control-lab", "minVersion": "1.0" }
     ]

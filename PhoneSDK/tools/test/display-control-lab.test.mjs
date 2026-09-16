@@ -76,11 +76,11 @@ test('Display Control Lab pairs one Web plugin with one GMP protocol', async () 
       },
     },
   ]);
-  assert.equal(manifest.version, '0.1.3');
+  assert.equal(manifest.version, '0.1.4');
   assert.equal(manifest.deviceRequirements.requiredPluginId, manifest.id);
-  assert.equal(manifest.deviceRequirements.minPluginVersion, '2');
+  assert.equal(manifest.deviceRequirements.minPluginVersion, '3');
   assert.equal(glassManifest.id, manifest.id);
-  assert.equal(glassManifest.version, 2);
+  assert.equal(glassManifest.version, 3);
   assert.equal(glassManifest.provides.protocols[0].id, 'gm.display-control-lab');
 });
 
@@ -149,6 +149,14 @@ test('Display Control Lab preserves cleanup state when Host calls fail', async (
     `${root}/../GlassSDK/examples/display_control_lab/display_control_lab.c`, 'utf8');
   assert.match(gmp, /auto_brightness_block\(false\);[\s\S]*if \(result == GM_PLUGIN_OK\) self->auto_brightness_blocked = false/);
   assert.match(gmp, /if \(result != GM_PLUGIN_OK\) \{[\s\S]*clear_ui\(self\);/);
+});
+
+test('Display Control Lab keeps the accepted fixed brightness while auto brightness is blocked', async () => {
+  const gmp = await readFile(
+    `${root}/../GlassSDK/examples/display_control_lab/display_control_lab.c`, 'utf8');
+  assert.match(gmp, /if \(!self->auto_brightness_blocked\)\s+self->brightness = \(uint8_t\)self->host->display_control\.brightness_get\(\)/);
+  assert.match(gmp, /brightness_set\([\s\S]*?if \(result == GM_PLUGIN_OK\) self->brightness = value/);
+  assert.match(gmp, /RESTORE_STEP_BRIGHTNESS[\s\S]*?if \(next == GM_PLUGIN_OK\)\s+self->brightness = self->initial_brightness/);
 });
 
 test('Display Control Lab wakes and synchronizes power from glasses input', async () => {
