@@ -166,12 +166,20 @@ test('Audio Capture Lab separates recording results from stream-only metrics', a
   assert.match(plugin, /streamMetrics\.classList\.toggle\('hidden', mode !== 'stream'\)/);
 });
 
-test('Audio Capture Lab aborts an opening capture when the page becomes hidden', async () => {
+test('Audio Capture Lab does not stop capture when the page becomes hidden', async () => {
   const plugin = await readFile(`${root}/examples/audio-capture-lab/plugin.js`, 'utf8');
-  assert.match(plugin, /if \(captureOpening\) abortCapture\(\)/);
-  assert.match(plugin, /abortController\.signal\.aborted\s*\|\|\s*document\.visibilityState === 'hidden'/);
-  assert.match(plugin, /await session\.stop\(\)\.catch\(\(\) => \{\}\)/);
-  assert.match(plugin, /document\.visibilityState === 'hidden'\) void stopActiveOperation\('page-hidden'\)/);
+  assert.doesNotMatch(plugin, /document\.visibilityState/);
+  assert.doesNotMatch(plugin, /visibilitychange/);
+  assert.doesNotMatch(plugin, /pagehide/);
+  assert.doesNotMatch(plugin, /Audio Capture Lab lifecycle ended/);
+  assert.match(plugin, /const telemetryTimer = window\.setInterval/);
+  assert.match(plugin, /window\.addEventListener\('beforeunload', cleanup, \{ once: true \}\)/);
+  assert.match(plugin, /window\.clearInterval\(telemetryTimer\)/);
+  assert.match(plugin, /captureAbortController\?\.abort\('Audio Capture Lab page unloaded'\)/);
+  assert.match(plugin, /if \(currentCapture\) void currentCapture\.stop\(\)\.catch\(\(\) => \{\}\)/);
+  assert.match(plugin, /URL\.revokeObjectURL\(recordingUrl\)/);
+  assert.match(plugin, /ui\.stopCapture\.addEventListener\('click', \(\) => void stopCapture\('phone-button'\)\)/);
+  assert.match(plugin, /event\.action === 'single'\) void stopActiveOperation\('glasses-button'\)/);
 });
 
 test('Audio Capture Lab exits the GMP on primary LONG and VERY_LONG actions', async () => {
