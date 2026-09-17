@@ -6,6 +6,8 @@
 #define IMAGE_HEIGHT ((PF_SPRITE_HEIGHT * 2U + 1U) / 3U)
 #define IMAGE_ROW_BYTES ((IMAGE_WIDTH + 1U) / 2U)
 #define IMAGE_DATA_SIZE (64U + IMAGE_ROW_BYTES * IMAGE_HEIGHT)
+/* LVGL reads 32-bit palette entries. Align every frame, not just the array. */
+#define IMAGE_STORAGE_STRIDE ((IMAGE_DATA_SIZE + 3U) & ~3U)
 #define FRAME_COUNT 4U
 #define PANEL_WIDTH 276
 #define PANEL_HEIGHT 230
@@ -19,7 +21,7 @@ static const uint8_t s_fighter_frame_indexes[FRAME_COUNT] = {0U, 5U, 8U, 1U};
 static const gm_plugin_lvgl_api_t *s_ui;
 static gm_plugin_lvgl_obj_t *s_static_image;
 static gm_plugin_lvgl_obj_t *s_animation;
-static uint8_t s_frame_data[FRAME_COUNT][IMAGE_DATA_SIZE];
+_Alignas(4) static uint8_t s_frame_data[FRAME_COUNT][IMAGE_STORAGE_STRIDE];
 static gm_plugin_lvgl_image_dsc_t s_frame_descriptors[FRAME_COUNT];
 static uint32_t s_move_elapsed_ms;
 static int16_t s_animation_x;

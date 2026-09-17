@@ -241,11 +241,19 @@ developer and relocation metadata used by `build.py inspect`. The glasses and
 Desktop Studio load the compact `.gmp` package from `build-host/.build/`, not
 the complete ELF file.
 
-### Why is the plugin gone after reboot?
+### What are the Flash, RAM and stack limits?
 
-Plugins currently run from RAM and are not persisted in Flash. Start Desktop
-Studio again and reinstall the `.gmp` with Studio's QR code through the official
-App's Developer Workbench after the glasses reboot.
+Code/constants are cached and executed in CUS8 Flash (at most **500 KiB**).
+Static RAM (.data/.bss, padding and pointer tables) must be **below 100 KiB**;
+it is initialized again on each load. A complete matching Flash cache skips
+retransmission; incomplete or mismatched packages cannot run.
+
+The SDK fails compilation for a function frame over **1024 bytes** or dynamic
+stack allocation, and saves GCC `.su` reports beside objects. Large buffers
+should use `host->alloc()/free()` with allocation-failure handling. This check
+covers individual compiled functions, not the total call chain. The 100 KiB
+static limit excludes dynamic heap and Host overhead. See [ABI.md](docs/ABI.md#build-memory-and-stack-checks)
+for exact limits and the glasses' shared 8 KiB display-task stack.
 
 ### Which graphics API should I use?
 

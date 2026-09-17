@@ -63,6 +63,23 @@ readable and unchanged until `image_set_source()` replaces the source,
 `anim_image_set_sources()` replaces the frame set, or the object is deleted.
 Static storage is the simplest safe choice.
 
+Each payload address must be **4-byte aligned**, because LVGL reads its palette
+as 32-bit colors. The Host rejects unaligned payloads. Align both the array base
+and each frame's storage stride; do not add padding within image rows or count
+trailing storage padding in `data_size`. For example:
+
+```c
+#define IMAGE_BYTES (64U + ((WIDTH + 1U) / 2U) * HEIGHT)
+#define FRAME_STRIDE ((IMAGE_BYTES + 3U) & ~3U)
+_Alignas(4) static uint8_t frames[FRAME_COUNT][FRAME_STRIDE];
+/* descriptor.data = frames[index]; descriptor.data_size = IMAGE_BYTES; */
+```
+
+The SDK compiler supports `_Alignas(4)`. A 75 by 65 image has 2534 payload
+bytes but uses a 2536-byte stride in such an array. Dynamically allocated image
+storage must also keep every frame address aligned; adding an arbitrary byte
+offset to an aligned allocation can violate the requirement.
+
 `anim_image_create()` creates a stopped animation. Set its frame duration and
 repeat count as needed, then call `anim_image_start()`. A repeat count of zero
 plays once; `GM_PLUGIN_LVGL_ANIM_REPEAT_INFINITE` loops indefinitely. The Host

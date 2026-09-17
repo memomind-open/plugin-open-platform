@@ -5,21 +5,13 @@ plugins. The public headers under `include/` are the canonical source.
 
 ## Compatibility baseline
 
-ABI 1.0 is the initial compatibility baseline. Firmware build versions and
-plugin ABI versions are independent: an internal firmware change does not bump
-the plugin ABI. Capability bits, event IDs, existing field offsets, function
-signatures, and published behavior are immutable.
+This pre-release revision uses GMP v2 only. Package ABI, plugin descriptor ABI,
+and firmware Host ABI must match exactly. A mismatched package is rejected
+before execution. There is no GMP v1 loading or wire fallback.
 
-The core ABI does not accept additive changes after publication. New optional
-modules use separately identified extension tables. Changed extension behavior
-requires a new entry or extension ID while the Host keeps serving the old
-interface. Future package formats are added beside GMP v1 rather than replacing
-it.
-
-Use `GM_PLUGIN_ABI_MIN_VERSION`, `GM_PLUGIN_HOST_API_MIN_SIZE`, and
-`GM_PLUGIN_DESCRIPTOR_MIN_SIZE` to validate the frozen baseline. The
-cross-platform build driver compiles fixed RV32 layout assertions. Repository CI additionally
-compares public layouts and the wire contract against a frozen snapshot.
+The public headers define the current core and extension table layouts. The
+build compiles RV32 layout assertions. Future release compatibility policy is
+separate from this first-stage strict matching rule.
 
 ## Lifecycle
 
@@ -34,16 +26,15 @@ gm_plugin_entry
   must not allocate or acquire resources because a rejected descriptor has no
   validated cleanup callback.
 - `on_load` acquires non-UI resources that live for the loaded image.
-- If `on_load` returns an error, the Host still calls `on_unload` before
-  releasing the image. `on_unload` must safely clean up a partially initialized
-  context. Do not free the same resources in both failure paths.
+- If `on_load` returns an error, it must clean up its partial state. The Host
+  does not call `on_unload` for a failed load.
 - `on_start` creates UI and starts one visible application cycle. A display root
   does not exist during `on_load`.
 - If `on_start` returns an error, `on_stop` is not called. The failed callback
   must clean up its partial start/UI state.
 - `on_stop` releases resources belonging to the visible cycle.
-- `on_unload` releases load-lifetime resources before executable memory is
-  freed.
+- `on_unload` releases load-lifetime resources before RAM data is
+  freed. The cached Flash image remains available.
 
 Callbacks execute serially on the display task. They must not block, sleep,
 spin, or retain borrowed event payload pointers.
@@ -57,7 +48,7 @@ spin, or retain borrowed event payload pointers.
 - Store the Host function table and access firmware services only through it.
 - Normal plugins should populate lifecycle callbacks at runtime. The packer can
   record base relocations needed by third-party libraries with static pointers.
-- Do not use TLS, GOT imports, exceptions, RTTI, static constructors, dynamic
+- Do not use TLS, external GOT imports, exceptions, RTTI, static constructors, dynamic
   allocation before `gm_plugin_entry`, or undefined symbols.
 
 ## Core and extensions
@@ -106,17 +97,37 @@ Plugins do not link firmware libraries, LVGL, libc, or FreeRTOS. The Host owns
 shared runtime services. The `log` entry accepts a `printf`-style format and
 arguments; the Host performs logging without a plugin-side persistent buffer.
 
-The packer enforces the current 200 KiB package/runtime ceiling. GMP is padded
-only when its allocation must cover the runtime image and BSS. On commit, the
-Host converts the received allocation into the executable image in place. It
-does not retain both a package buffer and a second runtime buffer.
+Code and read-only constants execute in CUS8 Flash. Writable data, BSS, GOT and
+relocatable pointer tables use RAM. The package contains only RAM initial data;
+BSS is zeroed at load. Constant pointer tables may require RAM even when their
+pointed-to strings or assets remain in Flash.
 
-Only one plugin is supported. Receiving a replacement unloads the previous
-image before allocating the incoming package.
+The package storage limit is 3 MiB minus 64 KiB of directory space. Flash
+code/constants must be at most 500 KiB. Static RAM data/BSS (including linked
+padding, GOT and pointer tables) must be strictly below 100 KiB. This static
+limit excludes dynamic heap, task stack and Host bookkeeping; allocation can
+still fail under system pressure. There is one 512 B static address-slot table. RAM allocations include
+up to 63 B alignment padding. No full-package RAM copy is used by SPP install.
+Bluetooth installation uses independent blocks, normally 64 KiB before compression.
+The bounded pipeline reuses one 65,824 B arena for encoded input, decoded output,
+and next-block data in already-written prefixes. One existing BT payload of at
+most 8192 B is parsed directly into its final TLV node; ownership of the whole
+node passes to the worker without an extra 8 KiB copy. The arena is
+released at the final COMMIT fence before runtime RAM is allocated, or on abort.
+65,824 + 8192 B is a data-buffer subtotal, **not** the whole-system peak: directory,
+protocol metadata and the existing 8 KiB worker stack also use RAM. OPEN temporarily
+probes 8704 B receive headroom, then frees that probe; other tasks can allocate later.
+Low-memory OPEN failures reduce the block size; ultimately plain 8 KiB CHUNKs
+need no large arena. Unhelpful compression is carried as raw data through the same
+pipeline. See [PROTOCOL.md](PROTOCOL.md#bounded-receive--decode--flash-pipeline).
 
-For firmware development leak checks, enable `GM_PLUGIN_ALLOC_LEAK_CHECK=1`.
-The default production configuration points plugin allocation calls directly at
-the firmware allocator without tracking headers or state.
+Only one plugin is loaded at a time. Beginning a replacement stops and unloads
+the current runtime. The cache may retain the old complete version until the
+new candidate has been fully checked and committed.
+
+The Host tracks plugin allocations by load/run lifetime and reclaims them on
+stop/unload. Allocation headers, guards and tracking state are additional RAM;
+the static-RAM build check does not measure or cap this dynamic footprint.
 
 ## Events and services
 
@@ -148,3 +159,41 @@ if (host->imu_read(&sample) == GM_PLUGIN_OK) {
 See [GRAPHICS.md](GRAPHICS.md) for rendering rules,
 [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md) for service mappings, and
 [SECURITY.md](SECURITY.md) for the trust boundary.
+
+## Build memory and stack checks
+
+`build.py` checks ROM and RAM independently. The linker and GMP packer both
+reject code/constants above 512000 bytes and static RAM at or above 102400
+bytes. The same limits apply in the phone, firmware loader and simulator.
+The stored GMP also contains metadata and RAM initialization bytes; its total
+size is not the same as the Flash code/constants segment size.
+
+The C compiler launcher always requests GCC `-fstack-usage`. Each compiled
+function, after optimization/inlining, must have a statically known frame of
+at most **1024 bytes**. Larger frames and dynamic stack allocation (including
+VLA/alloca) fail the build before assembly. Reports are saved beside each
+object as `.su`; empty translation units are valid. A failed incremental check
+removes the previous object and report rather than leaving stale checked output.
+
+The glasses' display task and Flash worker each use **2048 four-byte words =
+8192 bytes** of task stack. Plugin entry and lifecycle callbacks run on the
+display task, sharing its stack with firmware and Host calls. There is no
+separate 8 KiB allowance for each plugin callback. The 1024-byte check is a
+per-function policy, not proof of maximum call-chain depth. Recursion, nested
+callbacks, indirect calls and hand-written stack-changing assembly still need
+review and on-device stack high-water measurements. Prebuilt objects or builds
+that bypass the SDK launcher are not covered by this compiler check.
+
+Use Host-managed heap for a large temporary buffer (the SDK equivalent of
+malloc/free), and handle allocation failure:
+
+```c
+uint8_t *buffer = host->alloc(4096);
+if (buffer == NULL) return GM_PLUGIN_ENOMEM;
+/* Use the buffer while this lifecycle scope is active. */
+host->free(buffer);
+```
+
+Do not replace a large local array with a large global just to silence the
+stack check: it consumes the static-RAM budget for the entire loaded lifetime.
+Truly read-only assets should be `static const` so their bytes stay in Flash.

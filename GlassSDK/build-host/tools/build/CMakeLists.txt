@@ -14,6 +14,10 @@ if(NOT DEFINED GM_PYTHON_EXECUTABLE)
   set(GM_PYTHON_EXECUTABLE "${Python3_EXECUTABLE}")
 endif()
 
+set(GM_PLUGIN_LINKER_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/gm_plugin_xip.ld")
+set(GM_PLUGIN_PACKER "${GM_SDK_ROOT}/build-host/tools/gmp_xip_pack.py")
+set(GM_PLUGIN_XIP ON)
+
 add_library(gm_plugin_flags INTERFACE)
 target_include_directories(gm_plugin_flags INTERFACE "${GM_SDK_ROOT}/include")
 if(GM_REVIEW_SYSTEM_INCLUDE_DIRS)
@@ -41,6 +45,10 @@ target_compile_options(gm_plugin_flags INTERFACE
   -Werror
   -std=gnu99
 )
+
+if(GM_PLUGIN_XIP)
+  target_compile_options(gm_plugin_flags INTERFACE -fPIC -msmall-data-limit=0)
+endif()
 
 # Compile the ABI checks once; every GMP target depends on this verification.
 add_library(gm_abi_check OBJECT "${CMAKE_CURRENT_LIST_DIR}/abi_check.c")
@@ -77,8 +85,14 @@ function(gm_add_plugin manifest)
   set(elf "${intermediate_dir}/${plugin_name}.elf")
   set(gmp "${output_dir}/${plugin_name}.gmp")
 
+  set_source_files_properties(${sources} PROPERTIES OBJECT_DEPENDS
+    "${GM_SDK_ROOT}/build-host/tools/xip_compile.py")
   add_library("${object_target}" OBJECT ${sources})
   target_link_libraries("${object_target}" PRIVATE gm_plugin_flags)
+  if(GM_PLUGIN_XIP)
+    set_property(TARGET "${object_target}" PROPERTY C_COMPILER_LAUNCHER
+      "${GM_PYTHON_EXECUTABLE};${GM_SDK_ROOT}/build-host/tools/xip_compile.py")
+  endif()
   if(GM_PROJECT_DIR)
     target_include_directories("${object_target}" PRIVATE ${GM_PROJECT_INCLUDE_DIRS})
   endif()
@@ -89,14 +103,15 @@ function(gm_add_plugin manifest)
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${output_dir}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${intermediate_dir}"
     COMMAND "${CMAKE_LINKER}" -m elf32lriscv --no-relax --emit-relocs --gc-sections
-            -T "${CMAKE_CURRENT_LIST_DIR}/gm_plugin.ld" -o "${elf}"
+            -T "${GM_PLUGIN_LINKER_SCRIPT}" -o "${elf}"
             $<TARGET_OBJECTS:${object_target}>
-    COMMAND "${GM_PYTHON_EXECUTABLE}" "${GM_SDK_ROOT}/build-host/tools/gmp_pack.py"
+    COMMAND "${GM_PYTHON_EXECUTABLE}" "${GM_PLUGIN_PACKER}"
             --elf "${elf}" --manifest "${manifest}" --output "${gmp}"
     DEPENDS $<TARGET_OBJECTS:${object_target}> $<TARGET_OBJECTS:gm_abi_check>
             "${manifest}"
-            "${CMAKE_CURRENT_LIST_DIR}/gm_plugin.ld"
-            "${GM_SDK_ROOT}/build-host/tools/gmp_pack.py"
+            "${GM_PLUGIN_LINKER_SCRIPT}"
+            "${GM_PLUGIN_PACKER}"
+            "${GM_SDK_ROOT}/build-host/tools/gmp_elf.py"
     COMMAND_EXPAND_LISTS
     VERBATIM
   )

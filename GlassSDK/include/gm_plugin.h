@@ -53,6 +53,7 @@ enum {
     GM_PLUGIN_EIO = -5,      /**< Host device or transport operation failed. */
     GM_PLUGIN_EPERM = -6,    /**< Operation is not permitted in this context. */
     GM_PLUGIN_ESTATE = -7,   /**< Operation is invalid in the current state. */
+    GM_PLUGIN_EFULL = -9,    /**< Plugin Flash cache has insufficient capacity. */
     GM_PLUGIN_EVERSION = -8, /**< ABI or table version is incompatible. */
 };
 
