@@ -1,6 +1,6 @@
 > Bridge 2.0 开发分支说明：权限与接口变更以 [权限调试说明](permission-debug.md) 为准。本文旧版字符串权限和旧音频接口不再适用。
 
-# Bridge v1 API Overview
+# Bridge API Overview
 
 ## Runtime
 
@@ -121,13 +121,19 @@ the failed tile.
 Events include `device.button`, `device.imuGesture`, `device.rawImu`, and
 `device.connection`.
 
-`device.getInfo` is a permission-free, read-only connection query. Subscribing
+`device.getInfo` is a read-only connection query requiring `device.info`. Subscribing
 to or unsubscribing from device events requires the `device.events` manifest
 permission.
 
-## Custom messages — not available in the first release
+## Custom messages
 
-`device.messaging`, `plugin.sendMessage`, and `plugin.message` are not public capabilities. Manifests declaring this permission are rejected; raw calls return `METHOD_NOT_FOUND`. Use `display` for graphics and `device.events` for input. The internal Bluetooth transport remains available to the Host, not to H5 plugins.
+`gm.plugin.sendMessage(channel, data)` and `gm.plugin.onMessage(listener)` are
+available for paired plugins. Both directions require granted `device.messaging`
+permission covering the channel. Standard display and input-event channels also
+require their corresponding permissions. This does not install or replace a GMP.
+See [Application messaging](application-messaging.md) for declarations, binary
+limits, acknowledgements, receive filtering and errors, and the linked glasses
+wire protocol for GM frame/TLV layouts.
 
 ## Native glasses audio
 
@@ -304,3 +310,14 @@ The App shows native consent and a recording indicator outside the WebView.
 Hiding, suspending, reloading, or closing the plugin stops audio and closes any
 active stream. A plugin may use browser audio only when the Host audio
 capability is absent, not as a fallback after a native operation fails.
+
+## Foreground location
+
+- `location.getCurrentPosition`
+- `location.watchPosition`
+- `location.clearWatch`
+- Events: `location.position`, `location.error`.
+
+Requires `location.foreground` and phone system permission. See
+[Foreground location](location.md) for parameters, WGS84 results, timeout,
+foreground cancellation and errors.

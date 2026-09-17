@@ -80,8 +80,9 @@ must be presented immediately.
 
 ## Uplink event protocol
 
-The channels below use GM plugin service `0x0F`, glasses-to-phone command
-`0x29`. Phone-to-glasses scene messages continue to use command `0x28`.
+The channels below carry application messages through the public Host and
+PhoneSDK Bluetooth APIs. Device transport framing is managed by the platform;
+these payloads do not expose installation or lifecycle commands.
 
 ## Event header
 
@@ -137,3 +138,13 @@ block the display task to retry.
 
 Keep framebuffer tiles separate from active LVGL objects. A later LVGL redraw
 may overwrite direct framebuffer pixels in an overlapping region.
+
+### Bluetooth wire mapping
+
+Application messages use GM service `0x0F`: phone-to-glasses command `0x28`
+with `INT16 channel` and `BYTES data`; its acknowledgement also uses `0x28`.
+The plugin sends application replies/events with `bt_send()` through command
+`0x29`, carrying the same channel/data TLV layout. See
+[the binary protocol](../../docs/PROTOCOL.md#plugin-application-service-0x0f)
+for framing, byte order and acknowledgement semantics. This is business data,
+not executable-plugin package transfer.

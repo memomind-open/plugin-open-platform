@@ -31,8 +31,12 @@ maintain the business fields; the packager generates `schemaVersion` and
   "name": "Weather Plugin",
   "version": "1.0.0",
   "entry": "index.html",
-  "bridgeVersion": "1.0",
-  "permissions": ["display", "device.events", "storage"]
+  "bridgeVersion": "2.0",
+  "permissionPolicyVersion": 1,
+  "permissions": [
+    { "name": "display", "required": true },
+    { "name": "storage", "required": false }
+  ]
 }
 ```
 
@@ -44,30 +48,25 @@ Field constraints:
 - `version`: semantic version such as `1.0.0` or `1.0.0-beta.1`.
 - `entry`: package-relative HTML path, at most 256 characters. It must not
   contain empty path segments, `.`, `..`, backslashes, or an absolute path.
-- `bridgeVersion`: currently fixed at `1.0`.
-- `permissions`: at most 16 unique entries. The allowed values are `display`,
-  `device.events`, `storage`, `files.user-selected`, `network`, and
-  `audio.capture`.
+- `bridgeVersion`: currently `2.0`; final package `schemaVersion` is `2`,
+  and `permissionPolicyVersion` is `1`.
+- `permissions`: at most 10 uniquely named permission objects, with `name`,
+  `required`, optional `reason`, and mandatory `scope` for `device.events` or
+  `device.messaging`. The allowed names are `storage`, `files.user-selected`,
+  `display`, `device.info`, `device.events`, `device.messaging`, `audio.capture`,
+  `audio.playback`, `network`, and `location.foreground`. See
+  [permission details](permission-debug.md) and
+  [messaging declarations](application-messaging.md).
 
-Permission meanings:
-
-| Permission | Capability |
-| --- | --- |
-| `display` | Create, update, and close glasses display pages |
-| `device.events` | Subscribe to button, head-motion, connection, and IMU events; read-only `device.getInfo` does not require this permission |
-| `storage` | Use App key-value storage isolated to the current plugin |
-| `files.user-selected` | Import user-selected files into App-managed private storage and access them through `files.*` |
-| `network` | Declare that the plugin needs network access; the current Debug App does not yet enforce a domain sandbox |
-| `audio.capture` | Capture 16 kHz mono Opus from the glasses after native user consent through the binary stream API; short recording is a bounded Web SDK helper |
-
-The App checks `display`, `device.events`, `storage`, `files.user-selected`, and
-`audio.capture` permissions for the corresponding Bridge calls. Do not declare
-unused permissions. A networked plugin must still configure a strict CSP; the
-`network` declaration does not mean that the App has completed network
-isolation.
+The complete permission table and Bridge method mapping are in
+[Current capability contract](capability-contract.md). Scoped permissions require
+`scope.types` for `device.events` or `scope.channels` for `device.messaging`.
+`device.getInfo` requires `device.info`. Declaration and user approval are separate;
+do not declare unused capabilities.
 
 `plugin.sendMessage` uses the device plugin currently installed and running by
-the App. It requires no manifest permission by default. It does not install or
+the App. Sending and receiving require `device.messaging` with approved channel
+scope; see [Application messaging](application-messaging.md). It does not install or
 select a `.gmp`, and it does not bypass device connection state or protocol
 acknowledgements.
 
@@ -133,20 +132,24 @@ The packager:
 2. Rejects symbolic links and files that exceed resource limits.
 3. Computes SHA-256 for every regular file except `manifest.json` and
    `signature.sig`.
-4. Writes `schemaVersion: 1` and the complete `files` hash table.
+4. Writes `schemaVersion: 2` and the complete `files` hash table.
 5. Produces a deterministic ZIP and writes the `.mmpkg` atomically.
 
 The final manifest resembles:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "com.example.weather",
   "name": "Weather Plugin",
   "version": "1.0.0",
   "entry": "index.html",
-  "bridgeVersion": "1.0",
-  "permissions": ["display", "device.events", "storage"],
+  "bridgeVersion": "2.0",
+  "permissionPolicyVersion": 1,
+  "permissions": [
+    { "name": "display", "required": true },
+    { "name": "storage", "required": false }
+  ],
   "files": {
     "assets/index.css": "sha256:<64 lowercase hexadecimal characters>",
     "assets/index.js": "sha256:<64 lowercase hexadecimal characters>",

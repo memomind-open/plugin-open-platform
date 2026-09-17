@@ -2,7 +2,7 @@
 
 MemoMind Desktop Studio matches a Web plugin to a device plugin through declared
 protocols. This avoids coupling ordinary Web plugins to one device package
-when multiple packages implement the same transport contract.
+when multiple packages implement the same application-level messaging contract.
 
 ## Device plugin declaration
 

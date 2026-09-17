@@ -2,7 +2,7 @@
 
 > Status: preview draft
 > DevKit version: 0.1.0
-> Bridge version: 1.0
+> Bridge version: 2.0
 > Runtime requirement: Node.js 18 or later
 
 ## 1. Overview
@@ -163,11 +163,13 @@ The H5 output directory must contain `manifest.json` at its root:
   "name": "Weather Plugin",
   "version": "1.0.0",
   "entry": "index.html",
-  "bridgeVersion": "1.0",
+  "bridgeVersion": "2.0",
+  "permissionPolicyVersion": 1,
   "permissions": [
-    "display",
-    "device.events",
-    "storage"
+    { "name": "display", "required": true },
+    { "name": "device.events", "required": true,
+      "scope": { "types": ["button", "imuGesture"] } },
+    { "name": "storage", "required": false }
   ]
 }
 ```
@@ -178,34 +180,18 @@ The H5 output directory must contain `manifest.json` at its root:
 | `name` | Yes | Display name, at most 80 characters |
 | `version` | Yes | Semantic version such as `1.0.0` |
 | `entry` | Yes | Package-relative entry HTML path |
-| `bridgeVersion` | Yes | Currently `1.0` |
+| `bridgeVersion` | Yes | Currently `2.0` |
 | `permissions` | Yes | App capabilities requested by the plugin, at most 16 unique entries |
 
 `entry` must point to an HTML file, be no longer than 256 characters, and must
 not be absolute or contain backslashes, empty path segments, `.`, or `..`.
 
-Supported permissions:
-
-| Permission | Capability |
-| --- | --- |
-| `display` | Create, update, and close glasses display pages |
-| `device.events` | Subscribe to button, head-motion, connection, and IMU events |
-| `storage` | Use App key-value storage isolated to the current plugin |
-| `files.user-selected` | Import user-selected files into App-managed private storage and access them through `files.*` |
-| `network` | Declare that the plugin needs network access |
-| `audio.capture` | Capture 16 kHz mono Opus from the glasses through the binary stream API; short recording is a bounded Web SDK helper over the same stream |
-
-The App checks `display`, `device.events`, `storage`, `files.user-selected`, and
-`audio.capture` at the corresponding Bridge calls. `device.getInfo()` and
-`plugin.sendMessage()` require no manifest permission. Do not declare unused
-permissions.
-
-In the current Debug App, `network` is informational and does not mean that the
-App enforces domain isolation. Networked plugins must still use a strict CSP and
-connect only to required domains.
-
-See [Final `.mmpkg` package](package-format.md) for
-`deviceRequirements` and the complete manifest contract.
+Supported permissions and method authorization are defined in the
+[current capability contract](capability-contract.md). It lists all ten permission
+names, the complete Bridge registry and the object-based declaration format.
+`device.getInfo()` requires `device.info`; custom message send and receive require
+`device.messaging` with approved channels. Network and audio playback are Host
+policies; do not interpret their declarations as a native-code sandbox.
 
 ## 6. Runtime and storage
 
@@ -455,8 +441,8 @@ const info = await gm.device.getInfo();
 console.log(info.connected, info.transport, info.profile);
 ```
 
-`device.getInfo()` is a read-only query and requires no `device.events`
-permission.
+`device.getInfo()` is a read-only query requiring `device.info`.
+Event subscriptions separately require `device.events` with an approved type scope.
 
 Subscribe before registering listeners:
 
@@ -547,8 +533,9 @@ const offMessage = gm.plugin.onMessage(({ channel, data }) => {
 
 The Bridge event is `plugin.message` with wire data
 `{ channel, dataBase64 }`. The SDK validates the event and returns `data` as a
-`Uint8Array`. It is independent of `device.subscribeEvents` and requires no
-manifest permission. The Host attaches the active `runtimeGeneration`, and the
+`Uint8Array`. It is independent of `device.subscribeEvents`, but both send and
+receive require `device.messaging` with the corresponding channel granted.
+Standard display/event channels add their respective permission checks. The Host attaches the active `runtimeGeneration`, and the
 SDK discards stale-generation events.
 
 `channel` must be an integer from 0 through 65535. The payload must be a
@@ -706,7 +693,7 @@ The input must be the final deployable output, not a project root containing
 the plugin name or ID and version.
 
 The packager validates the manifest and entry, rejects symbolic links and
-unsafe paths, calculates SHA-256 for payload files, writes `schemaVersion: 1`
+unsafe paths, calculates SHA-256 for payload files, writes `schemaVersion: 2`
 and the complete `files` table, checks resource limits, and atomically produces
 a deterministic ZIP.
 
@@ -823,7 +810,7 @@ generated `.mmpkg` manually; rebuild it after every source change.
 - [ ] `id` is unique and uses reverse-domain form.
 - [ ] `version` is a semantic version.
 - [ ] `entry` points to an existing HTML file.
-- [ ] `bridgeVersion` is `1.0`.
+- [ ] `bridgeVersion` is `2.0`; schema version is `2` and permission policy version is `1`.
 - [ ] Only required permissions are declared.
 
 ### Functionality

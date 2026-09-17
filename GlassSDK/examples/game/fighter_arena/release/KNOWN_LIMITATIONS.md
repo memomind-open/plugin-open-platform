@@ -9,6 +9,8 @@
   selection, story mode, throw, aerial attack, save data, or online play.
 - Sound is produced by the Web plugin host on the phone or computer, not by the
   glasses.
-- Plugins currently run from RAM and must be reinstalled after a glasses reboot.
+- Current firmware caches complete plugin images in Flash. A reboot clears runtime
+  state; a matching valid cache can be reused when the App launches the plugin.
+  Evicted or invalid images are supplied again by the App.
 - Display residue must be assessed on real hardware; Desktop Studio cannot
   prove optical behavior.

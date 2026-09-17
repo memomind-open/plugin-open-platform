@@ -22,3 +22,9 @@ PhoneSDK Browser Studio. Only content submitted through `gm.display.*` is
 rendered on the glasses display. Desktop Studio is the recommended debugger for
 paired Web and `.gmp` development; Browser Studio is the lightweight Web-only
 tool included in the DevKit ZIP.
+
+## Detailed capability contracts
+
+- [Paired-plugin application messages](application-messaging.md)
+- [Foreground phone location](location.md)
+- [Current permissions and capability boundaries](capability-contract.md)
