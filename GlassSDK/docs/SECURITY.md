@@ -2,14 +2,15 @@
 
 ## Package integrity
 
-GMP v1 uses a fixed 28-byte header and one whole-package CRC32. The Host also
-validates package format, ABI compatibility, bounds, image layout, relocations,
-and runtime memory size before activation.
+GMP v2 uses a 120-byte header and whole-package CRC32. The cache also verifies
+SHA-256 against the canonical package identity sent by the phone. Installed
+instruction bindings are checked before canonicalization; corrupt executable
+bytes cannot be hidden by replacing them during the hash check.
 
-CRC32 detects accidental transport corruption. It does not authenticate the
-publisher and is not a digital signature. Manifest text, SHA-256, a second
-header CRC, duplicated capability declarations, and derivable offsets are not
-transferred in the runtime package.
+Format, exact ABI, bounds, RAM sizes and relocations are validated before
+activation. CRC32 and SHA-256 detect content changes; neither authenticates the
+publisher without a trusted signature. Name/version/ABI are embedded in the
+package; the full manifest is not.
 
 ## Trust boundary
 

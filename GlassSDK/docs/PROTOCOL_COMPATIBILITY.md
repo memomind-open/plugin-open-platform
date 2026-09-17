@@ -51,7 +51,7 @@ Desktop Studio labels discovered device plugins as recommended, compatible or
 incompatible. An explicit developer selection is preserved for diagnostics,
 but an incompatible pairing is not reported as ready.
 
-GMP v1 does not embed manifest text. Desktop Studio reads protocol metadata
+GMP v2 embeds identity fields, but not the full manifest text. Desktop Studio reads protocol metadata
 from the source manifest associated with an SDK `build-host/.build` output, or
 from a `manifest.json` beside an imported package. A standalone `.gmp` without
 either source layout is reported as having unknown compatibility rather than

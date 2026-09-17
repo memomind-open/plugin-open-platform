@@ -18,8 +18,8 @@ ABI_CHECK(gm_lvgl_selector_indicator,
           GM_PLUGIN_LVGL_SELECTOR_INDICATOR == UINT32_C(0x020000));
 ABI_CHECK(gm_lvgl_selector_knob,
           GM_PLUGIN_LVGL_SELECTOR_KNOB == UINT32_C(0x030000));
-ABI_CHECK(gm_package_v1_value, GM_PLUGIN_PACKAGE_FORMAT_VERSION == 1U);
-ABI_CHECK(gm_package_v1_header_size, GM_PLUGIN_PACKAGE_HEADER_SIZE == 28U);
+ABI_CHECK(gm_package_v2_value, GM_PLUGIN_PACKAGE_FORMAT_VERSION == 2U);
+ABI_CHECK(gm_package_v2_header_size, GM_PLUGIN_PACKAGE_HEADER_SIZE == 120U);
 ABI_CHECK(gm_plugin_service_id, GM_PLUGIN_SERVICE_ID == UINT8_C(0x0F));
 ABI_CHECK(gm_plugin_downlink_command,
           GM_PLUGIN_COMMAND_PHONE_TO_GLASSES == UINT8_C(0x28));

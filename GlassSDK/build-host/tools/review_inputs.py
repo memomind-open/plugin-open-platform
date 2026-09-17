@@ -186,7 +186,9 @@ def capture(sdk, source, gmp, build_dir, ninja, compiler, project_root=None, inc
                 if path == source / 'README.md' and path.resolve() not in dependencies:
                     continue
                 add(path, 'SDK/' + path.relative_to(sdk).as_posix() if directory == sdk / 'include' else None)
-    for relative in ('build.py', 'build-host/tools/gm_build.py', 'build-host/tools/gmp_pack.py',
+    for relative in ('build.py', 'build-host/tools/gm_build.py', 'build-host/tools/gmp_pack.py', 'build-host/tools/gmp_xip_pack.py',
+                     'build-host/tools/gmp_elf.py', 'build-host/tools/xip_compile.py',
+                     'build-host/tools/build/gm_plugin_xip.ld',
                      'build-host/tools/review_inputs.py', 'build-host/tools/review_crypto.py',
                      'build-host/tools/review_public_key.json', 'build-host/tools/requirements-review.txt',
                      'build-host/tools/build/CMakeLists.txt',

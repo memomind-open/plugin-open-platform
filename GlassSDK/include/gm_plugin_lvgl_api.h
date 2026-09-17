@@ -58,7 +58,9 @@ typedef struct {
     gm_plugin_lvgl_image_format_t format;
     /** Must be zero. Reserved for a future compatible descriptor extension. */
     uint8_t reserved;
-    /** Palette and packed indexes. The Host does not copy this payload. */
+    /** Palette and packed indexes; must start at a 4-byte-aligned address.
+     * The Host borrows this payload without copying. For packed frame arrays,
+     * round each storage stride up to 4 bytes; data_size excludes that padding. */
     const uint8_t *data;
     /** Exact payload size in bytes. */
     uint32_t data_size;
