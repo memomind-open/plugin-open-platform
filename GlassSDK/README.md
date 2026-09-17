@@ -157,8 +157,9 @@ every example directory containing `manifest.json` and compiles all of its
   resources.
 - Optional functionality is discovered through independently versioned
   extension tables.
-- Only one plugin is currently installed at a time, and plugins are not
-  persisted across a glasses reboot.
+- Multiple plugins can be cached in Flash across reboots; only one plugin is
+  loaded at a time. Runtime RAM state is not persistent. Cache reuse requires a
+  complete, matching package and compatible firmware.
 
 See [ABI.md](docs/ABI.md) for the complete ABI and lifecycle contract and
 [GRAPHICS.md](docs/GRAPHICS.md) for LVGL and framebuffer rules.
@@ -168,12 +169,13 @@ See [ABI.md](docs/ABI.md) for the complete ABI and lifecycle contract and
 After building, use the prebuilt Desktop Studio under `../Studio/<platform>/`
 for local simulation. To install on physical glasses, select the package in
 Studio and scan Studio's developer-app QR code from the official App's
-Developer Workbench entry.
+Developer Workbench entry. The scan page also supports a saved or manually
+entered Studio IP address and port.
 
 The public workflow does not require a separate installer source repository.
 See [INSTALLATION.md](docs/INSTALLATION.md) for the complete preview and
 build-to-glasses workflow and [PROTOCOL.md](docs/PROTOCOL.md) for the
-underlying transport contract.
+App-managed installation and public application communication.
 
 ## Examples
 
@@ -216,7 +218,9 @@ included in the published SDK.
 | [ABI.md](docs/ABI.md) | ABI compatibility, lifecycle, callbacks, memory, and Host services |
 | [GRAPHICS.md](docs/GRAPHICS.md) | Shared LVGL and direct framebuffer rendering |
 | [SECURITY.md](docs/SECURITY.md) | Package integrity, trust, and isolation limits |
-| [PROTOCOL.md](docs/PROTOCOL.md) | Phone/PC-to-glasses transport protocol |
+| [PROTOCOL.md](docs/PROTOCOL.md) | App-managed installation and plugin messages |
+| [BLE_ACCESSORY_PROTOCOL.md](docs/BLE_ACCESSORY_PROTOCOL.md) | BLE accessory control, GATT and HID wire data |
+| [DEVICE_BUSINESS_PROTOCOL.md](docs/DEVICE_BUSINESS_PROTOCOL.md) | Common native device business commands |
 | [PROTOCOL_COMPATIBILITY.md](docs/PROTOCOL_COMPATIBILITY.md) | Declare Web/device protocol requirements and compatibility |
 | [CAPABILITY_MATRIX.md](docs/CAPABILITY_MATRIX.md) | Mapping from applications to low-level Host services |
 | [examples/README.md](examples/README.md) | Maintained examples and build instructions |

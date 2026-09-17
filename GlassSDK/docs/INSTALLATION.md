@@ -62,13 +62,9 @@ pressure exactly. Complete final validation on physical glasses.
 
 ### 1. Prepare the connection
 
-The phone and development computer must be on the same trusted LAN. The
-official App must already be paired with the glasses. If another host owns the
-glasses Bluetooth SPP connection, disconnect it before continuing.
-
-In the official App, use **Settings > Device connection > Unpair device** when
-the glasses must be paired again. A factory reset is normally necessary only
-when the connection cannot be recovered; it removes the existing pairing.
+The phone and development computer must be on the same trusted LAN for package
+import. Connect the official App to the glasses before starting the glasses
+plugin; pairing alone does not establish an active connection.
 
 ### 2. Generate the package QR in Desktop Studio
 
@@ -80,65 +76,77 @@ combination into one developer-app ZIP and displays its single QR code.
 Studio updates the served package whenever the selected combination changes.
 The GlassSDK build command does not create a ZIP, QR image, or LAN server.
 
-### 3. Scan and run
+### 3. Import and run through the official App
 
-In the official App, open:
+In the official App, open **Settings > Memo Lab > Developer Workbench** and use
+**Scan to open app** (Chinese: **设置 > Memo 实验室 > 开发者工作台 > 扫码打开应用**).
+Scan the QR code shown by Desktop Studio. The App downloads and validates the
+bundle, prepares the phone plugin and manages delivery and startup on the glasses.
 
-**Settings > Device information > Debug > Developer Workbench > Scan to
-import**
+The scan page also supports manual entry of the Studio IPv4 address and port
+(1–65535). The last address is saved and can be reused or edited, so a camera is
+not required for manual import. Enter only the address and port; do not type a
+URI prefix. Studio must be running and serving the desired package at that
+address. A saved address does not identify an immutable package: Studio serves
+the currently selected combination.
 
-Scan the QR code shown by Desktop Studio. The App downloads the package, validates its
-size, SHA-256, GMP header, CRC, ABI, and memory bounds, then installs and starts
-it on the glasses.
+The phone and computer must be able to reach the address shown beside the QR
+code. LAN package download is not protected by TLS or publisher signatures;
+use a trusted LAN and trusted packages. The App still applies its account and
+permission checks. Package checksums detect inconsistent content, not a trusted
+publisher. See [SECURITY.md](SECURITY.md).
 
-The QR uses this compact URI form:
+Once imported, the App retains the package for subsequent launches. Reopening
+that installed entry does not require rescanning or keeping Studio online.
+Reimport after changing a package in Studio to update the App's installed copy.
 
-```text
-mmapp+tcp://192.168.1.8:18765
-```
-
-Studio displays the active LAN address beside the QR code. The phone and
-computer must be able to reach that address.
-
-This debug channel has no TLS, authentication, or signature. Use it only on a
-trusted LAN with packages from a trusted source. Size, SHA-256, and GMP CRC
-detect truncation and inconsistent content but do not prevent an active
-attacker from replacing both the package and checksum.
-
-ZIP composition and incremental transfer are handled internally by Desktop
-Studio and the App; plugin developers do not need to implement that protocol.
-
-## Lifecycle operations
+## Lifecycle and Flash cache
 
 | Operation | Result |
 | --- | --- |
-| Install | Transfer and validate a `.gmp`; replacing a plugin unloads the previous one |
-| Start | Open the installed plugin application on the glasses |
-| Stop | Close the visible application while keeping its image loaded |
-| Remove | Unload the plugin and release its runtime memory |
+| First launch or changed package | The App validates the package and manages transfer to the glasses cache before execution |
+| Launch with a complete cache match | Reuses the cached image without transferring the package again |
+| Stop | Ends the visible application cycle; the image may remain loaded and its Flash cache is retained |
+| Replace the loaded plugin | Stops and unloads the current runtime before loading its replacement |
+| Reboot | Clears runtime RAM state; valid Flash cache entries can be reused on the next App launch |
 
-Only one plugin is currently supported. Plugins run from temporary RAM and are
-not persisted in Flash. After the glasses reboot, keep Desktop Studio running
-and install the selected package again from its QR code.
+Multiple plugins can be cached, but only one is loaded at a time. Code and
+ordinary read-only constants run from Flash; writable data, BSS, relocatable
+pointer tables and dynamic allocations need RAM. The build enforces a 500 KiB
+Flash code/constants limit and static RAM strictly below 100 KiB, not a 500 KiB
+limit on the whole package or a 100 KiB total runtime memory guarantee. See
+[ABI.md](ABI.md#runtime-and-memory).
+
+The cache manages space and directory entries, evicts eligible least-recently-used
+external plugins when necessary, and keeps an old complete version until a
+replacement is validated. An update therefore needs temporary space for its new
+candidate. Insufficient capacity is reported through the App. Name, version,
+content identity and ABI must match for reuse; cached packages are not selected
+solely by name. See [PROTOCOL.md](PROTOCOL.md#flash-cache-and-execution) for the
+cache rules, protection policy and interrupted-transfer behavior.
 
 ## Troubleshooting
 
 - **Studio cannot find SDK examples:** keep `Studio`, `GlassSDK`, and `PhoneSDK`
   together in the Plugin Open Platform layout, or import the `.gmp` directly.
-- **Phone cannot open the QR address:** confirm that phone and computer are on
-  the same LAN, allow Desktop Studio through the computer firewall, and verify
-  that the address displayed by Studio is reachable from the phone.
+- **Phone cannot open the address:** check the current Studio address, LAN
+  reachability and computer firewall. Edit the saved address if it has changed.
+- **Camera unavailable:** use the scan page's manual IP address and port entry.
 - **Package rejected:** rebuild with the current SDK and confirm that the
-  firmware supports the package ABI and required extensions.
-- **Package too large:** the packer enforces the advertised package and runtime
-  memory limits during the build.
-- **Transfer interrupted:** keep Desktop Studio running and scan its QR code
-  again; do not concatenate or resend protocol chunks manually.
-- **Plugin disappeared after reboot:** this is expected because plugins are not
-  persisted in Flash.
+  firmware supports the exact package ABI and required extensions. A changed
+  firmware or invalid cache may require the App to send its package again.
+- **Package too large or insufficient capacity:** distinguish a build limit from
+  device cache capacity. Multiple cached packages and an update candidate share
+  the available space. See [ABI.md](ABI.md) and [PROTOCOL.md](PROTOCOL.md).
+- **Transfer interrupted:** reconnect the App and retry the installed entry.
+  Matching valid candidates can resume from the saved durable checkpoint;
+  otherwise the App transfers again. Incomplete images never run.
+- **First launch after reboot or firmware update:** a valid cache can be reused;
+  an invalid or evicted entry is supplied again by the App. Rescanning is only
+  needed when importing a package, not for every glasses reboot.
 - **Untrusted package:** do not install it. A GMP contains native code and is
   not currently isolated by an MPU. See [SECURITY.md](SECURITY.md).
 
-The transport command and acknowledgement contract is specified in
-[PROTOCOL.md](PROTOCOL.md). Most plugin developers should use Desktop Studio
-and the official App instead of implementing the transport directly.
+Installation and lifecycle control belong to the official App. Public plugin
+messages and capability usage are described in [PROTOCOL.md](PROTOCOL.md);
+plugin code should not implement a separate device installer.

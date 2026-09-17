@@ -61,7 +61,10 @@ The Host copies `gm_plugin_lvgl_image_dsc_t` values and animation frame-pointer
 lists during each API call, but pixel payloads are borrowed. Keep their bytes
 readable and unchanged until `image_set_source()` replaces the source,
 `anim_image_set_sources()` replaces the frame set, or the object is deleted.
-Static storage is the simplest safe choice.
+Static storage is the simplest safe choice. Prebuilt, immutable pixel arrays
+should be `static const` so their bytes can remain in Flash. Mutable static
+arrays, such as the writable example below, consume RAM. Relocatable frame
+pointer tables can still require RAM even when the pixels are in Flash.
 
 Each payload address must be **4-byte aligned**, because LVGL reads its palette
 as 32-bit colors. The Host rejects unaligned payloads. Align both the array base

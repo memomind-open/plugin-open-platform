@@ -107,19 +107,16 @@ code/constants must be at most 500 KiB. Static RAM data/BSS (including linked
 padding, GOT and pointer tables) must be strictly below 100 KiB. This static
 limit excludes dynamic heap, task stack and Host bookkeeping; allocation can
 still fail under system pressure. There is one 512 B static address-slot table. RAM allocations include
-up to 63 B alignment padding. No full-package RAM copy is used by SPP install.
-Bluetooth installation uses independent blocks, normally 64 KiB before compression.
-The bounded pipeline reuses one 65,824 B arena for encoded input, decoded output,
-and next-block data in already-written prefixes. One existing BT payload of at
-most 8192 B is parsed directly into its final TLV node; ownership of the whole
-node passes to the worker without an extra 8 KiB copy. The arena is
-released at the final COMMIT fence before runtime RAM is allocated, or on abort.
-65,824 + 8192 B is a data-buffer subtotal, **not** the whole-system peak: directory,
-protocol metadata and the existing 8 KiB worker stack also use RAM. OPEN temporarily
-probes 8704 B receive headroom, then frees that probe; other tasks can allocate later.
-Low-memory OPEN failures reduce the block size; ultimately plain 8 KiB CHUNKs
-need no large arena. Unhelpful compression is carried as raw data through the same
-pipeline. See [PROTOCOL.md](PROTOCOL.md#bounded-receive--decode--flash-pipeline).
+up to 63 B alignment padding. No full-package RAM copy is used for installation.
+
+The official App manages bounded, optionally compressed delivery. With the
+current default 64 KiB uncompressed block size, the reusable transfer arena is
+65,824 B, plus one received payload of up to 8192 B. These are data-buffer sizes,
+**not** a whole-system peak: directory state, protocol bookkeeping, allocation
+overhead and the worker task stack also consume RAM. The implementation can
+reduce buffering under memory pressure. Transfer buffers are released before
+runtime RAM is allocated, or when installation is cancelled. See
+[PROTOCOL.md](PROTOCOL.md#memory-during-installation-and-execution).
 
 Only one plugin is loaded at a time. Beginning a replacement stops and unloads
 the current runtime. The cache may retain the old complete version until the
