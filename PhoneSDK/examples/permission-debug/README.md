@@ -1,81 +1,81 @@
-> 2026-09-08 恢复受控配对通信：共 10 类权限、32 个 Bridge 方法。自定义 H5/设备配对插件声明 device.messaging 和 channels，授权后通过 gm.plugin.sendMessage/onMessage 双向通信；未授权、越界、失效运行态拒绝。标准显示/事件通道仍叠加相应权限。权限实验室只测试九类标准能力，不提供任意消息按钮。通信权限不代表设备插件内部敏感行为已被 App 隔离；真机配对验收待完成。
+> 2026-09-08: Controlled paired communication was restored: 10 permission categories and 32 Bridge methods. Custom paired H5/device plugins declare device.messaging and channels, then use gm.plugin.sendMessage/onMessage for bidirectional communication after authorization. Unauthorized, out-of-scope, and stale-runtime operations are rejected. Standard display/event channels still require their corresponding additional permissions. The lab tests only nine standard capabilities and has no arbitrary-message buttons. Messaging permission does not imply that the App isolates sensitive behavior inside device plugins; paired hardware acceptance testing remains pending.
 
 # Plugin Capability Lab 0.2.8
 
-这是实际功能插件，不是日志展示页。宿主仍使用既有 Bridge 2.0，不升级 WebView。
-在当前权限开发版 Desktop Studio 刷新手机插件列表，选择「Plugin Capability Lab · Bridge 2.0 0.2.8」。
-显示测试配对 GM Web Bridge；不提供通用消息发送功能。
+This plugin exercises real features rather than merely displaying logs. The Host uses the existing Bridge 2.0 without upgrading WebView.
+Refresh the phone plugin list in the permission development version of Desktop Studio and select "Plugin Capability Lab · Bridge 2.0 0.2.8".
+Pair with GM Web Bridge for display tests. The lab does not provide general-purpose messaging.
 
-九种权限都声明为 optional，方便启动时全拒绝、部分同意、全部同意，比较真实操作结果。
-宿主未开放的能力继续走真实接口并展示拒绝原因；H5 不调用电脑麦克风代替眼镜采集。
+All nine permissions are optional, allowing deny-all, partial-grant, and grant-all launches to be compared using real operations.
+Capabilities unavailable from the Host still use the real interface and display the rejection reason. H5 does not call the computer microphone directly as a substitute for glasses capture.
 
-| 权限 | 可实际操作 |
+| Permission | Available operations |
 | --- | --- |
-| storage | 便签保存、读取、删除单个专用 key |
-| files.user-selected | 宿主选文件、文件列表、二进制流读取、文本/图片/音频预览、单文件删除确认 |
-| display | 编辑文字并发送眼镜、发送 GRAY_4 棋盘、关闭页面 |
-| device.info | 手动读取设备并展示字段 |
-| device.events | 订阅/取消，按键计数、头动指示点、连接变化 |
-| audio.capture | 眼镜原生 recording 模式采集、停止、采集状态、H5 接收 Opus 数据及帧边界 |
-| audio.playback | 本地生成 WAV 测试音、延迟 play()、H5 播放收到的眼镜 Opus 录音 |
-| network | 预填支持 CORS 的地址，可修改后实际 H5 GET、状态码/耗时/响应正文、超时/取消 |
-| location.foreground | 原生单次/监听/取消，坐标、精度、采样时间及离线轨迹图 |
+| storage | Save, read, and delete a note using one dedicated key |
+| files.user-selected | Host file picker, file list, binary stream reads, text/image/audio previews, and confirmation before deleting a single file |
+| display | Edit and send text to the glasses, send a GRAY_4 checkerboard, and close the page |
+| device.info | Manually read device information and display its fields |
+| device.events | Subscribe/unsubscribe, button-press count, head-motion indicator, and connection changes |
+| audio.capture | Native glasses capture in recording mode, stop, capture state, and reception of Opus data and frame boundaries in H5 |
+| audio.playback | Locally generated WAV test tone, delayed play(), and H5 playback of received glasses Opus recordings |
+| network | Editable CORS-enabled URL, actual H5 GET, status/elapsed time/response body, timeout, and cancellation |
+| location.foreground | Native one-shot/watch/cancel operations, coordinates, accuracy, sample time, and an offline track plot |
 
-所有文件预览限 1 MiB、网络正文限 64 KiB；位置和文件不上传。
-测试音为 2 秒低幅度 PCM WAV。锁屏/页面隐藏时保留正在播放的音频和录音会话，但取消网络、定位和事件订阅；真正卸载页面时才全量清理。
-不保存权限审批结果，不使用 H5 localStorage 替代 storage Bridge。
+File previews are limited to 1 MiB and network response bodies to 64 KiB. Locations and files are not uploaded.
+The test tone is a two-second, low-amplitude PCM WAV. Screen locking/page hiding preserves active audio playback and recording sessions but cancels network, location, and event subscriptions. Full cleanup occurs only when the page actually unloads.
+Grant decisions are not saved, and H5 localStorage is not used as a substitute for the storage Bridge.
 
-## 0.2.8 变更
+## Changes in 0.2.8
 
-- 短录音改用 Web SDK 的 `openRecording()` 便利封装；Host 仅保留统一二进制流接口。
+- Short recordings use the Web SDK's `openRecording()` convenience wrapper. The Host retains only the unified binary stream interface.
 
-## 0.2.7 变更
+## Changes in 0.2.7
 
-- 插件清单名称、页面标题和主标题统一改为英文 `Plugin Capability Lab`。
+- The manifest name, page title, and main heading all use the English name `Plugin Capability Lab`.
 
-## 0.2.6 修复
+## Fixes in 0.2.6
 
-- 锁屏、`document.hidden`、`pagehide` 和 Runtime `suspended` 不再主动暂停 H5 音频或调用 `audio.stopCapture`。
-- 锁屏时仍取消网络请求、定位和设备事件订阅；`beforeunload` 保留完整释放。
+- Screen locking, `document.hidden`, `pagehide`, and Runtime `suspended` no longer proactively pause H5 audio or call `audio.stopCapture`.
+- Screen locking still cancels network requests, location, and device-event subscriptions. `beforeunload` retains full cleanup.
 
-## 0.2.5 修复
+## Fixes in 0.2.5
 
-- 展示录音帧数、Opus 字节数和采集时长；这些指标不等于有效人声。
-- 原生回放期间禁用重复播放和测试音按钮，终态恢复；显示并记录完整播放错误。
-- 修正 capturing 状态识别；当时页面隐藏会停止采集，已由 0.2.6 调整。
-- 网络默认使用支持 CORS 的公共测试接口，不代理请求、不绕过跨域限制。
-- App 导出日志同步保留录音数值统计及哈希后的回放 ID，不保存音频内容。
+- Displayed recording frame count, Opus byte count, and capture duration; these metrics do not prove that intelligible speech was captured.
+- Disabled duplicate-playback and test-tone buttons during native playback, restoring them on terminal states; displayed and logged complete playback errors.
+- Corrected recognition of the capturing state. Page hiding stopped capture in this version; 0.2.6 changed that behavior.
+- Used a CORS-enabled public test endpoint by default, without proxying requests or bypassing cross-origin restrictions.
+- App log exports retained numeric recording statistics and hashed playback IDs, without saving audio content.
 
-## 直接运行
+## Run directly
 
-在 PhoneSDK 目录：
+From the PhoneSDK directory:
 
 ```sh
 npm run dev:permissions -- --port 4187
 npm run pack:plugin -- examples/permission-debug dist/permission-debug-0.2.8.mmpkg
 ```
 
-若端口上已有此工作区的预览，直接刷新即可。
-Browser Studio 的 Reload 保留当前打开工作区的便签和文件，但每次重新申请授权；关闭或整体刷新 Browser Studio 页面仍是内存模拟器，数据不持久化。Desktop 存储由其宿主管理。
+If this workspace already has a preview running on that port, refresh it.
+Browser Studio's Reload preserves notes and files for the currently open workspace but requests authorization again each time. Closing or fully refreshing the Browser Studio page loses the in-memory simulator data. Desktop storage is managed by its Host.
 
-## 测试建议
+## Suggested tests
 
-1. 全部拒绝启动：Bridge 各功能应显示 NOT_GRANTED。再重载并勾选目标权限。
-2. 写便签，清空输入框，读取后应恢复；用宿主 Reload 后再次授权读取。
-3. 选择附带 sample-note.txt，读取预览应显示实际中文内容。
-4. 发文字和棋盘，观察眼镜/虚拟显示；仅看插件小图不算发送成功。
-5. 监听后按眼镜按键 / Studio Single click，计数应增加；模拟头动后指示点移动。
-6. 播放测试音；输入自己允许访问的测试 URL 发送 GET。
-7. 负向测试在折叠区：rawImu 范围、未知 network.request 方法。
+1. Launch with all permissions denied: Bridge features should show NOT_GRANTED. Reload and select the permissions to test.
+2. Write a note, clear the input, and read it back. Use Host Reload, authorize again, and read it again.
+3. Select the included sample-note.txt. The preview should display its actual text, including the Chinese characters used to test Unicode file reading.
+4. Send text and the checkerboard, then inspect the glasses or virtual display. The small plugin preview alone does not prove delivery.
+5. Subscribe, then press the glasses button or use Studio Single click. The count should increase. Simulated head motion should move the indicator.
+6. Play the test tone. Enter a test URL you are allowed to access and send a GET request.
+7. Use the collapsible negative-test section for the rawImu scope and unknown network.request method checks.
 
-## 不混淆的边界
+## Testing boundaries
 
-- Studio 定位来自宿主模拟器，页面醒目标注“模拟位置”；App 真机则展示 App 原生返回。没有偷偷使用 navigator.geolocation 绕过 Bridge。
-- macOS Desktop Studio 使用电脑麦克风模拟眼镜 Opus 采集并将数据交给 H5 播放；真实眼镜录音仍需 App + 眼镜验证。
-- H5 播放与 HTTP 是真实操作，但 Studio 没有原生隔离。拒绝权限后仍能播放/请求，意味着该宿主没有拦截，不能宣称验收通过。
-- GET 失败可能是 CORS/网络故障，不能自动判成权限拦截。默认 https://httpbin.org/get（第三方公共服务，可能不可达）；仅点击后请求，不自动联系外部服务。
-- 自动播放探针曾有页面交互，不能替代冷启动无用户手势的真机测试。
-- App 完整插件 Runtime 的开放限制沿用既有结论，本插件不会绕过它。
+- Studio location comes from the Host simulator and is prominently labeled as simulated. On a real phone, the App's native result is displayed. The plugin does not bypass the Bridge with navigator.geolocation.
+- macOS Desktop Studio uses the computer microphone to simulate glasses Opus capture and sends the data to H5 for playback. Real glasses recording still requires App + glasses validation.
+- H5 playback and HTTP requests are real operations, but Studio does not provide native isolation. Playback or requests succeeding after permission denial means the Host did not block them; it is not an acceptance-test pass.
+- GET failures may be caused by CORS or network errors and cannot automatically be classified as permission enforcement. The default is https://httpbin.org/get, a third-party public service that may be unavailable. Requests occur only after a click; the plugin does not contact external services automatically.
+- The autoplay probe follows prior page interaction and cannot replace a real-device cold-start test without a user gesture.
+- Existing restrictions on access to the App's full plugin Runtime still apply. This plugin does not bypass them.
 
-2026-09-07 页面实测：便签存取、文字/棋盘发送、按键计数、头动反馈、设备信息、测试音 play()、HTTP 200、本地文件流预览成功；
-位置明确显示模拟来源，录音真实返回 CAPABILITY_UNAVAILABLE。该历史实测不代表当前版本已通过真机验收。
+Historical page testing on 2026-09-07 successfully exercised note storage/retrieval, text/checkerboard delivery, button counts, head-motion feedback, device information, test-tone play(), HTTP 200, and local file-stream previews.
+Location clearly identified its simulated source, and recording returned CAPABILITY_UNAVAILABLE from the real interface. This historical testing does not establish that the current version has passed hardware acceptance testing.

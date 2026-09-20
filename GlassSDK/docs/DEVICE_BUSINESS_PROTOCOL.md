@@ -11,6 +11,10 @@ for positional arrays. Ordinary responses use the system STATUS namespace,
 not the plugin service's INT8 result layout. Several handlers enqueue work on the
 display task: success does not prove pixels were rendered or settings persisted.
 
+For complete annotated packets, see [WIRE_EXAMPLES.md](WIRE_EXAMPLES.md).
+[HUD_PROTOCOL.md](HUD_PROTOCOL.md) covers generic scene/pixel drawing, and
+[AUDIO_PROTOCOL.md](AUDIO_PROTOCOL.md) covers recording and media controls.
+
 ## System queries and display settings — service `0x01`
 
 | Command | Request | Successful response / meaning |
@@ -111,7 +115,7 @@ finished displaying it.
 ## Notifications — service `0x05`
 
 `0x01` carries INT8 style (1 detailed / 2 compact), followed by JSON with:
-`id` (notification ID), `a` (App name), `type` (0 App / 1 simulated / 2 schedule),
+`id` (integer notification ID), `a` (App name), `type` (0 App / 1 simulated / 2 schedule),
 `ts` (App-local timestamp convention), `c` (content), `ti` (sender/title),
 `pkg_name` (source package). The native sender uses wall-clock seconds adjusted
 by its zone offset for `ts`; do not silently reinterpret it as UTC milliseconds.
