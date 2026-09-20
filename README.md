@@ -89,3 +89,13 @@ The SDK headers, JavaScript packages, examples, package formats, transport
 specifications, and documents in this repository are the public development
 contract. Desktop Studio is distributed as a prebuilt tool. Its private source
 tree and internal build system are not required public dependencies.
+
+## Native Bluetooth and BLE integrations
+
+Third-party native clients can implement the public business protocols without
+using the H5 Bridge. Start with the [Bluetooth developer guide](GlassSDK/docs/BLUETOOTH_DEVELOPER_GUIDE.md)
+and [byte-by-byte Hex examples](GlassSDK/docs/WIRE_EXAMPLES.md). They cover HUD
+control, microphone Opus streaming, native HFP speaker playback, media controls,
+and the HOGP accessory gateway. The guide distinguishes implemented transport
+paths from BLE release gaps. Only executable GMP delivery/installation wire
+transactions are withheld; ordinary application and accessory data are public.

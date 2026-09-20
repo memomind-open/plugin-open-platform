@@ -1,4 +1,4 @@
-> Bridge 2.0 开发分支说明：权限与接口变更以 [权限调试说明](permission-debug.md) 为准。本文旧版字符串权限和旧音频接口不再适用。
+> Bridge 2.0 development branch: follow the [permission debugging guide](permission-debug.md) for permission and API changes. The legacy string-based permissions and audio interfaces in this document no longer apply.
 
 # Bridge API Overview
 
@@ -290,7 +290,11 @@ The default profile is `interactive`, the default pickup mode is
 `frontBalanced`, and noise reduction is enabled by default.
 
 Capture is always Opus, 16 kHz, mono, with 20 ms frames. Only one native capture
-operation can own the glasses audio channel at a time. Playback is owned by H5.
+operation can own the glasses audio channel at a time. H5 requests media playback;
+the native Host/OS controls the actual output route. Native Speak uses HFP/SCO,
+not recording-channel Opus upload. This Web SDK does not expose an HFP-routing
+or `speak` method; `audio.playback` permission alone does not select HFP.
+See the [native audio and Bluetooth contract](../../../GlassSDK/docs/AUDIO_PROTOCOL.md).
 
 ### State and lifecycle
 

@@ -1,4 +1,4 @@
-> 自定义配对插件：必须配对本示例对应的设备插件，声明并批准 device.messaging 通道后才能通信。当前恢复包准入与受控消息能力；不应与默认 Web Bridge 任意混配，真机功能仍需对应设备插件验收。
+> Custom paired plugin: use the matching device plugin for this example and declare and grant device.messaging channel permissions before communicating. Package admission and controlled messaging are available again. Do not arbitrarily pair this example with the default Web Bridge; hardware functionality still requires validation with its matching device plugin.
 
 # Fighter Arena Controller
 

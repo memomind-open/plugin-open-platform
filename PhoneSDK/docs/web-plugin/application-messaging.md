@@ -12,7 +12,11 @@ The binary device contract is in
 [GlassSDK PROTOCOL](../../../GlassSDK/docs/PROTOCOL.md#plugin-application-service-0x0f).
 Application data uses service `0x0F`, command `0x28` toward the glasses and `0x29`
 for plugin-originated data. Its frame, TLV and checksum formats are public.
-Executable package delivery remains managed by the official App.
+Executable package delivery remains managed by the official App. Native clients
+can implement these business messages directly; see the
+[Bluetooth/BLE integration guide](../../../GlassSDK/docs/BLUETOOTH_DEVELOPER_GUIDE.md)
+for actual GATT discovery, framing, transport availability, HUD and audio.
+H5 Bridge restrictions do not mean the public native wire protocol is withheld.
 
 ## Declare and obtain permission
 

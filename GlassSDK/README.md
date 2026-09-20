@@ -218,7 +218,11 @@ included in the published SDK.
 | [ABI.md](docs/ABI.md) | ABI compatibility, lifecycle, callbacks, memory, and Host services |
 | [GRAPHICS.md](docs/GRAPHICS.md) | Shared LVGL and direct framebuffer rendering |
 | [SECURITY.md](docs/SECURITY.md) | Package integrity, trust, and isolation limits |
-| [PROTOCOL.md](docs/PROTOCOL.md) | App-managed installation and plugin messages |
+| [BLUETOOTH_DEVELOPER_GUIDE.md](docs/BLUETOOTH_DEVELOPER_GUIDE.md) | Native Bluetooth/BLE integration, transport discovery, and release readiness |
+| [WIRE_EXAMPLES.md](docs/WIRE_EXAMPLES.md) | Complete Hex vectors with every byte annotated |
+| [HUD_PROTOCOL.md](docs/HUD_PROTOCOL.md) | Display settings, text, shapes, pixels, and frame acknowledgements |
+| [AUDIO_PROTOCOL.md](docs/AUDIO_PROTOCOL.md) | Capture commands, Opus packet extraction, HFP playback, and media controls |
+| [PROTOCOL.md](docs/PROTOCOL.md) | GM framing, TLVs, application messages, screenshots, and recording |
 | [BLE_ACCESSORY_PROTOCOL.md](docs/BLE_ACCESSORY_PROTOCOL.md) | BLE accessory control, GATT and HID wire data |
 | [DEVICE_BUSINESS_PROTOCOL.md](docs/DEVICE_BUSINESS_PROTOCOL.md) | Common native device business commands |
 | [PROTOCOL_COMPATIBILITY.md](docs/PROTOCOL_COMPATIBILITY.md) | Declare Web/device protocol requirements and compatibility |

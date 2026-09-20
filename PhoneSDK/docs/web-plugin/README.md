@@ -1,9 +1,10 @@
-> 本开发分支已切换 Bridge 2.0。权限与接口调试以 [权限调试说明](permission-debug.md) 为准；下列旧版文档中的 Bridge 1.0、字符串权限和旧音频方法不再适用。
+> This development branch uses Bridge 2.0. Follow the [permission debugging guide](permission-debug.md) for permission and API testing. Bridge 1.0, string-based permissions, and legacy audio methods in the older documentation below no longer apply.
 
 # Web Plugin Development Documentation (Draft)
 
 This directory contains the first public draft of the GM Web Plugin developer
-documentation. The current contract version is Bridge v1.
+documentation. The current contract version is Bridge 2.0; use the permission
+and capability contracts for current declarations.
 
 ## Recommended reading order
 
@@ -28,3 +29,11 @@ tool included in the DevKit ZIP.
 - [Paired-plugin application messages](application-messaging.md)
 - [Foreground phone location](location.md)
 - [Current permissions and capability boundaries](capability-contract.md)
+
+## Native Bluetooth clients
+
+For integrations outside the H5 Host, see the
+[Bluetooth/BLE developer guide](../../../GlassSDK/docs/BLUETOOTH_DEVELOPER_GUIDE.md)
+and [byte-by-byte wire examples](../../../GlassSDK/docs/WIRE_EXAMPLES.md).
+These document HUD control, Opus capture, native HFP playback, and HOGP without
+requiring the private App source. GMP executable delivery remains App-managed.

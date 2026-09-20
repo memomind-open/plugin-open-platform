@@ -79,7 +79,7 @@ The GlassSDK build command does not create a ZIP, QR image, or LAN server.
 ### 3. Import and run through the official App
 
 In the official App, open **Settings > Memo Lab > Developer Workbench** and use
-**Scan to open app** (Chinese: **设置 > Memo 实验室 > 开发者工作台 > 扫码打开应用**).
+**Scan to open app**.
 Scan the QR code shown by Desktop Studio. The App downloads and validates the
 bundle, prepares the phone plugin and manages delivery and startup on the glasses.
 

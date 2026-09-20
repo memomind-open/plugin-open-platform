@@ -1,5 +1,11 @@
 # Phone and glasses protocols
 
+For an independent native client, start with the [Bluetooth/BLE integration guide](BLUETOOTH_DEVELOPER_GUIDE.md)
+and [byte-by-byte Hex examples](WIRE_EXAMPLES.md). Public business protocols include
+[HUD drawing](HUD_PROTOCOL.md), [capture and native HFP playback](AUDIO_PROTOCOL.md),
+and [HOGP control and mappings](BLE_ACCESSORY_PROTOCOL.md). Only executable GMP
+delivery/installation transactions are deliberately withheld.
+
 ## Supported installation path
 
 Desktop Studio builds the developer-app bundle from the selected packages and
@@ -112,7 +118,7 @@ PhoneSDK APIs and their permission contracts; see
 | GM application commands and screenshots | `00007033-0000-1000-8000-00805f9b34fb` | `ql.iap2.protocol02` |
 | Recording control and Opus stream | `00002024-0000-1000-8000-00805f9b34fb` | `ql.iap2.protocol01` |
 
-The two transports are independent byte streams. In particular, the raw
+The command and recording transports are independent byte streams. In particular, the raw
 recording commands described below are not GM packets and must be sent on the
 recording transport.
 
@@ -121,6 +127,10 @@ characteristics. iAP2 is another transport. BLE accessory/HOGP gateway operation
 use their own connection and attribute model; a GM frame length is not a BLE MTU.
 H5 plugins access application messages through the App Bridge, with
 [permission and channel checks](../../PhoneSDK/docs/web-plugin/application-messaging.md).
+
+For phone-facing BLE service/characteristic UUIDs, CCCD setup, MTU handling,
+and firmware configuration gaps, see the [BLE discovery contract](BLUETOOTH_DEVELOPER_GUIDE.md#phone-facing-ble-discovery).
+SPP support does not establish BLE recording support.
 
 ## GM packet framing
 
@@ -137,7 +147,9 @@ the checksum):
 | 7 | variable | TLVs or continuation payload |
 | last 2 | 2 | Unsigned big-endian sum of all preceding bytes in this frame, modulo 65536 |
 
-Each physical frame is at most 512 bytes, leaving at most 503 payload bytes.
+The standard SPP/firmware transmit frame ceiling is 512 bytes, leaving at most
+503 payload bytes. BLE writes must use complete GM frames within the actual
+characteristic write limit; the header/checksum consume nine bytes of that limit.
 All frames repeat the logical length, event, service, and command. The logical
 packet limit used by the reference client is 80 KiB.
 
@@ -158,8 +170,10 @@ the value bytes. Types used here are:
 
 The 24-bit length is the **logical** length: all TLV bytes plus one 9-byte
 envelope. It is not the sum of physical frame lengths. Each physical frame has
-its own repeated 7-byte header and 2-byte checksum. Non-final frames carry
-503 body bytes and are 512 bytes long; the final frame carries the remainder.
+its own repeated 7-byte header and 2-byte checksum. With a 512-byte physical
+ceiling, non-final frames carry 503 body bytes and are 512 bytes long; the final
+frame carries the remainder. BLE downlinks can use smaller complete GM frames
+at ATT write boundaries. See the integration guide for the current uplink MTU limitation.
 A TLV header or value may straddle frames. Reassemble the logical TLV stream
 before interpreting its fields; never interpret a continuation body as a fresh
 TLV list.
@@ -185,7 +199,10 @@ checksum bytes. No whole-message checksum replaces these per-frame sums.
 Continuation heads advance from `0x01` upward; the firmware increment helper
 wraps `0xF0` to `0x01`. The 80 KiB logical limit is reached before that wrap for
 ordinary maximum-size frames. Event/service/command and logical length must
-remain consistent throughout the message.
+remain consistent throughout the message. The App serializer historically wraps
+after `0xEF`, while the firmware macro wraps after `0xF0`. Avoid this boundary
+by keeping a business message below 240 physical frames; on small-MTU BLE links,
+reduce logical payload size instead of assuming the 80 KiB limit is always usable.
 
 The parser rejects bad checksums, missing/out-of-order continuation heads,
 impossible lengths and malformed TLV lengths. A new `0xFA` first frame replaces
@@ -194,7 +211,7 @@ connection reset, discard partial data and old request correlation state. Do not
 interleave two partial messages on one reassembly context. An empty flow-control
 response is not the final application-delivery ACK.
 
-The physical Bluetooth read callback is a byte stream: it may contain part of a
+On SPP/iAP2 the receive side must account for a byte stream: it may contain part of a
 frame or several frames. Buffer/split by the protocol lengths rather than read
 callback boundaries. Product builds can add an outer transport envelope; the GM
 layout described here is the inner command packet, not a BLE MTU or a promise
@@ -202,7 +219,9 @@ that every raw socket begins directly with `0xFA`.
 
 On timeout, check whether the business operation is safe to repeat. A lost reply
 does not prove the operation did not execute. The GM frame format alone does not
-supply an exactly-once application transaction.
+supply an exactly-once application transaction. On the legacy BLE command
+write callback, preserve complete GM physical-frame boundaries; arbitrary
+partial-frame writes are not reassembled as a generic stream by that callback.
 
 ## Plugin application service (`0x0F`)
 
@@ -260,6 +279,10 @@ STATUS TLV namespace. Do not apply one service's error table to another.
 | 7 | `GM_PLUGIN_ESTATE` | Invalid runtime state |
 | 8 | `GM_PLUGIN_EVERSION` | Incompatible ABI or table version |
 | 9 | `GM_PLUGIN_EFULL` | Insufficient plugin Flash capacity |
+
+An early dispatch failure, before the display/plugin handler runs, can instead
+return a generic STATUS TLV (for example queue pressure or allocation failure).
+Inspect the TLV type before choosing an error namespace.
 
 This is the shared result namespace; not every command returns every value.
 The Host C API returns the negative error value; the wire carries its positive

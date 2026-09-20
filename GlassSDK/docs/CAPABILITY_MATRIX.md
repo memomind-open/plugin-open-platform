@@ -53,6 +53,8 @@ software must not install packages from an untrusted source.
 Mic and speaker PCM are intentionally not part of the glasses plugin ABI.
 Glasses plugins send control/state through Bluetooth business messages. Phone
 plugins with `audio.capture` can use `gm.audio.openCapture()` to receive the
-native glasses Opus stream; this is not an HFP-only capture contract. Playback
-is handled by the phone/WebView and its policy; phone-call HFP is a separate path.
+native glasses Opus stream; this is not an HFP-only capture contract. H5 playback is requested by the phone/WebView; the native Host/OS selects the
+output route. The intended native Speak path uses HFP/SCO to the glasses speaker,
+not a BLE Opus upload. The current Web SDK has no method that forces HFP routing.
+See the [audio wire and routing contract](AUDIO_PROTOCOL.md).
 See the [PhoneSDK audio API](../../PhoneSDK/docs/web-plugin/api-reference.md#native-glasses-audio).

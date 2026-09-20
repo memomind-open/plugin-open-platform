@@ -1,4 +1,4 @@
-> Bridge 2.0 开发分支说明：权限与接口变更以 [权限调试说明](permission-debug.md) 为准。本文旧版字符串权限和旧音频接口不再适用。
+> Bridge 2.0 development branch: follow the [permission debugging guide](permission-debug.md) for permission and API changes. The legacy string-based permissions and audio interfaces in this document no longer apply.
 
 # Quick Start
 

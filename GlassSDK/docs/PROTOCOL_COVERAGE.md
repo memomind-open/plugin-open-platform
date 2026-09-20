@@ -1,62 +1,98 @@
-# 业务通信协议文档覆盖检查（2026-09-17）
+# Business Protocol Documentation Coverage Review (2026-09-17)
 
-## 开放边界
+## Public scope
 
-公开插件业务消息及其他设备功能的协议格式。插件包安装、压缩分块、续传等
-由官方 APP 管理，不在公开文档提供可独立实现安装器的指令和报文说明。
+The public documentation describes plugin business messages and protocols for other
+device features. The official App manages plugin package installation, compressed
+chunks, and transfer resumption. Public documentation does not provide the commands
+and packet specifications needed to implement a standalone installer.
 
-“有源码接口”不等于“已经形成完整的公开契约”。以下检查以当前接口注册表、
-处理函数和现有 Markdown 为依据，不把枚举中的名称当成已验证的完整协议。
+An interface in source code is not necessarily a complete public contract. This
+review uses the current interface registry, handlers, and Markdown documentation;
+an enum name alone is not treated as a verified protocol specification.
 
-## 本轮已补齐或纠正
+## Corrections completed in this review
 
-| 项目 | 发现 | 处理 |
+| Area | Finding | Correction |
 | --- | --- | --- |
-| 双向自定义消息 | API 页写未开放，开发指南却写无需权限，与 APP 实现冲突 | 统一为 `device.messaging` 授权和通道范围控制 |
-| 收包权限 | 仅说明监听回调，未讲清入站也按通道过滤 | 补充双向授权、标准显示/事件通道额外权限和失效运行代次过滤 |
-| 二进制与 Bridge 的关系 | Base64、业务字节、GM 帧容易混淆 | 补充 H5 Uint8Array、Bridge Base64、设备二进制三个层次 |
-| 应答语义 | 容易把命令 ACK 当业务处理完成 | 补充独立业务回复、请求 ID、超时和重复处理责任 |
-| 错误码 | 插件 INT8 status、系统 STATUS 和 Bridge 字符串错误缺少区分 | 补充插件数值错误表及 Bridge 权限/运行态/参数错误 |
-| 承载名称 | SPP UUID 容易被当成 BLE GATT characteristic | 明确 Classic SPP、iAP2 和 BLE/HOGP 是不同通道 |
-| 设备信息查询 | 文档写无需权限 | 修正为 `device.info` |
-| 权限 manifest | 保留旧字符串列表、Bridge 1.0 示例 | 包格式页更新为当前对象声明和版本要求 |
+| Bidirectional custom messages | The API reference said messaging was unavailable, while the developer guide said no permission was required; both conflicted with the App implementation | Documented `device.messaging` authorization and channel scope consistently |
+| Receive permissions | Callback documentation did not explain inbound channel filtering | Added authorization in both directions, additional permissions for standard display/event channels, and filtering of stale runtime generations |
+| Binary data and the Bridge | Base64, business payload bytes, and GM frames could be confused | Distinguished H5 Uint8Array, Bridge Base64, and device binary data |
+| Response semantics | A command ACK could be mistaken for completed business processing | Documented separate business responses, request IDs, timeouts, and responsibility for duplicate handling |
+| Error codes | Plugin INT8 status, system STATUS, and Bridge string errors were not clearly distinguished | Added numeric plugin errors and Bridge permission, runtime-state, and parameter errors |
+| Transport names | An SPP UUID could be mistaken for a BLE GATT characteristic | Clarified that Classic SPP, iAP2, and BLE/HOGP are separate transports |
+| Device information queries | Documentation said no permission was required | Corrected the requirement to `device.info` |
+| Permission manifests | Legacy string lists and Bridge 1.0 examples remained | Updated the package format page with current object declarations and version requirements |
 
-参见 [业务协议](PROTOCOL.md)、
-[APP 插件双向通信](../../PhoneSDK/docs/web-plugin/application-messaging.md)。
+See the [business protocol](PROTOCOL.md) and
+[bidirectional App plugin messaging](../../PhoneSDK/docs/web-plugin/application-messaging.md).
 
-## 后续补齐结果
+## Additional coverage completed
 
-| 接口族 | 已补内容 | 文档 |
+| Interface family | Coverage added | Documentation |
 | --- | --- | --- |
-| BLE/HOGP 戒指网关 | 控制/GATT/HID 指令与 TLV、接收上限、ACK/异步结果、句柄代际、扫描及发现分片、错误处理；纠正旧设计中 ACK 带 JSON/seq 和 unbond 同步完成的说法 | [BLE accessory](BLE_ACCESSORY_PROTOCOL.md) |
-| 系统状态与显示 | 信息/状态查询的 STRING JSON 格式、常用字段、亮度/高度/距离取值与异步应用限制 | [Device business](DEVICE_BUSINESS_PROTOCOL.md) |
-| 翻译、提词器、通知、导航 | 常用消息字段/顺序、上下行区别、旧通知指令停用、导航实际模式与能力限制 | [Device business](DEVICE_BUSINESS_PROTOCOL.md) |
-| 通用帧 | 两帧可重建二进制例子、逐帧校验和、逻辑/物理长度区别、跨帧 TLV、断线/错误重置与重试语义 | [GM protocol](PROTOCOL.md#fragmentation-and-recovery) |
-| 定位接口 | 三个方法、两个事件、WGS84 字段、前台生命周期、超时、错误和示例 | [Foreground location](../../PhoneSDK/docs/web-plugin/location.md) |
-| APP 权限与版本 | 32 个方法与权限逐项映射、10 类权限、scope、当前对象声明及 Bridge/schema 版本 | [Capability contract](../../PhoneSDK/docs/web-plugin/capability-contract.md) |
-| 音频路径 | 修正 glasses Host 能力矩阵中“录音只能 HFP”的误导；PhoneSDK 原生 Opus 流和 HFP 通话分开 | [Capability matrix](CAPABILITY_MATRIX.md) |
+| BLE/HOGP ring gateway | Control/GATT/HID commands and TLVs, receive limits, ACKs and asynchronous results, handle generations, scan/discovery fragmentation, and error handling; corrected legacy claims that ACKs carry JSON/seq and unbond completes synchronously | [BLE accessory](BLE_ACCESSORY_PROTOCOL.md) |
+| System status and display | STRING JSON formats for information/status queries, common fields, brightness/height/distance values, and asynchronous application limits | [Device business](DEVICE_BUSINESS_PROTOCOL.md) |
+| Translation, teleprompter, notifications, and navigation | Common message fields and ordering, uplink/downlink differences, retired notification commands, actual navigation modes, and capability limits | [Device business](DEVICE_BUSINESS_PROTOCOL.md) |
+| Common framing | A reconstructable two-frame binary example, per-frame checksums, logical versus physical lengths, cross-frame TLVs, disconnect/error resets, and retry semantics | [GM protocol](PROTOCOL.md#fragmentation-and-recovery) |
+| Location | Three methods, two events, WGS84 fields, foreground lifecycle, timeouts, errors, and examples | [Foreground location](../../PhoneSDK/docs/web-plugin/location.md) |
+| App permissions and versions | Individual permission mappings for 32 methods, 10 permission categories, scopes, current object declarations, and Bridge/schema versions | [Capability contract](../../PhoneSDK/docs/web-plugin/capability-contract.md) |
+| Audio paths | Corrected the misleading claim in the glasses Host capability matrix that recording is available only through HFP; distinguished PhoneSDK native Opus streams from HFP calls | [Capability matrix](CAPABILITY_MATRIX.md) |
 
-## 覆盖范围与验证
+## Coverage and validation
 
-以上是依据当前源码补充的接口契约，不承诺将固件所有内部调试/工厂命令公开为
-稳定 SDK。产品特有的完整导航图像/地图对象、出租车业务、HID 输入规则表等复杂
-业务模型，仍需独立的产品/附件契约，不能用通用 BYTES 或一个指令枚举替代其定义。
-本文明确标出这一范围，未把这些模型宣称为已完整文档化。
+These interface contracts were added based on the current source. They do not
+promise to expose every internal firmware debugging or factory command as a stable
+SDK. Complex models such as product-specific navigation images/map objects, taxi
+services, and HID input rule tables still require separate product/accessory
+contracts. Generic BYTES fields or command enums cannot replace those definitions.
+These models are explicitly outside the claim of complete documentation.
 
-核对依据为 APP `plugin_location_adapter/source.dart`、`plugin_capability_policy.dart`、
-`common_blue/lib/command` 中的业务编码器，SDK `permission-policy.js`、`web-sdk`，以及
-固件 `gm_package.c`、`bt_data_handler.c`、`display_main_event.c`、`navi_app.c` 和
-`app_hogp_relay.c`。处理函数优先于历史设计和过期注释。
+The review used the App's `plugin_location_adapter/source.dart`,
+`plugin_capability_policy.dart`, and business encoders in `common_blue/lib/command`;
+the SDK's `permission-policy.js` and `web-sdk`; and the firmware's `gm_package.c`,
+`bt_data_handler.c`, `display_main_event.c`, `navi_app.c`, and `app_hogp_relay.c`.
+Handlers take precedence over historical designs and outdated comments.
 
-权限策略、Studio 权限、Web SDK 的 62 项已有测试通过。测试时用临时 Node loader
-解析本地 workspace 包，避免依赖未链接的问题；未修改仓库源码或依赖文件。
-二进制示例已计算长度和校验和；这不替代真实蓝牙链路时序验收。
+At the time of this review, 62 existing permission-policy, Studio-permission, and
+Web SDK tests passed. A temporary Node loader resolved local workspace packages to
+avoid unlinked dependencies; repository source and dependency files were not
+changed. Binary example lengths and checksums were calculated. This does not
+replace timing validation over a real Bluetooth connection.
 
-## “只能官方 APP 安装”的保证范围
+## Limits of the official-App-only installation guarantee
 
-APP 内的权限和通道控制用于约束 H5 插件，不等同于眼镜端验证安装客户端身份。
-本次检查的安装命令分发路径没有展示独立的官方 APP 身份验证；这不是对全部
-蓝牙栈鉴权路径的完整安全审计。隐藏文档不能作为“非官方客户端一定无法安装”的证据。
+App permission and channel controls constrain H5 plugins; they do not establish
+that the glasses authenticate the installation client. The installation command
+dispatch path inspected in this review did not demonstrate independent official
+App authentication. This was not a complete security audit of every authentication
+path in the Bluetooth stack. Withholding documentation is not evidence that an
+unofficial client cannot install packages.
 
-如果产品要求强制只接受官方授权安装，需要单独核对眼镜端是否验证可信的安装授权，
-并覆盖新安装、续传和缓存激活的授权生命周期。该项属于实现与安全设计，本轮未改代码。
+If the product must accept only officially authorized installations, a separate
+review must verify trusted installation authorization on the glasses, including
+its lifecycle for new installations, resumed transfers, and cached activation.
+This is an implementation and security-design concern; this review did not change
+that code.
+
+## Public SDK expansion (2026-09-20)
+
+The public scope now explicitly includes third-party native Bluetooth clients,
+BLE endpoint discovery, HUD scene/pixel payloads, microphone control and Opus
+extraction, native HFP Speak routing, media commands, and the complete HOGP
+input-map schema. Only executable GMP delivery/installation transactions remain
+withheld. HOGP mapping-table fragmentation is public configuration data.
+
+Start with [the integration guide](BLUETOOTH_DEVELOPER_GUIDE.md). The
+[wire appendix](WIRE_EXAMPLES.md) provides complete, synthetic, byte-annotated
+vectors generated by a public Python example. Offline checks validate framing,
+checksums, fragmented reassembly, invalid inputs, and legacy/compact Opus
+extraction. These checks do not replace hardware validation.
+
+Source review identified release gaps: conditional legacy GM GATT registration,
+unimplemented recording GATT send/registration in the current XGIMI path, and a
+GM transmit frame ceiling that is not negotiated with BLE MTU. The App also uses
+a legacy control-service UUID representation distinct from its recording-service
+configuration. These findings must be resolved/validated against the release
+firmware before advertising universal BLE-only capture. Native HFP is separate
+from BLE, and the current Web SDK does not expose a method that forces HFP.
