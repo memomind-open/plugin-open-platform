@@ -11,7 +11,7 @@
     const requestId = `req-${Date.now()}-${++sequence}`;
     pending.set(requestId, { resolve, reject });
     MemoPluginBridge.postMessage(JSON.stringify({
-      version: '1.0', sessionToken: token, requestId, method, params,
+      version: '2.0', sessionToken: token, requestId, method, params,
       runtimeGeneration: generation
     }));
   });
@@ -19,7 +19,7 @@
   window.__memoPluginBootstrap = async (sessionToken, runtimeGeneration) => {
     token = sessionToken;
     generation = runtimeGeneration;
-    document.getElementById('runtime').textContent = `Bridge v1 / Generation ${generation}`;
+    document.getElementById('runtime').textContent = `Bridge v2 / Generation ${generation}`;
     try {
       await call('runtime.ready');
       const saved = await call('storage.get', { key: 'seconds' });
