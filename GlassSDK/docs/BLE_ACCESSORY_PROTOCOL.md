@@ -1,5 +1,9 @@
 # BLE accessory gateway protocol
 
+For a complete desktop/mobile workflow without the official App, start with
+[HOGP quick start](HOGP_QUICKSTART.md): connect the controller, scan/connect an
+accessory, decode directional input, and explicitly disconnect it.
+
 This is the App-to-glasses **GM service `0x10`** for the glasses' BLE Central /
 HID Host gateway. The accessory link is BLE; the App control link uses the
 [GM transport and TLVs](PROTOCOL.md#gm-packet-framing). Do not connect to a
@@ -10,6 +14,51 @@ method by `device.messaging`.
 The current implementation manages one accessory. Query capabilities before
 using optional functionality. Do not treat a scan address, a permanent bond
 identity, a GM event ID and a GATT transaction `seq` as interchangeable IDs.
+
+## Minimal setup for standard HID buttons
+
+A third-party native controller can replace the official App for accessory
+setup by implementing the GM transport and this service. No executable plugin
+or plugin-package transfer is required for the built-in HID navigation path.
+
+The two links have independent roles: on an enabled phone-facing BLE GM link,
+the glasses expose a GATT server to the controller; on the accessory link, the
+glasses act as BLE Central, GATT Client and HID Host. The accessory is the HID
+Device. This is concurrent role support, not a command that switches the
+phone-facing link into a HID Host. The GM control link must be available in the
+target firmware; accessory HOGP support alone does not enable that transport.
+
+Follow the [quick-start scan/connect workflow](HOGP_QUICKSTART.md#3-scan-and-connect-an-accessory)
+for the ordered requests and response handling. Check existing state before
+scanning: reuse the desired connection, or explicitly disconnect another
+accessory first. Wait for HID readiness after connect; an ACK only accepts the
+request. Firmware performs pairing/security, HID discovery, Report Map parsing
+and input notification subscription automatically.
+
+Built-in keyboard mappings include the following HID usages (page `0x07`):
+
+| Usage ID | Local action | Default UI event |
+| --- | --- | --- |
+| `0x004F` | Right | `EVTSYS_BUTTON_RIGHT` |
+| `0x0050` | Left | `EVTSYS_BUTTON_LEFT` |
+| `0x0051` | Down | `EVTSYS_BUTTON_DOWN` |
+| `0x0052` | Up | `EVTSYS_BUTTON_UP` |
+| `0x0028`, `0x0058` | Select / Enter | `EVTSYS_BUTTON_SINGLE` |
+| `0x0029` | Back / Escape | `EVTSYS_BUTTON_BACK` |
+
+These are HID usage identifiers, not fixed byte offsets in every report.
+The accessory's Report Map defines its actual report layout. The default
+navigation path applies when no custom mapping or foreground raw-input
+subscription overrides it. Visible behavior depends on the foreground app
+handling the corresponding event; a standard HID label alone does not prove
+that every device/report layout is supported by this firmware.
+
+`enable_hid_event` only enables a separate mirror to the controller (`0x06`);
+it is not required for local navigation. `query_gatt_list`, private GATT
+operations and `0x0B` input mappings are optional advanced features, not
+prerequisites for standard keys. Disconnecting the controller link stops
+forwarding and report-mode scans and abandons controller-driven GATT work;
+it leaves the established accessory link intact so local HID input continues.
 
 ## Commands and response shapes
 
@@ -70,7 +119,9 @@ Do not persist an RPA as the permanent accessory identity.
 
 A link snapshot includes `state`, `reason`, `err`, `connected`, `bonded`,
 `hid_ready`, `gatt_ready`, `addr`, and `addr_type`, with identity/name information
-when available. Use the readiness flags: connected does not imply HID ready,
+when available. The current wire format uses numeric `0`/`1` for the four
+connection/bond/readiness flags; accept these as well as boolean equivalents.
+Use the readiness flags: connected does not imply HID ready,
 and HID ready does not imply that private GATT discovery is complete. Treat
 numeric state/reason values as host enums, not booleans. Clear handle caches
 when the link or capability-list generation changes.
@@ -146,7 +197,10 @@ refresh status after disconnect/timeouts. Avoid blind replay of writes.
 
 `0x02` scan results contain `{seq:0, scan_id, devices:[...]}`. Each device contains
 `adv_addr`, `adv_addr_type`, `rssi`, and optional name/service-UUID information.
-Use the same scan's address/type for connecting. `0x09` is separate and contains
+Use the same scan's address/type for connecting. In report mode the current
+firmware only surfaces devices with a nonempty name and recognized HID service
+`0x1812` or supported HID appearance, after merging advertising and scan-response
+data. An empty result does not prove that no BLE devices are nearby. `0x09` is separate and contains
 `seq:0`, `scan_id`, `state` (`scanning` or `ended`) and `reason`; a final empty
 scan batch is not a substitute for this lifecycle event.
 
@@ -195,6 +249,9 @@ sequenceDiagram
     G-->>P: STATUS queue ACK
     G->>R: Connect, pair/encrypt as needed, discover HID, subscribe
     G-->>P: 10/07 link/readiness and 10/08 bond events
+    R-->>G: HID report notification (local input works at HID readiness)
+    Note over G: Decode and dispatch local navigation/input
+    opt Optional controller mirroring and private GATT access
     P->>G: 10/01 query_gatt_list and enable_hid_event
     G-->>P: ACK/list fragments; JSON HID forwarding configuration
     P->>G: 10/03 JSON seq/read/current list_id/value_handle
@@ -204,6 +261,7 @@ sequenceDiagram
     G-->>P: 10/04 JSON read_result plus BYTES
     R-->>G: HID report notification
     G-->>P: 10/06 normalized JSON, optionally raw JSON plus BYTES
+    end
 ```
 
 Do not wait for a GATT read result on command `03`: it arrives on `04`. Do not
