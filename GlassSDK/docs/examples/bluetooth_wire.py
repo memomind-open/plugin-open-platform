@@ -182,6 +182,7 @@ def examples():
         ('HOGP scan start', 16, 1, json_tlv({'op': 'scan_start', 'report': True, 'duration_ms': 10000}), 'ACK first; scan lifecycle and batches arrive asynchronously.'),
         ('HOGP scan stop', 16, 1, json_tlv({'op': 'scan_stop'}), 'Wait for scan-ended event as well as ACK.'),
         ('HOGP connect', 16, 1, json_tlv({'op': 'connect', 'addr': 'AA:BB:CC:DD:EE:FF', 'addr_type': 0}), 'Synthetic address only. Replace with address/type from the same scan.'),
+        ('HOGP enable normalized HID events', 16, 1, json_tlv({'op': 'enable_hid_event', 'enable': True, 'raw': False}), 'Enable normalized forwarding only; matches the independent HOGP quick start. Returns JSON, not a STATUS success.'),
         ('HOGP enable HID events', 16, 1, json_tlv({'op': 'enable_hid_event', 'enable': True, 'raw': True}), 'Returns enable/raw/rate_hz JSON. Raw reports are a separate opt-in.'),
         ('HOGP GATT list', 16, 1, json_tlv({'op': 'query_gatt_list'}), 'Requires HID readiness; collect all list fragments from command 05.'),
         ('HOGP descriptor', 16, 1, json_tlv({'op': 'query_hid_desc', 'include_usages': True}), 'Collect command 0A descriptor fragments.'),
@@ -194,6 +195,12 @@ def examples():
         ('HOGP unbond', 16, 1, json_tlv({'op': 'unbond'}), 'Removes accessory bond; do not send merely to probe connectivity.'),
         ('HOGP read result', 16, 4, json_tlv({'seq': 12, 'event': 'read_result', 'list_id': 1, 'value_handle': 37, 'att_err': 0}) + tlv(1, b'\x01\x02'), 'Synthetic glasses-to-phone success result. Correlate JSON seq=12, not this illustrative GM event ID.'),
         ('HOGP notification data', 16, 4, json_tlv({'event': 'notify', 'seq': 0, 'list_id': 1, 'value_handle': 37}) + tlv(1, b'\x01'), 'Synthetic unsolicited accessory value. Not a pending read response.'),
+        ('HOGP control success', 16, 1, tlv(6, b'\0'), 'Synthetic response to control event 1: queue accepted, not scan/connect/disconnect completion. Do not send this as a request.'),
+        ('HOGP scan result', 16, 2, json_tlv({'seq': 0, 'scan_id': 1, 'devices': [{'adv_addr': 'AA:BB:CC:DD:EE:FF', 'adv_addr_type': 0, 'rssi': -48, 'name': 'Demo HID', 'service_uuids': ['1812']}]}), 'Synthetic glasses-to-controller notification. Copy adv_addr and adv_addr_type into connect addr and addr_type. Not a response correlated by GM event ID.'),
+        ('HOGP link ready', 16, 7, json_tlv({'state': 2, 'reason': 1, 'err': 0, 'connected': 1, 'bonded': 1, 'hid_ready': 1, 'gatt_ready': 0, 'addr': 'AA:BB:CC:DD:EE:FF', 'addr_type': 0}), 'Synthetic unsolicited HID-ready event. Numeric readiness flags; private GATT is not ready in this example.'),
+        ('HOGP link disconnected', 16, 7, json_tlv({'state': 4, 'reason': 5, 'err': 0, 'connected': 0, 'bonded': 1, 'hid_ready': 0, 'gatt_ready': 0, 'addr': 'AA:BB:CC:DD:EE:FF', 'addr_type': 0}), 'Synthetic manual-disconnect event; bond retained. The address may be empty depending on state.'),
+        ('HOGP normalized Up press', 16, 6, json_tlv({'type': 'hid_key', 'key': 0, 'phase': 0, 'src': 1, 'axis': 0, 'rid': 1, 'app': 65542, 'val': 1, 'norm': 1, 'x': 0, 'y': 0, 'mod': 0, 'page': 7, 'usage': 82, 'ts': 1000}), 'Synthetic normalized keyboard Up press; key and phase zero are valid. Firmware-generated event, not a command for injecting a key. Release uses phase 1; actual report ID and timestamp depend on the accessory/session.'),
+        ('HOGP normalized Up release', 16, 6, json_tlv({'type': 'hid_key', 'key': 0, 'phase': 1, 'src': 1, 'axis': 0, 'rid': 1, 'app': 65542, 'val': 0, 'norm': 0, 'x': 0, 'y': 0, 'mod': 0, 'page': 7, 'usage': 82, 'ts': 1100}), 'Synthetic normalized keyboard Up release matching the press fixture. Do not treat it as a second navigation press or transmit it as a command.'),
         ('HOGP raw HID report', 16, 6, json_tlv({'type': 'hid_raw', 'rid': 1, 'len': 2}) + tlv(1, b'\x01\x00'), 'Synthetic two-byte report. Decode its bits using the actual accessory descriptor.'),
     ]
     return items

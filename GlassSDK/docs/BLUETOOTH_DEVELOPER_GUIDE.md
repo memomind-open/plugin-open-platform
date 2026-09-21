@@ -15,6 +15,7 @@ HOGP mapping-table data are not GMP delivery and are documented publicly.
 
 | Goal | Contract |
 | --- | --- |
+| Control a ring/remote from a computer or phone without the official App | [Independent HOGP quick start](HOGP_QUICKSTART.md) |
 | Connect using BLE, choose the correct characteristic | Transport section below |
 | Encode/decode the command envelope and responses | [GM framing and TLVs](PROTOCOL.md#gm-packet-framing) |
 | Inspect each individual byte of a complete example | [Annotated wire examples](WIRE_EXAMPLES.md) |

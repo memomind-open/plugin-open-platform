@@ -219,6 +219,7 @@ included in the published SDK.
 | [GRAPHICS.md](docs/GRAPHICS.md) | Shared LVGL and direct framebuffer rendering |
 | [SECURITY.md](docs/SECURITY.md) | Package integrity, trust, and isolation limits |
 | [BLUETOOTH_DEVELOPER_GUIDE.md](docs/BLUETOOTH_DEVELOPER_GUIDE.md) | Native Bluetooth/BLE integration, transport discovery, and release readiness |
+| [HOGP_QUICKSTART.md](docs/HOGP_QUICKSTART.md) | Independent desktop/mobile control: scan, connect, directional input, and disconnect |
 | [WIRE_EXAMPLES.md](docs/WIRE_EXAMPLES.md) | Complete Hex vectors with every byte annotated |
 | [HUD_PROTOCOL.md](docs/HUD_PROTOCOL.md) | Display settings, text, shapes, pixels, and frame acknowledgements |
 | [AUDIO_PROTOCOL.md](docs/AUDIO_PROTOCOL.md) | Capture commands, Opus packet extraction, HFP playback, and media controls |

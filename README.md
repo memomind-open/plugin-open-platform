@@ -99,3 +99,6 @@ control, microphone Opus streaming, native HFP speaker playback, media controls,
 and the HOGP accessory gateway. The guide distinguishes implemented transport
 paths from BLE release gaps. Only executable GMP delivery/installation wire
 transactions are withheld; ordinary application and accessory data are public.
+
+For the complete scan/connect/directional-input/disconnect workflow from an
+independent desktop or mobile client, see the [HOGP quick start](GlassSDK/docs/HOGP_QUICKSTART.md).

@@ -48,6 +48,7 @@ See [transport and release limitations](BLUETOOTH_DEVELOPER_GUIDE.md), [audio](A
 - [HOGP scan start](#hogp-scan-start)
 - [HOGP scan stop](#hogp-scan-stop)
 - [HOGP connect](#hogp-connect)
+- [HOGP enable normalized HID events](#hogp-enable-normalized-hid-events)
 - [HOGP enable HID events](#hogp-enable-hid-events)
 - [HOGP GATT list](#hogp-gatt-list)
 - [HOGP descriptor](#hogp-descriptor)
@@ -60,6 +61,12 @@ See [transport and release limitations](BLUETOOTH_DEVELOPER_GUIDE.md), [audio](A
 - [HOGP unbond](#hogp-unbond)
 - [HOGP read result](#hogp-read-result)
 - [HOGP notification data](#hogp-notification-data)
+- [HOGP control success](#hogp-control-success)
+- [HOGP scan result](#hogp-scan-result)
+- [HOGP link ready](#hogp-link-ready)
+- [HOGP link disconnected](#hogp-link-disconnected)
+- [HOGP normalized Up press](#hogp-normalized-up-press)
+- [HOGP normalized Up release](#hogp-normalized-up-release)
 - [HOGP raw HID report](#hogp-raw-hid-report)
 
 ## Heartbeat
@@ -1356,6 +1363,81 @@ FA 00 00 46 01 10 01 05 00 00 39 7B 22 6F 70 22 3A 22 63 6F 6E 6E 65 63 74 22 2C
 | 68 | `12` | Additive checksum high byte |
 | 69 | `7E` | Additive checksum low byte |
 
+## HOGP enable normalized HID events
+
+Enable normalized forwarding only; matches the independent HOGP quick start. Returns JSON, not a STATUS success.
+
+```text
+FA 00 00 40 01 10 01 05 00 00 33 7B 22 6F 70 22 3A 22 65 6E 61 62 6C 65 5F 68 69 64 5F 65 76 65 6E 74 22 2C 22 65 6E 61 62 6C 65 22 3A 74 72 75 65 2C 22 72 61 77 22 3A 66 61 6C 73 65 7D 13 69
+```
+
+| Offset (decimal) | Hex byte | Meaning |
+| ---: | --- | --- |
+| 0 | `FA` | First physical frame marker |
+| 1 | `00` | Logical length, high byte |
+| 2 | `00` | Logical length, middle byte |
+| 3 | `40` | Logical length, low byte (64 total) |
+| 4 | `01` | Event ID = 1 |
+| 5 | `10` | Service = 0x10 |
+| 6 | `01` | Command = 0x01 |
+| 7 | `05` | TLV 1 type: JSON |
+| 8 | `00` | Value length, high byte |
+| 9 | `00` | Value length, middle byte |
+| 10 | `33` | Value length, low byte (51 bytes) |
+| 11 | `7B` | JSON UTF-8 byte 0: `{` |
+| 12 | `22` | JSON UTF-8 byte 1: `"` |
+| 13 | `6F` | JSON UTF-8 byte 2: `o` |
+| 14 | `70` | JSON UTF-8 byte 3: `p` |
+| 15 | `22` | JSON UTF-8 byte 4: `"` |
+| 16 | `3A` | JSON UTF-8 byte 5: `:` |
+| 17 | `22` | JSON UTF-8 byte 6: `"` |
+| 18 | `65` | JSON UTF-8 byte 7: `e` |
+| 19 | `6E` | JSON UTF-8 byte 8: `n` |
+| 20 | `61` | JSON UTF-8 byte 9: `a` |
+| 21 | `62` | JSON UTF-8 byte 10: `b` |
+| 22 | `6C` | JSON UTF-8 byte 11: `l` |
+| 23 | `65` | JSON UTF-8 byte 12: `e` |
+| 24 | `5F` | JSON UTF-8 byte 13: `_` |
+| 25 | `68` | JSON UTF-8 byte 14: `h` |
+| 26 | `69` | JSON UTF-8 byte 15: `i` |
+| 27 | `64` | JSON UTF-8 byte 16: `d` |
+| 28 | `5F` | JSON UTF-8 byte 17: `_` |
+| 29 | `65` | JSON UTF-8 byte 18: `e` |
+| 30 | `76` | JSON UTF-8 byte 19: `v` |
+| 31 | `65` | JSON UTF-8 byte 20: `e` |
+| 32 | `6E` | JSON UTF-8 byte 21: `n` |
+| 33 | `74` | JSON UTF-8 byte 22: `t` |
+| 34 | `22` | JSON UTF-8 byte 23: `"` |
+| 35 | `2C` | JSON UTF-8 byte 24: `,` |
+| 36 | `22` | JSON UTF-8 byte 25: `"` |
+| 37 | `65` | JSON UTF-8 byte 26: `e` |
+| 38 | `6E` | JSON UTF-8 byte 27: `n` |
+| 39 | `61` | JSON UTF-8 byte 28: `a` |
+| 40 | `62` | JSON UTF-8 byte 29: `b` |
+| 41 | `6C` | JSON UTF-8 byte 30: `l` |
+| 42 | `65` | JSON UTF-8 byte 31: `e` |
+| 43 | `22` | JSON UTF-8 byte 32: `"` |
+| 44 | `3A` | JSON UTF-8 byte 33: `:` |
+| 45 | `74` | JSON UTF-8 byte 34: `t` |
+| 46 | `72` | JSON UTF-8 byte 35: `r` |
+| 47 | `75` | JSON UTF-8 byte 36: `u` |
+| 48 | `65` | JSON UTF-8 byte 37: `e` |
+| 49 | `2C` | JSON UTF-8 byte 38: `,` |
+| 50 | `22` | JSON UTF-8 byte 39: `"` |
+| 51 | `72` | JSON UTF-8 byte 40: `r` |
+| 52 | `61` | JSON UTF-8 byte 41: `a` |
+| 53 | `77` | JSON UTF-8 byte 42: `w` |
+| 54 | `22` | JSON UTF-8 byte 43: `"` |
+| 55 | `3A` | JSON UTF-8 byte 44: `:` |
+| 56 | `66` | JSON UTF-8 byte 45: `f` |
+| 57 | `61` | JSON UTF-8 byte 46: `a` |
+| 58 | `6C` | JSON UTF-8 byte 47: `l` |
+| 59 | `73` | JSON UTF-8 byte 48: `s` |
+| 60 | `65` | JSON UTF-8 byte 49: `e` |
+| 61 | `7D` | JSON UTF-8 byte 50: `}` |
+| 62 | `13` | Additive checksum high byte |
+| 63 | `69` | Additive checksum low byte |
+
 ## HOGP enable HID events
 
 Returns enable/raw/rate_hz JSON. Raw reports are a separate opt-in.
@@ -2299,6 +2381,819 @@ FA 00 00 4A 01 10 04 05 00 00 38 7B 22 65 76 65 6E 74 22 3A 22 6E 6F 74 69 66 79
 | 71 | `01` | Application byte 0 |
 | 72 | `13` | Additive checksum high byte |
 | 73 | `F0` | Additive checksum low byte |
+
+## HOGP control success
+
+Synthetic response to control event 1: queue accepted, not scan/connect/disconnect completion. Do not send this as a request.
+
+```text
+FA 00 00 0E 01 10 01 06 00 00 01 00 01 21
+```
+
+| Offset (decimal) | Hex byte | Meaning |
+| ---: | --- | --- |
+| 0 | `FA` | First physical frame marker |
+| 1 | `00` | Logical length, high byte |
+| 2 | `00` | Logical length, middle byte |
+| 3 | `0E` | Logical length, low byte (14 total) |
+| 4 | `01` | Event ID = 1 |
+| 5 | `10` | Service = 0x10 |
+| 6 | `01` | Command = 0x01 |
+| 7 | `06` | TLV 1 type: STATUS |
+| 8 | `00` | Value length, high byte |
+| 9 | `00` | Value length, middle byte |
+| 10 | `01` | Value length, low byte (1 bytes) |
+| 11 | `00` | STATUS byte 0; whole unsigned value = 0 |
+| 12 | `01` | Additive checksum high byte |
+| 13 | `21` | Additive checksum low byte |
+
+## HOGP scan result
+
+Synthetic glasses-to-controller notification. Copy adv_addr and adv_addr_type into connect addr and addr_type. Not a response correlated by GM event ID.
+
+```text
+FA 00 00 97 01 10 02 05 00 00 8A 7B 22 73 65 71 22 3A 30 2C 22 73 63 61 6E 5F 69 64 22 3A 31 2C 22 64 65 76 69 63 65 73 22 3A 5B 7B 22 61 64 76 5F 61 64 64 72 22 3A 22 41 41 3A 42 42 3A 43 43 3A 44 44 3A 45 45 3A 46 46 22 2C 22 61 64 76 5F 61 64 64 72 5F 74 79 70 65 22 3A 30 2C 22 72 73 73 69 22 3A 2D 34 38 2C 22 6E 61 6D 65 22 3A 22 44 65 6D 6F 20 48 49 44 22 2C 22 73 65 72 76 69 63 65 5F 75 75 69 64 73 22 3A 5B 22 31 38 31 32 22 5D 7D 5D 7D 2C 77
+```
+
+| Offset (decimal) | Hex byte | Meaning |
+| ---: | --- | --- |
+| 0 | `FA` | First physical frame marker |
+| 1 | `00` | Logical length, high byte |
+| 2 | `00` | Logical length, middle byte |
+| 3 | `97` | Logical length, low byte (151 total) |
+| 4 | `01` | Event ID = 1 |
+| 5 | `10` | Service = 0x10 |
+| 6 | `02` | Command = 0x02 |
+| 7 | `05` | TLV 1 type: JSON |
+| 8 | `00` | Value length, high byte |
+| 9 | `00` | Value length, middle byte |
+| 10 | `8A` | Value length, low byte (138 bytes) |
+| 11 | `7B` | JSON UTF-8 byte 0: `{` |
+| 12 | `22` | JSON UTF-8 byte 1: `"` |
+| 13 | `73` | JSON UTF-8 byte 2: `s` |
+| 14 | `65` | JSON UTF-8 byte 3: `e` |
+| 15 | `71` | JSON UTF-8 byte 4: `q` |
+| 16 | `22` | JSON UTF-8 byte 5: `"` |
+| 17 | `3A` | JSON UTF-8 byte 6: `:` |
+| 18 | `30` | JSON UTF-8 byte 7: `0` |
+| 19 | `2C` | JSON UTF-8 byte 8: `,` |
+| 20 | `22` | JSON UTF-8 byte 9: `"` |
+| 21 | `73` | JSON UTF-8 byte 10: `s` |
+| 22 | `63` | JSON UTF-8 byte 11: `c` |
+| 23 | `61` | JSON UTF-8 byte 12: `a` |
+| 24 | `6E` | JSON UTF-8 byte 13: `n` |
+| 25 | `5F` | JSON UTF-8 byte 14: `_` |
+| 26 | `69` | JSON UTF-8 byte 15: `i` |
+| 27 | `64` | JSON UTF-8 byte 16: `d` |
+| 28 | `22` | JSON UTF-8 byte 17: `"` |
+| 29 | `3A` | JSON UTF-8 byte 18: `:` |
+| 30 | `31` | JSON UTF-8 byte 19: `1` |
+| 31 | `2C` | JSON UTF-8 byte 20: `,` |
+| 32 | `22` | JSON UTF-8 byte 21: `"` |
+| 33 | `64` | JSON UTF-8 byte 22: `d` |
+| 34 | `65` | JSON UTF-8 byte 23: `e` |
+| 35 | `76` | JSON UTF-8 byte 24: `v` |
+| 36 | `69` | JSON UTF-8 byte 25: `i` |
+| 37 | `63` | JSON UTF-8 byte 26: `c` |
+| 38 | `65` | JSON UTF-8 byte 27: `e` |
+| 39 | `73` | JSON UTF-8 byte 28: `s` |
+| 40 | `22` | JSON UTF-8 byte 29: `"` |
+| 41 | `3A` | JSON UTF-8 byte 30: `:` |
+| 42 | `5B` | JSON UTF-8 byte 31: `[` |
+| 43 | `7B` | JSON UTF-8 byte 32: `{` |
+| 44 | `22` | JSON UTF-8 byte 33: `"` |
+| 45 | `61` | JSON UTF-8 byte 34: `a` |
+| 46 | `64` | JSON UTF-8 byte 35: `d` |
+| 47 | `76` | JSON UTF-8 byte 36: `v` |
+| 48 | `5F` | JSON UTF-8 byte 37: `_` |
+| 49 | `61` | JSON UTF-8 byte 38: `a` |
+| 50 | `64` | JSON UTF-8 byte 39: `d` |
+| 51 | `64` | JSON UTF-8 byte 40: `d` |
+| 52 | `72` | JSON UTF-8 byte 41: `r` |
+| 53 | `22` | JSON UTF-8 byte 42: `"` |
+| 54 | `3A` | JSON UTF-8 byte 43: `:` |
+| 55 | `22` | JSON UTF-8 byte 44: `"` |
+| 56 | `41` | JSON UTF-8 byte 45: `A` |
+| 57 | `41` | JSON UTF-8 byte 46: `A` |
+| 58 | `3A` | JSON UTF-8 byte 47: `:` |
+| 59 | `42` | JSON UTF-8 byte 48: `B` |
+| 60 | `42` | JSON UTF-8 byte 49: `B` |
+| 61 | `3A` | JSON UTF-8 byte 50: `:` |
+| 62 | `43` | JSON UTF-8 byte 51: `C` |
+| 63 | `43` | JSON UTF-8 byte 52: `C` |
+| 64 | `3A` | JSON UTF-8 byte 53: `:` |
+| 65 | `44` | JSON UTF-8 byte 54: `D` |
+| 66 | `44` | JSON UTF-8 byte 55: `D` |
+| 67 | `3A` | JSON UTF-8 byte 56: `:` |
+| 68 | `45` | JSON UTF-8 byte 57: `E` |
+| 69 | `45` | JSON UTF-8 byte 58: `E` |
+| 70 | `3A` | JSON UTF-8 byte 59: `:` |
+| 71 | `46` | JSON UTF-8 byte 60: `F` |
+| 72 | `46` | JSON UTF-8 byte 61: `F` |
+| 73 | `22` | JSON UTF-8 byte 62: `"` |
+| 74 | `2C` | JSON UTF-8 byte 63: `,` |
+| 75 | `22` | JSON UTF-8 byte 64: `"` |
+| 76 | `61` | JSON UTF-8 byte 65: `a` |
+| 77 | `64` | JSON UTF-8 byte 66: `d` |
+| 78 | `76` | JSON UTF-8 byte 67: `v` |
+| 79 | `5F` | JSON UTF-8 byte 68: `_` |
+| 80 | `61` | JSON UTF-8 byte 69: `a` |
+| 81 | `64` | JSON UTF-8 byte 70: `d` |
+| 82 | `64` | JSON UTF-8 byte 71: `d` |
+| 83 | `72` | JSON UTF-8 byte 72: `r` |
+| 84 | `5F` | JSON UTF-8 byte 73: `_` |
+| 85 | `74` | JSON UTF-8 byte 74: `t` |
+| 86 | `79` | JSON UTF-8 byte 75: `y` |
+| 87 | `70` | JSON UTF-8 byte 76: `p` |
+| 88 | `65` | JSON UTF-8 byte 77: `e` |
+| 89 | `22` | JSON UTF-8 byte 78: `"` |
+| 90 | `3A` | JSON UTF-8 byte 79: `:` |
+| 91 | `30` | JSON UTF-8 byte 80: `0` |
+| 92 | `2C` | JSON UTF-8 byte 81: `,` |
+| 93 | `22` | JSON UTF-8 byte 82: `"` |
+| 94 | `72` | JSON UTF-8 byte 83: `r` |
+| 95 | `73` | JSON UTF-8 byte 84: `s` |
+| 96 | `73` | JSON UTF-8 byte 85: `s` |
+| 97 | `69` | JSON UTF-8 byte 86: `i` |
+| 98 | `22` | JSON UTF-8 byte 87: `"` |
+| 99 | `3A` | JSON UTF-8 byte 88: `:` |
+| 100 | `2D` | JSON UTF-8 byte 89: `-` |
+| 101 | `34` | JSON UTF-8 byte 90: `4` |
+| 102 | `38` | JSON UTF-8 byte 91: `8` |
+| 103 | `2C` | JSON UTF-8 byte 92: `,` |
+| 104 | `22` | JSON UTF-8 byte 93: `"` |
+| 105 | `6E` | JSON UTF-8 byte 94: `n` |
+| 106 | `61` | JSON UTF-8 byte 95: `a` |
+| 107 | `6D` | JSON UTF-8 byte 96: `m` |
+| 108 | `65` | JSON UTF-8 byte 97: `e` |
+| 109 | `22` | JSON UTF-8 byte 98: `"` |
+| 110 | `3A` | JSON UTF-8 byte 99: `:` |
+| 111 | `22` | JSON UTF-8 byte 100: `"` |
+| 112 | `44` | JSON UTF-8 byte 101: `D` |
+| 113 | `65` | JSON UTF-8 byte 102: `e` |
+| 114 | `6D` | JSON UTF-8 byte 103: `m` |
+| 115 | `6F` | JSON UTF-8 byte 104: `o` |
+| 116 | `20` | JSON UTF-8 byte 105: ` ` |
+| 117 | `48` | JSON UTF-8 byte 106: `H` |
+| 118 | `49` | JSON UTF-8 byte 107: `I` |
+| 119 | `44` | JSON UTF-8 byte 108: `D` |
+| 120 | `22` | JSON UTF-8 byte 109: `"` |
+| 121 | `2C` | JSON UTF-8 byte 110: `,` |
+| 122 | `22` | JSON UTF-8 byte 111: `"` |
+| 123 | `73` | JSON UTF-8 byte 112: `s` |
+| 124 | `65` | JSON UTF-8 byte 113: `e` |
+| 125 | `72` | JSON UTF-8 byte 114: `r` |
+| 126 | `76` | JSON UTF-8 byte 115: `v` |
+| 127 | `69` | JSON UTF-8 byte 116: `i` |
+| 128 | `63` | JSON UTF-8 byte 117: `c` |
+| 129 | `65` | JSON UTF-8 byte 118: `e` |
+| 130 | `5F` | JSON UTF-8 byte 119: `_` |
+| 131 | `75` | JSON UTF-8 byte 120: `u` |
+| 132 | `75` | JSON UTF-8 byte 121: `u` |
+| 133 | `69` | JSON UTF-8 byte 122: `i` |
+| 134 | `64` | JSON UTF-8 byte 123: `d` |
+| 135 | `73` | JSON UTF-8 byte 124: `s` |
+| 136 | `22` | JSON UTF-8 byte 125: `"` |
+| 137 | `3A` | JSON UTF-8 byte 126: `:` |
+| 138 | `5B` | JSON UTF-8 byte 127: `[` |
+| 139 | `22` | JSON UTF-8 byte 128: `"` |
+| 140 | `31` | JSON UTF-8 byte 129: `1` |
+| 141 | `38` | JSON UTF-8 byte 130: `8` |
+| 142 | `31` | JSON UTF-8 byte 131: `1` |
+| 143 | `32` | JSON UTF-8 byte 132: `2` |
+| 144 | `22` | JSON UTF-8 byte 133: `"` |
+| 145 | `5D` | JSON UTF-8 byte 134: `]` |
+| 146 | `7D` | JSON UTF-8 byte 135: `}` |
+| 147 | `5D` | JSON UTF-8 byte 136: `]` |
+| 148 | `7D` | JSON UTF-8 byte 137: `}` |
+| 149 | `2C` | Additive checksum high byte |
+| 150 | `77` | Additive checksum low byte |
+
+## HOGP link ready
+
+Synthetic unsolicited HID-ready event. Numeric readiness flags; private GATT is not ready in this example.
+
+```text
+FA 00 00 8A 01 10 07 05 00 00 7D 7B 22 73 74 61 74 65 22 3A 32 2C 22 72 65 61 73 6F 6E 22 3A 31 2C 22 65 72 72 22 3A 30 2C 22 63 6F 6E 6E 65 63 74 65 64 22 3A 31 2C 22 62 6F 6E 64 65 64 22 3A 31 2C 22 68 69 64 5F 72 65 61 64 79 22 3A 31 2C 22 67 61 74 74 5F 72 65 61 64 79 22 3A 30 2C 22 61 64 64 72 22 3A 22 41 41 3A 42 42 3A 43 43 3A 44 44 3A 45 45 3A 46 46 22 2C 22 61 64 64 72 5F 74 79 70 65 22 3A 30 7D 28 2F
+```
+
+| Offset (decimal) | Hex byte | Meaning |
+| ---: | --- | --- |
+| 0 | `FA` | First physical frame marker |
+| 1 | `00` | Logical length, high byte |
+| 2 | `00` | Logical length, middle byte |
+| 3 | `8A` | Logical length, low byte (138 total) |
+| 4 | `01` | Event ID = 1 |
+| 5 | `10` | Service = 0x10 |
+| 6 | `07` | Command = 0x07 |
+| 7 | `05` | TLV 1 type: JSON |
+| 8 | `00` | Value length, high byte |
+| 9 | `00` | Value length, middle byte |
+| 10 | `7D` | Value length, low byte (125 bytes) |
+| 11 | `7B` | JSON UTF-8 byte 0: `{` |
+| 12 | `22` | JSON UTF-8 byte 1: `"` |
+| 13 | `73` | JSON UTF-8 byte 2: `s` |
+| 14 | `74` | JSON UTF-8 byte 3: `t` |
+| 15 | `61` | JSON UTF-8 byte 4: `a` |
+| 16 | `74` | JSON UTF-8 byte 5: `t` |
+| 17 | `65` | JSON UTF-8 byte 6: `e` |
+| 18 | `22` | JSON UTF-8 byte 7: `"` |
+| 19 | `3A` | JSON UTF-8 byte 8: `:` |
+| 20 | `32` | JSON UTF-8 byte 9: `2` |
+| 21 | `2C` | JSON UTF-8 byte 10: `,` |
+| 22 | `22` | JSON UTF-8 byte 11: `"` |
+| 23 | `72` | JSON UTF-8 byte 12: `r` |
+| 24 | `65` | JSON UTF-8 byte 13: `e` |
+| 25 | `61` | JSON UTF-8 byte 14: `a` |
+| 26 | `73` | JSON UTF-8 byte 15: `s` |
+| 27 | `6F` | JSON UTF-8 byte 16: `o` |
+| 28 | `6E` | JSON UTF-8 byte 17: `n` |
+| 29 | `22` | JSON UTF-8 byte 18: `"` |
+| 30 | `3A` | JSON UTF-8 byte 19: `:` |
+| 31 | `31` | JSON UTF-8 byte 20: `1` |
+| 32 | `2C` | JSON UTF-8 byte 21: `,` |
+| 33 | `22` | JSON UTF-8 byte 22: `"` |
+| 34 | `65` | JSON UTF-8 byte 23: `e` |
+| 35 | `72` | JSON UTF-8 byte 24: `r` |
+| 36 | `72` | JSON UTF-8 byte 25: `r` |
+| 37 | `22` | JSON UTF-8 byte 26: `"` |
+| 38 | `3A` | JSON UTF-8 byte 27: `:` |
+| 39 | `30` | JSON UTF-8 byte 28: `0` |
+| 40 | `2C` | JSON UTF-8 byte 29: `,` |
+| 41 | `22` | JSON UTF-8 byte 30: `"` |
+| 42 | `63` | JSON UTF-8 byte 31: `c` |
+| 43 | `6F` | JSON UTF-8 byte 32: `o` |
+| 44 | `6E` | JSON UTF-8 byte 33: `n` |
+| 45 | `6E` | JSON UTF-8 byte 34: `n` |
+| 46 | `65` | JSON UTF-8 byte 35: `e` |
+| 47 | `63` | JSON UTF-8 byte 36: `c` |
+| 48 | `74` | JSON UTF-8 byte 37: `t` |
+| 49 | `65` | JSON UTF-8 byte 38: `e` |
+| 50 | `64` | JSON UTF-8 byte 39: `d` |
+| 51 | `22` | JSON UTF-8 byte 40: `"` |
+| 52 | `3A` | JSON UTF-8 byte 41: `:` |
+| 53 | `31` | JSON UTF-8 byte 42: `1` |
+| 54 | `2C` | JSON UTF-8 byte 43: `,` |
+| 55 | `22` | JSON UTF-8 byte 44: `"` |
+| 56 | `62` | JSON UTF-8 byte 45: `b` |
+| 57 | `6F` | JSON UTF-8 byte 46: `o` |
+| 58 | `6E` | JSON UTF-8 byte 47: `n` |
+| 59 | `64` | JSON UTF-8 byte 48: `d` |
+| 60 | `65` | JSON UTF-8 byte 49: `e` |
+| 61 | `64` | JSON UTF-8 byte 50: `d` |
+| 62 | `22` | JSON UTF-8 byte 51: `"` |
+| 63 | `3A` | JSON UTF-8 byte 52: `:` |
+| 64 | `31` | JSON UTF-8 byte 53: `1` |
+| 65 | `2C` | JSON UTF-8 byte 54: `,` |
+| 66 | `22` | JSON UTF-8 byte 55: `"` |
+| 67 | `68` | JSON UTF-8 byte 56: `h` |
+| 68 | `69` | JSON UTF-8 byte 57: `i` |
+| 69 | `64` | JSON UTF-8 byte 58: `d` |
+| 70 | `5F` | JSON UTF-8 byte 59: `_` |
+| 71 | `72` | JSON UTF-8 byte 60: `r` |
+| 72 | `65` | JSON UTF-8 byte 61: `e` |
+| 73 | `61` | JSON UTF-8 byte 62: `a` |
+| 74 | `64` | JSON UTF-8 byte 63: `d` |
+| 75 | `79` | JSON UTF-8 byte 64: `y` |
+| 76 | `22` | JSON UTF-8 byte 65: `"` |
+| 77 | `3A` | JSON UTF-8 byte 66: `:` |
+| 78 | `31` | JSON UTF-8 byte 67: `1` |
+| 79 | `2C` | JSON UTF-8 byte 68: `,` |
+| 80 | `22` | JSON UTF-8 byte 69: `"` |
+| 81 | `67` | JSON UTF-8 byte 70: `g` |
+| 82 | `61` | JSON UTF-8 byte 71: `a` |
+| 83 | `74` | JSON UTF-8 byte 72: `t` |
+| 84 | `74` | JSON UTF-8 byte 73: `t` |
+| 85 | `5F` | JSON UTF-8 byte 74: `_` |
+| 86 | `72` | JSON UTF-8 byte 75: `r` |
+| 87 | `65` | JSON UTF-8 byte 76: `e` |
+| 88 | `61` | JSON UTF-8 byte 77: `a` |
+| 89 | `64` | JSON UTF-8 byte 78: `d` |
+| 90 | `79` | JSON UTF-8 byte 79: `y` |
+| 91 | `22` | JSON UTF-8 byte 80: `"` |
+| 92 | `3A` | JSON UTF-8 byte 81: `:` |
+| 93 | `30` | JSON UTF-8 byte 82: `0` |
+| 94 | `2C` | JSON UTF-8 byte 83: `,` |
+| 95 | `22` | JSON UTF-8 byte 84: `"` |
+| 96 | `61` | JSON UTF-8 byte 85: `a` |
+| 97 | `64` | JSON UTF-8 byte 86: `d` |
+| 98 | `64` | JSON UTF-8 byte 87: `d` |
+| 99 | `72` | JSON UTF-8 byte 88: `r` |
+| 100 | `22` | JSON UTF-8 byte 89: `"` |
+| 101 | `3A` | JSON UTF-8 byte 90: `:` |
+| 102 | `22` | JSON UTF-8 byte 91: `"` |
+| 103 | `41` | JSON UTF-8 byte 92: `A` |
+| 104 | `41` | JSON UTF-8 byte 93: `A` |
+| 105 | `3A` | JSON UTF-8 byte 94: `:` |
+| 106 | `42` | JSON UTF-8 byte 95: `B` |
+| 107 | `42` | JSON UTF-8 byte 96: `B` |
+| 108 | `3A` | JSON UTF-8 byte 97: `:` |
+| 109 | `43` | JSON UTF-8 byte 98: `C` |
+| 110 | `43` | JSON UTF-8 byte 99: `C` |
+| 111 | `3A` | JSON UTF-8 byte 100: `:` |
+| 112 | `44` | JSON UTF-8 byte 101: `D` |
+| 113 | `44` | JSON UTF-8 byte 102: `D` |
+| 114 | `3A` | JSON UTF-8 byte 103: `:` |
+| 115 | `45` | JSON UTF-8 byte 104: `E` |
+| 116 | `45` | JSON UTF-8 byte 105: `E` |
+| 117 | `3A` | JSON UTF-8 byte 106: `:` |
+| 118 | `46` | JSON UTF-8 byte 107: `F` |
+| 119 | `46` | JSON UTF-8 byte 108: `F` |
+| 120 | `22` | JSON UTF-8 byte 109: `"` |
+| 121 | `2C` | JSON UTF-8 byte 110: `,` |
+| 122 | `22` | JSON UTF-8 byte 111: `"` |
+| 123 | `61` | JSON UTF-8 byte 112: `a` |
+| 124 | `64` | JSON UTF-8 byte 113: `d` |
+| 125 | `64` | JSON UTF-8 byte 114: `d` |
+| 126 | `72` | JSON UTF-8 byte 115: `r` |
+| 127 | `5F` | JSON UTF-8 byte 116: `_` |
+| 128 | `74` | JSON UTF-8 byte 117: `t` |
+| 129 | `79` | JSON UTF-8 byte 118: `y` |
+| 130 | `70` | JSON UTF-8 byte 119: `p` |
+| 131 | `65` | JSON UTF-8 byte 120: `e` |
+| 132 | `22` | JSON UTF-8 byte 121: `"` |
+| 133 | `3A` | JSON UTF-8 byte 122: `:` |
+| 134 | `30` | JSON UTF-8 byte 123: `0` |
+| 135 | `7D` | JSON UTF-8 byte 124: `}` |
+| 136 | `28` | Additive checksum high byte |
+| 137 | `2F` | Additive checksum low byte |
+
+## HOGP link disconnected
+
+Synthetic manual-disconnect event; bond retained. The address may be empty depending on state.
+
+```text
+FA 00 00 8A 01 10 07 05 00 00 7D 7B 22 73 74 61 74 65 22 3A 34 2C 22 72 65 61 73 6F 6E 22 3A 35 2C 22 65 72 72 22 3A 30 2C 22 63 6F 6E 6E 65 63 74 65 64 22 3A 30 2C 22 62 6F 6E 64 65 64 22 3A 31 2C 22 68 69 64 5F 72 65 61 64 79 22 3A 30 2C 22 67 61 74 74 5F 72 65 61 64 79 22 3A 30 2C 22 61 64 64 72 22 3A 22 41 41 3A 42 42 3A 43 43 3A 44 44 3A 45 45 3A 46 46 22 2C 22 61 64 64 72 5F 74 79 70 65 22 3A 30 7D 28 33
+```
+
+| Offset (decimal) | Hex byte | Meaning |
+| ---: | --- | --- |
+| 0 | `FA` | First physical frame marker |
+| 1 | `00` | Logical length, high byte |
+| 2 | `00` | Logical length, middle byte |
+| 3 | `8A` | Logical length, low byte (138 total) |
+| 4 | `01` | Event ID = 1 |
+| 5 | `10` | Service = 0x10 |
+| 6 | `07` | Command = 0x07 |
+| 7 | `05` | TLV 1 type: JSON |
+| 8 | `00` | Value length, high byte |
+| 9 | `00` | Value length, middle byte |
+| 10 | `7D` | Value length, low byte (125 bytes) |
+| 11 | `7B` | JSON UTF-8 byte 0: `{` |
+| 12 | `22` | JSON UTF-8 byte 1: `"` |
+| 13 | `73` | JSON UTF-8 byte 2: `s` |
+| 14 | `74` | JSON UTF-8 byte 3: `t` |
+| 15 | `61` | JSON UTF-8 byte 4: `a` |
+| 16 | `74` | JSON UTF-8 byte 5: `t` |
+| 17 | `65` | JSON UTF-8 byte 6: `e` |
+| 18 | `22` | JSON UTF-8 byte 7: `"` |
+| 19 | `3A` | JSON UTF-8 byte 8: `:` |
+| 20 | `34` | JSON UTF-8 byte 9: `4` |
+| 21 | `2C` | JSON UTF-8 byte 10: `,` |
+| 22 | `22` | JSON UTF-8 byte 11: `"` |
+| 23 | `72` | JSON UTF-8 byte 12: `r` |
+| 24 | `65` | JSON UTF-8 byte 13: `e` |
+| 25 | `61` | JSON UTF-8 byte 14: `a` |
+| 26 | `73` | JSON UTF-8 byte 15: `s` |
+| 27 | `6F` | JSON UTF-8 byte 16: `o` |
+| 28 | `6E` | JSON UTF-8 byte 17: `n` |
+| 29 | `22` | JSON UTF-8 byte 18: `"` |
+| 30 | `3A` | JSON UTF-8 byte 19: `:` |
+| 31 | `35` | JSON UTF-8 byte 20: `5` |
+| 32 | `2C` | JSON UTF-8 byte 21: `,` |
+| 33 | `22` | JSON UTF-8 byte 22: `"` |
+| 34 | `65` | JSON UTF-8 byte 23: `e` |
+| 35 | `72` | JSON UTF-8 byte 24: `r` |
+| 36 | `72` | JSON UTF-8 byte 25: `r` |
+| 37 | `22` | JSON UTF-8 byte 26: `"` |
+| 38 | `3A` | JSON UTF-8 byte 27: `:` |
+| 39 | `30` | JSON UTF-8 byte 28: `0` |
+| 40 | `2C` | JSON UTF-8 byte 29: `,` |
+| 41 | `22` | JSON UTF-8 byte 30: `"` |
+| 42 | `63` | JSON UTF-8 byte 31: `c` |
+| 43 | `6F` | JSON UTF-8 byte 32: `o` |
+| 44 | `6E` | JSON UTF-8 byte 33: `n` |
+| 45 | `6E` | JSON UTF-8 byte 34: `n` |
+| 46 | `65` | JSON UTF-8 byte 35: `e` |
+| 47 | `63` | JSON UTF-8 byte 36: `c` |
+| 48 | `74` | JSON UTF-8 byte 37: `t` |
+| 49 | `65` | JSON UTF-8 byte 38: `e` |
+| 50 | `64` | JSON UTF-8 byte 39: `d` |
+| 51 | `22` | JSON UTF-8 byte 40: `"` |
+| 52 | `3A` | JSON UTF-8 byte 41: `:` |
+| 53 | `30` | JSON UTF-8 byte 42: `0` |
+| 54 | `2C` | JSON UTF-8 byte 43: `,` |
+| 55 | `22` | JSON UTF-8 byte 44: `"` |
+| 56 | `62` | JSON UTF-8 byte 45: `b` |
+| 57 | `6F` | JSON UTF-8 byte 46: `o` |
+| 58 | `6E` | JSON UTF-8 byte 47: `n` |
+| 59 | `64` | JSON UTF-8 byte 48: `d` |
+| 60 | `65` | JSON UTF-8 byte 49: `e` |
+| 61 | `64` | JSON UTF-8 byte 50: `d` |
+| 62 | `22` | JSON UTF-8 byte 51: `"` |
+| 63 | `3A` | JSON UTF-8 byte 52: `:` |
+| 64 | `31` | JSON UTF-8 byte 53: `1` |
+| 65 | `2C` | JSON UTF-8 byte 54: `,` |
+| 66 | `22` | JSON UTF-8 byte 55: `"` |
+| 67 | `68` | JSON UTF-8 byte 56: `h` |
+| 68 | `69` | JSON UTF-8 byte 57: `i` |
+| 69 | `64` | JSON UTF-8 byte 58: `d` |
+| 70 | `5F` | JSON UTF-8 byte 59: `_` |
+| 71 | `72` | JSON UTF-8 byte 60: `r` |
+| 72 | `65` | JSON UTF-8 byte 61: `e` |
+| 73 | `61` | JSON UTF-8 byte 62: `a` |
+| 74 | `64` | JSON UTF-8 byte 63: `d` |
+| 75 | `79` | JSON UTF-8 byte 64: `y` |
+| 76 | `22` | JSON UTF-8 byte 65: `"` |
+| 77 | `3A` | JSON UTF-8 byte 66: `:` |
+| 78 | `30` | JSON UTF-8 byte 67: `0` |
+| 79 | `2C` | JSON UTF-8 byte 68: `,` |
+| 80 | `22` | JSON UTF-8 byte 69: `"` |
+| 81 | `67` | JSON UTF-8 byte 70: `g` |
+| 82 | `61` | JSON UTF-8 byte 71: `a` |
+| 83 | `74` | JSON UTF-8 byte 72: `t` |
+| 84 | `74` | JSON UTF-8 byte 73: `t` |
+| 85 | `5F` | JSON UTF-8 byte 74: `_` |
+| 86 | `72` | JSON UTF-8 byte 75: `r` |
+| 87 | `65` | JSON UTF-8 byte 76: `e` |
+| 88 | `61` | JSON UTF-8 byte 77: `a` |
+| 89 | `64` | JSON UTF-8 byte 78: `d` |
+| 90 | `79` | JSON UTF-8 byte 79: `y` |
+| 91 | `22` | JSON UTF-8 byte 80: `"` |
+| 92 | `3A` | JSON UTF-8 byte 81: `:` |
+| 93 | `30` | JSON UTF-8 byte 82: `0` |
+| 94 | `2C` | JSON UTF-8 byte 83: `,` |
+| 95 | `22` | JSON UTF-8 byte 84: `"` |
+| 96 | `61` | JSON UTF-8 byte 85: `a` |
+| 97 | `64` | JSON UTF-8 byte 86: `d` |
+| 98 | `64` | JSON UTF-8 byte 87: `d` |
+| 99 | `72` | JSON UTF-8 byte 88: `r` |
+| 100 | `22` | JSON UTF-8 byte 89: `"` |
+| 101 | `3A` | JSON UTF-8 byte 90: `:` |
+| 102 | `22` | JSON UTF-8 byte 91: `"` |
+| 103 | `41` | JSON UTF-8 byte 92: `A` |
+| 104 | `41` | JSON UTF-8 byte 93: `A` |
+| 105 | `3A` | JSON UTF-8 byte 94: `:` |
+| 106 | `42` | JSON UTF-8 byte 95: `B` |
+| 107 | `42` | JSON UTF-8 byte 96: `B` |
+| 108 | `3A` | JSON UTF-8 byte 97: `:` |
+| 109 | `43` | JSON UTF-8 byte 98: `C` |
+| 110 | `43` | JSON UTF-8 byte 99: `C` |
+| 111 | `3A` | JSON UTF-8 byte 100: `:` |
+| 112 | `44` | JSON UTF-8 byte 101: `D` |
+| 113 | `44` | JSON UTF-8 byte 102: `D` |
+| 114 | `3A` | JSON UTF-8 byte 103: `:` |
+| 115 | `45` | JSON UTF-8 byte 104: `E` |
+| 116 | `45` | JSON UTF-8 byte 105: `E` |
+| 117 | `3A` | JSON UTF-8 byte 106: `:` |
+| 118 | `46` | JSON UTF-8 byte 107: `F` |
+| 119 | `46` | JSON UTF-8 byte 108: `F` |
+| 120 | `22` | JSON UTF-8 byte 109: `"` |
+| 121 | `2C` | JSON UTF-8 byte 110: `,` |
+| 122 | `22` | JSON UTF-8 byte 111: `"` |
+| 123 | `61` | JSON UTF-8 byte 112: `a` |
+| 124 | `64` | JSON UTF-8 byte 113: `d` |
+| 125 | `64` | JSON UTF-8 byte 114: `d` |
+| 126 | `72` | JSON UTF-8 byte 115: `r` |
+| 127 | `5F` | JSON UTF-8 byte 116: `_` |
+| 128 | `74` | JSON UTF-8 byte 117: `t` |
+| 129 | `79` | JSON UTF-8 byte 118: `y` |
+| 130 | `70` | JSON UTF-8 byte 119: `p` |
+| 131 | `65` | JSON UTF-8 byte 120: `e` |
+| 132 | `22` | JSON UTF-8 byte 121: `"` |
+| 133 | `3A` | JSON UTF-8 byte 122: `:` |
+| 134 | `30` | JSON UTF-8 byte 123: `0` |
+| 135 | `7D` | JSON UTF-8 byte 124: `}` |
+| 136 | `28` | Additive checksum high byte |
+| 137 | `33` | Additive checksum low byte |
+
+## HOGP normalized Up press
+
+Synthetic normalized keyboard Up press; key and phase zero are valid. Firmware-generated event, not a command for injecting a key. Release uses phase 1; actual report ID and timestamp depend on the accessory/session.
+
+```text
+FA 00 00 99 01 10 06 05 00 00 8C 7B 22 74 79 70 65 22 3A 22 68 69 64 5F 6B 65 79 22 2C 22 6B 65 79 22 3A 30 2C 22 70 68 61 73 65 22 3A 30 2C 22 73 72 63 22 3A 31 2C 22 61 78 69 73 22 3A 30 2C 22 72 69 64 22 3A 31 2C 22 61 70 70 22 3A 36 35 35 34 32 2C 22 76 61 6C 22 3A 31 2C 22 6E 6F 72 6D 22 3A 31 2C 22 78 22 3A 30 2C 22 79 22 3A 30 2C 22 6D 6F 64 22 3A 30 2C 22 70 61 67 65 22 3A 37 2C 22 75 73 61 67 65 22 3A 38 32 2C 22 74 73 22 3A 31 30 30 30 7D 28 CC
+```
+
+| Offset (decimal) | Hex byte | Meaning |
+| ---: | --- | --- |
+| 0 | `FA` | First physical frame marker |
+| 1 | `00` | Logical length, high byte |
+| 2 | `00` | Logical length, middle byte |
+| 3 | `99` | Logical length, low byte (153 total) |
+| 4 | `01` | Event ID = 1 |
+| 5 | `10` | Service = 0x10 |
+| 6 | `06` | Command = 0x06 |
+| 7 | `05` | TLV 1 type: JSON |
+| 8 | `00` | Value length, high byte |
+| 9 | `00` | Value length, middle byte |
+| 10 | `8C` | Value length, low byte (140 bytes) |
+| 11 | `7B` | JSON UTF-8 byte 0: `{` |
+| 12 | `22` | JSON UTF-8 byte 1: `"` |
+| 13 | `74` | JSON UTF-8 byte 2: `t` |
+| 14 | `79` | JSON UTF-8 byte 3: `y` |
+| 15 | `70` | JSON UTF-8 byte 4: `p` |
+| 16 | `65` | JSON UTF-8 byte 5: `e` |
+| 17 | `22` | JSON UTF-8 byte 6: `"` |
+| 18 | `3A` | JSON UTF-8 byte 7: `:` |
+| 19 | `22` | JSON UTF-8 byte 8: `"` |
+| 20 | `68` | JSON UTF-8 byte 9: `h` |
+| 21 | `69` | JSON UTF-8 byte 10: `i` |
+| 22 | `64` | JSON UTF-8 byte 11: `d` |
+| 23 | `5F` | JSON UTF-8 byte 12: `_` |
+| 24 | `6B` | JSON UTF-8 byte 13: `k` |
+| 25 | `65` | JSON UTF-8 byte 14: `e` |
+| 26 | `79` | JSON UTF-8 byte 15: `y` |
+| 27 | `22` | JSON UTF-8 byte 16: `"` |
+| 28 | `2C` | JSON UTF-8 byte 17: `,` |
+| 29 | `22` | JSON UTF-8 byte 18: `"` |
+| 30 | `6B` | JSON UTF-8 byte 19: `k` |
+| 31 | `65` | JSON UTF-8 byte 20: `e` |
+| 32 | `79` | JSON UTF-8 byte 21: `y` |
+| 33 | `22` | JSON UTF-8 byte 22: `"` |
+| 34 | `3A` | JSON UTF-8 byte 23: `:` |
+| 35 | `30` | JSON UTF-8 byte 24: `0` |
+| 36 | `2C` | JSON UTF-8 byte 25: `,` |
+| 37 | `22` | JSON UTF-8 byte 26: `"` |
+| 38 | `70` | JSON UTF-8 byte 27: `p` |
+| 39 | `68` | JSON UTF-8 byte 28: `h` |
+| 40 | `61` | JSON UTF-8 byte 29: `a` |
+| 41 | `73` | JSON UTF-8 byte 30: `s` |
+| 42 | `65` | JSON UTF-8 byte 31: `e` |
+| 43 | `22` | JSON UTF-8 byte 32: `"` |
+| 44 | `3A` | JSON UTF-8 byte 33: `:` |
+| 45 | `30` | JSON UTF-8 byte 34: `0` |
+| 46 | `2C` | JSON UTF-8 byte 35: `,` |
+| 47 | `22` | JSON UTF-8 byte 36: `"` |
+| 48 | `73` | JSON UTF-8 byte 37: `s` |
+| 49 | `72` | JSON UTF-8 byte 38: `r` |
+| 50 | `63` | JSON UTF-8 byte 39: `c` |
+| 51 | `22` | JSON UTF-8 byte 40: `"` |
+| 52 | `3A` | JSON UTF-8 byte 41: `:` |
+| 53 | `31` | JSON UTF-8 byte 42: `1` |
+| 54 | `2C` | JSON UTF-8 byte 43: `,` |
+| 55 | `22` | JSON UTF-8 byte 44: `"` |
+| 56 | `61` | JSON UTF-8 byte 45: `a` |
+| 57 | `78` | JSON UTF-8 byte 46: `x` |
+| 58 | `69` | JSON UTF-8 byte 47: `i` |
+| 59 | `73` | JSON UTF-8 byte 48: `s` |
+| 60 | `22` | JSON UTF-8 byte 49: `"` |
+| 61 | `3A` | JSON UTF-8 byte 50: `:` |
+| 62 | `30` | JSON UTF-8 byte 51: `0` |
+| 63 | `2C` | JSON UTF-8 byte 52: `,` |
+| 64 | `22` | JSON UTF-8 byte 53: `"` |
+| 65 | `72` | JSON UTF-8 byte 54: `r` |
+| 66 | `69` | JSON UTF-8 byte 55: `i` |
+| 67 | `64` | JSON UTF-8 byte 56: `d` |
+| 68 | `22` | JSON UTF-8 byte 57: `"` |
+| 69 | `3A` | JSON UTF-8 byte 58: `:` |
+| 70 | `31` | JSON UTF-8 byte 59: `1` |
+| 71 | `2C` | JSON UTF-8 byte 60: `,` |
+| 72 | `22` | JSON UTF-8 byte 61: `"` |
+| 73 | `61` | JSON UTF-8 byte 62: `a` |
+| 74 | `70` | JSON UTF-8 byte 63: `p` |
+| 75 | `70` | JSON UTF-8 byte 64: `p` |
+| 76 | `22` | JSON UTF-8 byte 65: `"` |
+| 77 | `3A` | JSON UTF-8 byte 66: `:` |
+| 78 | `36` | JSON UTF-8 byte 67: `6` |
+| 79 | `35` | JSON UTF-8 byte 68: `5` |
+| 80 | `35` | JSON UTF-8 byte 69: `5` |
+| 81 | `34` | JSON UTF-8 byte 70: `4` |
+| 82 | `32` | JSON UTF-8 byte 71: `2` |
+| 83 | `2C` | JSON UTF-8 byte 72: `,` |
+| 84 | `22` | JSON UTF-8 byte 73: `"` |
+| 85 | `76` | JSON UTF-8 byte 74: `v` |
+| 86 | `61` | JSON UTF-8 byte 75: `a` |
+| 87 | `6C` | JSON UTF-8 byte 76: `l` |
+| 88 | `22` | JSON UTF-8 byte 77: `"` |
+| 89 | `3A` | JSON UTF-8 byte 78: `:` |
+| 90 | `31` | JSON UTF-8 byte 79: `1` |
+| 91 | `2C` | JSON UTF-8 byte 80: `,` |
+| 92 | `22` | JSON UTF-8 byte 81: `"` |
+| 93 | `6E` | JSON UTF-8 byte 82: `n` |
+| 94 | `6F` | JSON UTF-8 byte 83: `o` |
+| 95 | `72` | JSON UTF-8 byte 84: `r` |
+| 96 | `6D` | JSON UTF-8 byte 85: `m` |
+| 97 | `22` | JSON UTF-8 byte 86: `"` |
+| 98 | `3A` | JSON UTF-8 byte 87: `:` |
+| 99 | `31` | JSON UTF-8 byte 88: `1` |
+| 100 | `2C` | JSON UTF-8 byte 89: `,` |
+| 101 | `22` | JSON UTF-8 byte 90: `"` |
+| 102 | `78` | JSON UTF-8 byte 91: `x` |
+| 103 | `22` | JSON UTF-8 byte 92: `"` |
+| 104 | `3A` | JSON UTF-8 byte 93: `:` |
+| 105 | `30` | JSON UTF-8 byte 94: `0` |
+| 106 | `2C` | JSON UTF-8 byte 95: `,` |
+| 107 | `22` | JSON UTF-8 byte 96: `"` |
+| 108 | `79` | JSON UTF-8 byte 97: `y` |
+| 109 | `22` | JSON UTF-8 byte 98: `"` |
+| 110 | `3A` | JSON UTF-8 byte 99: `:` |
+| 111 | `30` | JSON UTF-8 byte 100: `0` |
+| 112 | `2C` | JSON UTF-8 byte 101: `,` |
+| 113 | `22` | JSON UTF-8 byte 102: `"` |
+| 114 | `6D` | JSON UTF-8 byte 103: `m` |
+| 115 | `6F` | JSON UTF-8 byte 104: `o` |
+| 116 | `64` | JSON UTF-8 byte 105: `d` |
+| 117 | `22` | JSON UTF-8 byte 106: `"` |
+| 118 | `3A` | JSON UTF-8 byte 107: `:` |
+| 119 | `30` | JSON UTF-8 byte 108: `0` |
+| 120 | `2C` | JSON UTF-8 byte 109: `,` |
+| 121 | `22` | JSON UTF-8 byte 110: `"` |
+| 122 | `70` | JSON UTF-8 byte 111: `p` |
+| 123 | `61` | JSON UTF-8 byte 112: `a` |
+| 124 | `67` | JSON UTF-8 byte 113: `g` |
+| 125 | `65` | JSON UTF-8 byte 114: `e` |
+| 126 | `22` | JSON UTF-8 byte 115: `"` |
+| 127 | `3A` | JSON UTF-8 byte 116: `:` |
+| 128 | `37` | JSON UTF-8 byte 117: `7` |
+| 129 | `2C` | JSON UTF-8 byte 118: `,` |
+| 130 | `22` | JSON UTF-8 byte 119: `"` |
+| 131 | `75` | JSON UTF-8 byte 120: `u` |
+| 132 | `73` | JSON UTF-8 byte 121: `s` |
+| 133 | `61` | JSON UTF-8 byte 122: `a` |
+| 134 | `67` | JSON UTF-8 byte 123: `g` |
+| 135 | `65` | JSON UTF-8 byte 124: `e` |
+| 136 | `22` | JSON UTF-8 byte 125: `"` |
+| 137 | `3A` | JSON UTF-8 byte 126: `:` |
+| 138 | `38` | JSON UTF-8 byte 127: `8` |
+| 139 | `32` | JSON UTF-8 byte 128: `2` |
+| 140 | `2C` | JSON UTF-8 byte 129: `,` |
+| 141 | `22` | JSON UTF-8 byte 130: `"` |
+| 142 | `74` | JSON UTF-8 byte 131: `t` |
+| 143 | `73` | JSON UTF-8 byte 132: `s` |
+| 144 | `22` | JSON UTF-8 byte 133: `"` |
+| 145 | `3A` | JSON UTF-8 byte 134: `:` |
+| 146 | `31` | JSON UTF-8 byte 135: `1` |
+| 147 | `30` | JSON UTF-8 byte 136: `0` |
+| 148 | `30` | JSON UTF-8 byte 137: `0` |
+| 149 | `30` | JSON UTF-8 byte 138: `0` |
+| 150 | `7D` | JSON UTF-8 byte 139: `}` |
+| 151 | `28` | Additive checksum high byte |
+| 152 | `CC` | Additive checksum low byte |
+
+## HOGP normalized Up release
+
+Synthetic normalized keyboard Up release matching the press fixture. Do not treat it as a second navigation press or transmit it as a command.
+
+```text
+FA 00 00 99 01 10 06 05 00 00 8C 7B 22 74 79 70 65 22 3A 22 68 69 64 5F 6B 65 79 22 2C 22 6B 65 79 22 3A 30 2C 22 70 68 61 73 65 22 3A 31 2C 22 73 72 63 22 3A 31 2C 22 61 78 69 73 22 3A 30 2C 22 72 69 64 22 3A 31 2C 22 61 70 70 22 3A 36 35 35 34 32 2C 22 76 61 6C 22 3A 30 2C 22 6E 6F 72 6D 22 3A 30 2C 22 78 22 3A 30 2C 22 79 22 3A 30 2C 22 6D 6F 64 22 3A 30 2C 22 70 61 67 65 22 3A 37 2C 22 75 73 61 67 65 22 3A 38 32 2C 22 74 73 22 3A 31 31 30 30 7D 28 CC
+```
+
+| Offset (decimal) | Hex byte | Meaning |
+| ---: | --- | --- |
+| 0 | `FA` | First physical frame marker |
+| 1 | `00` | Logical length, high byte |
+| 2 | `00` | Logical length, middle byte |
+| 3 | `99` | Logical length, low byte (153 total) |
+| 4 | `01` | Event ID = 1 |
+| 5 | `10` | Service = 0x10 |
+| 6 | `06` | Command = 0x06 |
+| 7 | `05` | TLV 1 type: JSON |
+| 8 | `00` | Value length, high byte |
+| 9 | `00` | Value length, middle byte |
+| 10 | `8C` | Value length, low byte (140 bytes) |
+| 11 | `7B` | JSON UTF-8 byte 0: `{` |
+| 12 | `22` | JSON UTF-8 byte 1: `"` |
+| 13 | `74` | JSON UTF-8 byte 2: `t` |
+| 14 | `79` | JSON UTF-8 byte 3: `y` |
+| 15 | `70` | JSON UTF-8 byte 4: `p` |
+| 16 | `65` | JSON UTF-8 byte 5: `e` |
+| 17 | `22` | JSON UTF-8 byte 6: `"` |
+| 18 | `3A` | JSON UTF-8 byte 7: `:` |
+| 19 | `22` | JSON UTF-8 byte 8: `"` |
+| 20 | `68` | JSON UTF-8 byte 9: `h` |
+| 21 | `69` | JSON UTF-8 byte 10: `i` |
+| 22 | `64` | JSON UTF-8 byte 11: `d` |
+| 23 | `5F` | JSON UTF-8 byte 12: `_` |
+| 24 | `6B` | JSON UTF-8 byte 13: `k` |
+| 25 | `65` | JSON UTF-8 byte 14: `e` |
+| 26 | `79` | JSON UTF-8 byte 15: `y` |
+| 27 | `22` | JSON UTF-8 byte 16: `"` |
+| 28 | `2C` | JSON UTF-8 byte 17: `,` |
+| 29 | `22` | JSON UTF-8 byte 18: `"` |
+| 30 | `6B` | JSON UTF-8 byte 19: `k` |
+| 31 | `65` | JSON UTF-8 byte 20: `e` |
+| 32 | `79` | JSON UTF-8 byte 21: `y` |
+| 33 | `22` | JSON UTF-8 byte 22: `"` |
+| 34 | `3A` | JSON UTF-8 byte 23: `:` |
+| 35 | `30` | JSON UTF-8 byte 24: `0` |
+| 36 | `2C` | JSON UTF-8 byte 25: `,` |
+| 37 | `22` | JSON UTF-8 byte 26: `"` |
+| 38 | `70` | JSON UTF-8 byte 27: `p` |
+| 39 | `68` | JSON UTF-8 byte 28: `h` |
+| 40 | `61` | JSON UTF-8 byte 29: `a` |
+| 41 | `73` | JSON UTF-8 byte 30: `s` |
+| 42 | `65` | JSON UTF-8 byte 31: `e` |
+| 43 | `22` | JSON UTF-8 byte 32: `"` |
+| 44 | `3A` | JSON UTF-8 byte 33: `:` |
+| 45 | `31` | JSON UTF-8 byte 34: `1` |
+| 46 | `2C` | JSON UTF-8 byte 35: `,` |
+| 47 | `22` | JSON UTF-8 byte 36: `"` |
+| 48 | `73` | JSON UTF-8 byte 37: `s` |
+| 49 | `72` | JSON UTF-8 byte 38: `r` |
+| 50 | `63` | JSON UTF-8 byte 39: `c` |
+| 51 | `22` | JSON UTF-8 byte 40: `"` |
+| 52 | `3A` | JSON UTF-8 byte 41: `:` |
+| 53 | `31` | JSON UTF-8 byte 42: `1` |
+| 54 | `2C` | JSON UTF-8 byte 43: `,` |
+| 55 | `22` | JSON UTF-8 byte 44: `"` |
+| 56 | `61` | JSON UTF-8 byte 45: `a` |
+| 57 | `78` | JSON UTF-8 byte 46: `x` |
+| 58 | `69` | JSON UTF-8 byte 47: `i` |
+| 59 | `73` | JSON UTF-8 byte 48: `s` |
+| 60 | `22` | JSON UTF-8 byte 49: `"` |
+| 61 | `3A` | JSON UTF-8 byte 50: `:` |
+| 62 | `30` | JSON UTF-8 byte 51: `0` |
+| 63 | `2C` | JSON UTF-8 byte 52: `,` |
+| 64 | `22` | JSON UTF-8 byte 53: `"` |
+| 65 | `72` | JSON UTF-8 byte 54: `r` |
+| 66 | `69` | JSON UTF-8 byte 55: `i` |
+| 67 | `64` | JSON UTF-8 byte 56: `d` |
+| 68 | `22` | JSON UTF-8 byte 57: `"` |
+| 69 | `3A` | JSON UTF-8 byte 58: `:` |
+| 70 | `31` | JSON UTF-8 byte 59: `1` |
+| 71 | `2C` | JSON UTF-8 byte 60: `,` |
+| 72 | `22` | JSON UTF-8 byte 61: `"` |
+| 73 | `61` | JSON UTF-8 byte 62: `a` |
+| 74 | `70` | JSON UTF-8 byte 63: `p` |
+| 75 | `70` | JSON UTF-8 byte 64: `p` |
+| 76 | `22` | JSON UTF-8 byte 65: `"` |
+| 77 | `3A` | JSON UTF-8 byte 66: `:` |
+| 78 | `36` | JSON UTF-8 byte 67: `6` |
+| 79 | `35` | JSON UTF-8 byte 68: `5` |
+| 80 | `35` | JSON UTF-8 byte 69: `5` |
+| 81 | `34` | JSON UTF-8 byte 70: `4` |
+| 82 | `32` | JSON UTF-8 byte 71: `2` |
+| 83 | `2C` | JSON UTF-8 byte 72: `,` |
+| 84 | `22` | JSON UTF-8 byte 73: `"` |
+| 85 | `76` | JSON UTF-8 byte 74: `v` |
+| 86 | `61` | JSON UTF-8 byte 75: `a` |
+| 87 | `6C` | JSON UTF-8 byte 76: `l` |
+| 88 | `22` | JSON UTF-8 byte 77: `"` |
+| 89 | `3A` | JSON UTF-8 byte 78: `:` |
+| 90 | `30` | JSON UTF-8 byte 79: `0` |
+| 91 | `2C` | JSON UTF-8 byte 80: `,` |
+| 92 | `22` | JSON UTF-8 byte 81: `"` |
+| 93 | `6E` | JSON UTF-8 byte 82: `n` |
+| 94 | `6F` | JSON UTF-8 byte 83: `o` |
+| 95 | `72` | JSON UTF-8 byte 84: `r` |
+| 96 | `6D` | JSON UTF-8 byte 85: `m` |
+| 97 | `22` | JSON UTF-8 byte 86: `"` |
+| 98 | `3A` | JSON UTF-8 byte 87: `:` |
+| 99 | `30` | JSON UTF-8 byte 88: `0` |
+| 100 | `2C` | JSON UTF-8 byte 89: `,` |
+| 101 | `22` | JSON UTF-8 byte 90: `"` |
+| 102 | `78` | JSON UTF-8 byte 91: `x` |
+| 103 | `22` | JSON UTF-8 byte 92: `"` |
+| 104 | `3A` | JSON UTF-8 byte 93: `:` |
+| 105 | `30` | JSON UTF-8 byte 94: `0` |
+| 106 | `2C` | JSON UTF-8 byte 95: `,` |
+| 107 | `22` | JSON UTF-8 byte 96: `"` |
+| 108 | `79` | JSON UTF-8 byte 97: `y` |
+| 109 | `22` | JSON UTF-8 byte 98: `"` |
+| 110 | `3A` | JSON UTF-8 byte 99: `:` |
+| 111 | `30` | JSON UTF-8 byte 100: `0` |
+| 112 | `2C` | JSON UTF-8 byte 101: `,` |
+| 113 | `22` | JSON UTF-8 byte 102: `"` |
+| 114 | `6D` | JSON UTF-8 byte 103: `m` |
+| 115 | `6F` | JSON UTF-8 byte 104: `o` |
+| 116 | `64` | JSON UTF-8 byte 105: `d` |
+| 117 | `22` | JSON UTF-8 byte 106: `"` |
+| 118 | `3A` | JSON UTF-8 byte 107: `:` |
+| 119 | `30` | JSON UTF-8 byte 108: `0` |
+| 120 | `2C` | JSON UTF-8 byte 109: `,` |
+| 121 | `22` | JSON UTF-8 byte 110: `"` |
+| 122 | `70` | JSON UTF-8 byte 111: `p` |
+| 123 | `61` | JSON UTF-8 byte 112: `a` |
+| 124 | `67` | JSON UTF-8 byte 113: `g` |
+| 125 | `65` | JSON UTF-8 byte 114: `e` |
+| 126 | `22` | JSON UTF-8 byte 115: `"` |
+| 127 | `3A` | JSON UTF-8 byte 116: `:` |
+| 128 | `37` | JSON UTF-8 byte 117: `7` |
+| 129 | `2C` | JSON UTF-8 byte 118: `,` |
+| 130 | `22` | JSON UTF-8 byte 119: `"` |
+| 131 | `75` | JSON UTF-8 byte 120: `u` |
+| 132 | `73` | JSON UTF-8 byte 121: `s` |
+| 133 | `61` | JSON UTF-8 byte 122: `a` |
+| 134 | `67` | JSON UTF-8 byte 123: `g` |
+| 135 | `65` | JSON UTF-8 byte 124: `e` |
+| 136 | `22` | JSON UTF-8 byte 125: `"` |
+| 137 | `3A` | JSON UTF-8 byte 126: `:` |
+| 138 | `38` | JSON UTF-8 byte 127: `8` |
+| 139 | `32` | JSON UTF-8 byte 128: `2` |
+| 140 | `2C` | JSON UTF-8 byte 129: `,` |
+| 141 | `22` | JSON UTF-8 byte 130: `"` |
+| 142 | `74` | JSON UTF-8 byte 131: `t` |
+| 143 | `73` | JSON UTF-8 byte 132: `s` |
+| 144 | `22` | JSON UTF-8 byte 133: `"` |
+| 145 | `3A` | JSON UTF-8 byte 134: `:` |
+| 146 | `31` | JSON UTF-8 byte 135: `1` |
+| 147 | `31` | JSON UTF-8 byte 136: `1` |
+| 148 | `30` | JSON UTF-8 byte 137: `0` |
+| 149 | `30` | JSON UTF-8 byte 138: `0` |
+| 150 | `7D` | JSON UTF-8 byte 139: `}` |
+| 151 | `28` | Additive checksum high byte |
+| 152 | `CC` | Additive checksum low byte |
 
 ## HOGP raw HID report
 
