@@ -1,5 +1,6 @@
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_libc.h"
+#include "gm_plugin_input.h"
 #include "breakout_translations.h"
 
 #define COLS 15
@@ -18,6 +19,7 @@
 #define PADDLE_W 80
 #define PADDLE_H 10
 #define ACCESSORY_PADDLE_STEP 32
+#define WHEEL_PADDLE_STEP 12
 #define BALL_SIZE 10
 #define GYRO_THRESHOLD 15
 #define EXIT_PITCH 30
@@ -36,6 +38,11 @@ typedef struct {
     const gm_plugin_host_api_t *host;
     const gm_plugin_lvgl_api_t *ui;
     const gm_plugin_libc_extension_api_t *libc;
+    const gm_plugin_input_extension_api_t *input;
+    uint8_t input_active;
+    uint8_t touch_axes;
+    int32_t touch_x;
+    int32_t touch_y;
     const breakout_strings_t *strings;
     gm_plugin_lvgl_obj_t *root;
     gm_plugin_lvgl_obj_t *board;
@@ -478,8 +485,181 @@ static gm_plugin_result_t create_ui(breakout_t *self)
 
 static gm_plugin_result_t restart(breakout_t *self)
 {
+    self->touch_axes = 0;
+    self->paddle_y = self->board_height - 24;
     initialize_state(self);
     return create_ui(self);
+}
+
+static void move_paddle_with_wheel(breakout_t *self, int32_t delta)
+{
+    int32_t y;
+    /* HID positive wheel means up. Clamp before multiplying/negating. */
+    if (delta > self->board_height) delta = self->board_height;
+    if (delta < -self->board_height) delta = -self->board_height;
+    y = self->paddle_y - delta * WHEEL_PADDLE_STEP;
+    if (y < 2) y = 2;
+    if (y > self->board_height - PADDLE_H)
+        y = self->board_height - PADDLE_H;
+    self->paddle_y = (int16_t)y;
+    self->ui->obj_set_pos(self->paddle, (int16_t)(self->paddle_x / Q),
+                          self->paddle_y - 2);
+}
+
+static bool on_event(void *opaque, const gm_plugin_event_t *event);
+
+static void input_button(breakout_t *self, gm_plugin_button_t button,
+                         gm_plugin_button_action_t action)
+{
+    gm_plugin_event_t event = {0};
+    event.type = GM_PLUGIN_EVENT_BUTTON;
+    event.data.button.button = button;
+    event.data.button.action = action;
+    (void)on_event(self, &event);
+}
+
+static void on_input(void *opaque, const gm_plugin_input_event_t *event)
+{
+    breakout_t *self = opaque;
+    gm_plugin_input_classes_t category;
+    gm_plugin_input_axis_t axis;
+    int32_t delta;
+    int32_t maximum;
+    if (self == 0 || event == 0 || event->struct_size < sizeof(*event) ||
+        self->input_active == 0U || self->exiting == 2U) return;
+    category = gm_plugin_input_event_class(event);
+    if (category == GM_PLUGIN_INPUT_CLASS_KEY) {
+        if (event->phase != GM_PLUGIN_INPUT_PHASE_DOWN &&
+            event->phase != GM_PLUGIN_INPUT_PHASE_REPEAT) return;
+        if (event->key == GM_PLUGIN_INPUT_KEY_LEFT ||
+            event->key == GM_PLUGIN_INPUT_KEY_RIGHT) {
+            input_button(self, event->key == GM_PLUGIN_INPUT_KEY_LEFT ?
+                GM_PLUGIN_BUTTON_LEFT : GM_PLUGIN_BUTTON_RIGHT,
+                GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+        } else if (event->phase == GM_PLUGIN_INPUT_PHASE_DOWN) {
+            if (event->key == GM_PLUGIN_INPUT_KEY_MOUSE_LEFT ||
+                event->key == GM_PLUGIN_INPUT_KEY_SELECT ||
+                event->key == GM_PLUGIN_INPUT_KEY_GAMEPAD_A)
+                input_button(self, GM_PLUGIN_BUTTON_PRIMARY,
+                             GM_PLUGIN_BUTTON_ACTION_SINGLE);
+            else if (event->key == GM_PLUGIN_INPUT_KEY_MOUSE_RIGHT ||
+                     event->key == GM_PLUGIN_INPUT_KEY_BACK)
+                input_button(self, GM_PLUGIN_BUTTON_BACK,
+                             GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+        }
+        return;
+    }
+    if (category == GM_PLUGIN_INPUT_CLASS_TOUCH) {
+        if (event->phase == GM_PLUGIN_INPUT_PHASE_CANCEL ||
+            event->phase == GM_PLUGIN_INPUT_PHASE_UP ||
+            event->key == GM_PLUGIN_INPUT_KEY_TOUCH_UP) {
+            self->touch_axes = 0;
+            return;
+        }
+        if (event->key == GM_PLUGIN_INPUT_KEY_TOUCH_TAP) {
+            if (event->phase == GM_PLUGIN_INPUT_PHASE_DOWN)
+                input_button(self, GM_PLUGIN_BUTTON_PRIMARY,
+                             GM_PLUGIN_BUTTON_ACTION_SINGLE);
+            return;
+        }
+        if (event->key == GM_PLUGIN_INPUT_KEY_TOUCH_DOWN ||
+            (event->key == GM_PLUGIN_INPUT_KEY_TOUCH_MOVE &&
+             self->touch_axes == 0U)) {
+            self->touch_x = event->x;
+            self->touch_y = event->y;
+            self->touch_axes = 3;
+            return;
+        }
+    }
+    if (self->paused != 0U || self->ended != 0U || self->exiting != 0U ||
+        self->paddle == 0) {
+        self->touch_axes = 0;
+        return;
+    }
+    maximum = (self->board_width - PADDLE_W) * Q;
+    axis = event->axis;
+    delta = event->value;
+    if (category == GM_PLUGIN_INPUT_CLASS_ABS) {
+        int32_t position = event->norm_value;
+        if (event->phase != GM_PLUGIN_INPUT_PHASE_MOVE ||
+            (axis != GM_PLUGIN_INPUT_AXIS_X && axis != GM_PLUGIN_INPUT_AXIS_RX))
+            return;
+        if (event->source == GM_PLUGIN_INPUT_SOURCE_GAMEPAD) {
+            if (position < -1000) position = -1000;
+            if (position > 1000) position = 1000;
+            position = (position + 1000) * (self->board_width - PADDLE_W) / 2000;
+        }
+        /* Non-stick ABS carries device units: this demo treats them as pixels. */
+        if (position < 0) position = 0;
+        if (position > self->board_width - PADDLE_W)
+            position = self->board_width - PADDLE_W;
+        self->paddle_x = position * Q;
+        self->paddle_vx = 0;
+    } else if (category == GM_PLUGIN_INPUT_CLASS_TOUCH) {
+        int32_t coordinate;
+        int64_t difference;
+        uint8_t mask;
+        int32_t *previous;
+        if (event->phase != GM_PLUGIN_INPUT_PHASE_MOVE) return;
+        if (event->key == GM_PLUGIN_INPUT_KEY_TOUCH_MOVE) {
+            /* 2-D touch: horizontal coordinate controls the paddle. */
+            axis = GM_PLUGIN_INPUT_AXIS_X;
+            coordinate = event->x;
+        } else if (axis == GM_PLUGIN_INPUT_AXIS_X || axis == GM_PLUGIN_INPUT_AXIS_Y) {
+            coordinate = event->value;
+        } else return; /* pressure and other digitizer fields do not move it */
+        mask = axis == GM_PLUGIN_INPUT_AXIS_X ? 1U : 2U;
+        previous = mask == 1U ? &self->touch_x : &self->touch_y;
+        if ((self->touch_axes & mask) == 0U) {
+            *previous = coordinate;
+            self->touch_axes |= mask;
+            return;
+        }
+        difference = (int64_t)coordinate - *previous;
+        *previous = coordinate;
+        if (difference > self->board_width) difference = self->board_width;
+        if (difference < -self->board_width) difference = -self->board_width;
+        self->paddle_x += (int32_t)difference * Q;
+        if (self->paddle_x < 0) self->paddle_x = 0;
+        if (self->paddle_x > maximum) self->paddle_x = maximum;
+        self->paddle_vx = 0;
+    } else if (category != GM_PLUGIN_INPUT_CLASS_REL ||
+               event->phase != GM_PLUGIN_INPUT_PHASE_MOVE) {
+        return;
+    } else if (axis == GM_PLUGIN_INPUT_AXIS_X) {
+        /* Clamp before scaling to avoid overflowing on INT32_MIN/MAX. */
+        if (delta > self->board_width) delta = self->board_width;
+        if (delta < -self->board_width) delta = -self->board_width;
+        self->paddle_x += delta * Q;
+        if (self->paddle_x < 0) self->paddle_x = 0;
+        if (self->paddle_x > maximum) self->paddle_x = maximum;
+        self->paddle_vx = 0;
+    } else if (axis == GM_PLUGIN_INPUT_AXIS_Y) {
+        int32_t y;
+        if (delta > self->board_height) delta = self->board_height;
+        if (delta < -self->board_height) delta = -self->board_height;
+        y = self->paddle_y + delta;
+        if (y < 2) y = 2;
+        if (y > self->board_height - PADDLE_H)
+            y = self->board_height - PADDLE_H;
+        self->paddle_y = (int16_t)y;
+    } else if (axis == GM_PLUGIN_INPUT_AXIS_WHEEL) {
+        move_paddle_with_wheel(self, delta);
+        return;
+    } else {
+        /* HWheel has no game binding, matching the firmware reference game. */
+        return;
+    }
+    self->ui->obj_set_pos(self->paddle, (int16_t)(self->paddle_x / Q),
+                          self->paddle_y - 2);
+}
+
+static void subscribe_input(breakout_t *self)
+{
+    self->input_active = 0;
+    if (self->input != 0 &&
+        self->input->subscribe(GM_PLUGIN_INPUT_CLASS_ALL, on_input, self) == GM_PLUGIN_OK)
+        self->input_active = 1;
 }
 
 static void move_paddle(breakout_t *self, const gm_plugin_imu_sample_t *imu)
@@ -697,6 +877,7 @@ static gm_plugin_result_t on_start(void *opaque)
     if (self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW) != GM_PLUGIN_OK)
         return GM_PLUGIN_ESTATE;
     result = restart(self);
+    if (result == GM_PLUGIN_OK) subscribe_input(self);
     if (result != GM_PLUGIN_OK) {
         (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
         self->ui->obj_clean(self->ui->root_get());
@@ -758,6 +939,23 @@ static bool on_event(void *opaque, const gm_plugin_event_t *event)
         return true;
     }
     if (action == GM_PLUGIN_BUTTON_ACTION_TRIGGER) {
+        /* Mouse secondary click is cooked as BACK, not direction RIGHT. */
+        if (button == GM_PLUGIN_BUTTON_BACK) {
+            if (self->exiting != 2U) {
+                self->exiting = 2;
+                self->host->app_exit();
+            }
+            return true;
+        }
+        if (button == GM_PLUGIN_BUTTON_SCROLL_UP ||
+            button == GM_PLUGIN_BUTTON_SCROLL_DOWN) {
+            /* Old firmware has cooked wheel steps but no Input extension. */
+            if (self->input_active == 0U && self->paused == 0U &&
+                self->ended == 0U && self->exiting == 0U)
+                move_paddle_with_wheel(self,
+                    button == GM_PLUGIN_BUTTON_SCROLL_UP ? 1 : -1);
+            return true;
+        }
         if (button != GM_PLUGIN_BUTTON_LEFT &&
             button != GM_PLUGIN_BUTTON_RIGHT)
             return false;
@@ -785,6 +983,8 @@ static bool on_event(void *opaque, const gm_plugin_event_t *event)
 static void on_suspend(void *opaque)
 {
     breakout_t *self = opaque;
+    self->touch_axes = 0;
+    self->input_active = 0; /* Host pauses the subscription under overlays. */
     self->button_holding_exit = 0;
     self->button_hold_ms = 0;
     self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
@@ -795,12 +995,16 @@ static void on_resume(void *opaque)
 {
     breakout_t *self = opaque;
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW);
+    subscribe_input(self);
     self->frame_accumulator = 0;
 }
 
 static void on_stop(void *opaque)
 {
     breakout_t *self = opaque;
+    self->touch_axes = 0;
+    self->input_active = 0;
+    if (self->input != 0) self->input->unsubscribe();
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
     self->ui->obj_clean(self->ui->root_get());
 }
@@ -821,6 +1025,9 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         plugin->struct_size < GM_PLUGIN_DESCRIPTOR_MIN_SIZE)
         return GM_PLUGIN_EVERSION;
     game.host = host;
+    (void)gm_plugin_input_get(host, &game.input);
+    game.input_active = 0;
+    game.touch_axes = 0;
     game.ui = host->graphics.lvgl;
     if (gm_plugin_libc_get(host, &game.libc) != GM_PLUGIN_OK)
         return GM_PLUGIN_ENOTSUP;
