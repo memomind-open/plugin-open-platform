@@ -1,6 +1,8 @@
 #ifndef GM_PLUGIN_EXTENSIONS_H
 #define GM_PLUGIN_EXTENSIONS_H
 
+#include "gm_plugin.h"
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -15,6 +17,186 @@
 #define GM_PLUGIN_EXTENSION_RANDOM UINT32_C(1)
 #define GM_PLUGIN_EXTENSION_LZ4 UINT32_C(2)
 #define GM_PLUGIN_EXTENSION_LIBC UINT32_C(3)
+#define GM_PLUGIN_EXTENSION_INPUT UINT32_C(4)
+
+/** HOGP input classes that a foreground plugin can claim from cooked routing. */
+typedef uint32_t gm_plugin_input_classes_t;
+enum {
+    GM_PLUGIN_INPUT_CLASS_KEY = UINT32_C(1) << 0,
+    GM_PLUGIN_INPUT_CLASS_REL = UINT32_C(1) << 1,
+    GM_PLUGIN_INPUT_CLASS_ABS = UINT32_C(1) << 2,
+    GM_PLUGIN_INPUT_CLASS_TOUCH = UINT32_C(1) << 3,
+    GM_PLUGIN_INPUT_CLASS_ALL = UINT32_C(0x0F),
+};
+
+/** Device-independent key produced by the Host HOGP normalizer. */
+typedef uint8_t gm_plugin_input_key_t;
+enum {
+    GM_PLUGIN_INPUT_KEY_UP = 0,
+    GM_PLUGIN_INPUT_KEY_DOWN = 1,
+    GM_PLUGIN_INPUT_KEY_LEFT = 2,
+    GM_PLUGIN_INPUT_KEY_RIGHT = 3,
+    GM_PLUGIN_INPUT_KEY_SELECT = 4,
+    GM_PLUGIN_INPUT_KEY_BACK = 5,
+    GM_PLUGIN_INPUT_KEY_HOME = 6,
+    GM_PLUGIN_INPUT_KEY_MENU = 7,
+    GM_PLUGIN_INPUT_KEY_NEXT = 8,
+    GM_PLUGIN_INPUT_KEY_PREV = 9,
+    GM_PLUGIN_INPUT_KEY_PLAY_PAUSE = 10,
+    GM_PLUGIN_INPUT_KEY_VOL_UP = 11,
+    GM_PLUGIN_INPUT_KEY_VOL_DOWN = 12,
+    GM_PLUGIN_INPUT_KEY_MUTE = 13,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_A = 14,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_B = 15,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_X = 16,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_Y = 17,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_L1 = 18,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_R1 = 19,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_L2 = 20,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_R2 = 21,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_START = 22,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_SELECT = 23,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_THUMBL = 24,
+    GM_PLUGIN_INPUT_KEY_GAMEPAD_THUMBR = 25,
+    GM_PLUGIN_INPUT_KEY_MOUSE_LEFT = 26,
+    GM_PLUGIN_INPUT_KEY_MOUSE_RIGHT = 27,
+    GM_PLUGIN_INPUT_KEY_MOUSE_MIDDLE = 28,
+    GM_PLUGIN_INPUT_KEY_REL_X = 29,
+    GM_PLUGIN_INPUT_KEY_REL_Y = 30,
+    GM_PLUGIN_INPUT_KEY_REL_WHEEL = 31,
+    GM_PLUGIN_INPUT_KEY_REL_HWHEEL = 32,
+    GM_PLUGIN_INPUT_KEY_ABS_X = 33,
+    GM_PLUGIN_INPUT_KEY_ABS_Y = 34,
+    GM_PLUGIN_INPUT_KEY_ABS_Z = 35,
+    GM_PLUGIN_INPUT_KEY_ABS_RX = 36,
+    GM_PLUGIN_INPUT_KEY_ABS_RY = 37,
+    GM_PLUGIN_INPUT_KEY_ABS_RZ = 38,
+    GM_PLUGIN_INPUT_KEY_ABS_HAT_X = 39,
+    GM_PLUGIN_INPUT_KEY_ABS_HAT_Y = 40,
+    GM_PLUGIN_INPUT_KEY_ABS_PRESSURE = 41,
+    GM_PLUGIN_INPUT_KEY_TOUCH_DOWN = 42,
+    GM_PLUGIN_INPUT_KEY_TOUCH_UP = 43,
+    GM_PLUGIN_INPUT_KEY_TOUCH_MOVE = 44,
+    GM_PLUGIN_INPUT_KEY_TOUCH_TAP = 45,
+    GM_PLUGIN_INPUT_KEY_TOUCH_DOUBLE_TAP = 46,
+    GM_PLUGIN_INPUT_KEY_TOUCH_LONG_PRESS = 47,
+    GM_PLUGIN_INPUT_KEY_TOUCH_SWIPE_UP = 48,
+    GM_PLUGIN_INPUT_KEY_TOUCH_SWIPE_DOWN = 49,
+    GM_PLUGIN_INPUT_KEY_TOUCH_SWIPE_LEFT = 50,
+    GM_PLUGIN_INPUT_KEY_TOUCH_SWIPE_RIGHT = 51,
+    GM_PLUGIN_INPUT_KEY_VENDOR_USAGE = 52,
+    GM_PLUGIN_INPUT_KEY_UNKNOWN = 53,
+    GM_PLUGIN_INPUT_KEY_PAGE_UP = 54,
+    GM_PLUGIN_INPUT_KEY_PAGE_DOWN = 55,
+    GM_PLUGIN_INPUT_KEY_SCROLL_UP = 56,
+    GM_PLUGIN_INPUT_KEY_SCROLL_DOWN = 57,
+    GM_PLUGIN_INPUT_KEY_DOUBLE = 58,
+    GM_PLUGIN_INPUT_KEY_LONG = 59,
+    GM_PLUGIN_INPUT_KEY_AI_TRIGGER = 60,
+};
+
+typedef uint8_t gm_plugin_input_phase_t;
+enum {
+    GM_PLUGIN_INPUT_PHASE_DOWN = 0,
+    GM_PLUGIN_INPUT_PHASE_UP = 1,
+    GM_PLUGIN_INPUT_PHASE_REPEAT = 2,
+    GM_PLUGIN_INPUT_PHASE_MOVE = 3,
+    GM_PLUGIN_INPUT_PHASE_CANCEL = 4,
+};
+
+typedef uint8_t gm_plugin_input_source_t;
+enum {
+    GM_PLUGIN_INPUT_SOURCE_GENERIC = 0,
+    GM_PLUGIN_INPUT_SOURCE_KEYBOARD = 1,
+    GM_PLUGIN_INPUT_SOURCE_MOUSE = 2,
+    GM_PLUGIN_INPUT_SOURCE_CONSUMER = 3,
+    GM_PLUGIN_INPUT_SOURCE_DIGITIZER = 4,
+    GM_PLUGIN_INPUT_SOURCE_GAMEPAD = 5,
+    GM_PLUGIN_INPUT_SOURCE_VENDOR = 6,
+};
+
+typedef uint8_t gm_plugin_input_axis_t;
+enum {
+    GM_PLUGIN_INPUT_AXIS_NONE = 0,
+    GM_PLUGIN_INPUT_AXIS_X = 1,
+    GM_PLUGIN_INPUT_AXIS_Y = 2,
+    GM_PLUGIN_INPUT_AXIS_Z = 3,
+    GM_PLUGIN_INPUT_AXIS_RX = 4,
+    GM_PLUGIN_INPUT_AXIS_RY = 5,
+    GM_PLUGIN_INPUT_AXIS_RZ = 6,
+    GM_PLUGIN_INPUT_AXIS_WHEEL = 7,
+    GM_PLUGIN_INPUT_AXIS_HWHEEL = 8,
+    GM_PLUGIN_INPUT_AXIS_HAT_X = 9,
+    GM_PLUGIN_INPUT_AXIS_HAT_Y = 10,
+};
+
+enum {
+    GM_PLUGIN_INPUT_MOD_LCTRL = UINT16_C(1) << 0,
+    GM_PLUGIN_INPUT_MOD_LSHIFT = UINT16_C(1) << 1,
+    GM_PLUGIN_INPUT_MOD_LALT = UINT16_C(1) << 2,
+    GM_PLUGIN_INPUT_MOD_LGUI = UINT16_C(1) << 3,
+    GM_PLUGIN_INPUT_MOD_RCTRL = UINT16_C(1) << 4,
+    GM_PLUGIN_INPUT_MOD_RSHIFT = UINT16_C(1) << 5,
+    GM_PLUGIN_INPUT_MOD_RALT = UINT16_C(1) << 6,
+    GM_PLUGIN_INPUT_MOD_RGUI = UINT16_C(1) << 7,
+};
+
+/**
+ * One normalized HOGP input sample. The sample is borrowed and remains valid
+ * only for the callback duration. Relative axes use value as a delta; absolute
+ * axes use value plus norm_value; digitizers use x/y and may use pressure in
+ * value/norm_value. usage_page, usage_id, application and report_id preserve
+ * the originating HID identity for device-specific controls.
+ */
+typedef struct gm_plugin_input_event {
+    uint16_t struct_size;
+    gm_plugin_input_key_t key;
+    gm_plugin_input_phase_t phase;
+    gm_plugin_input_source_t source;
+    gm_plugin_input_axis_t axis;
+    uint8_t report_id;
+    uint8_t reserved0;
+    int32_t value;
+    int32_t norm_value;
+    int32_t x;
+    int32_t y;
+    uint16_t modifiers;
+    uint16_t usage_page;
+    uint16_t usage_id;
+    uint16_t reserved1;
+    uint32_t application;
+    uint32_t timestamp_ms;
+} gm_plugin_input_event_t;
+
+typedef void (*gm_plugin_input_callback_t)(
+    void *context, const gm_plugin_input_event_t *event);
+
+/**
+ * Foreground HOGP input subscription.
+ *
+ * Subscribed classes are delivered raw and no longer produce their normal
+ * cooked local navigation/button events. Subscribe only to classes the plugin
+ * handles. The phone-side HOGP mirror remains independent.
+ *
+ * Subscribe from on_start() or on_resume(). The Host suspends delivery while
+ * an overlay covers the plugin, restores it on resume, and revokes it before
+ * stop/unload. Registering again replaces the callback and class mask.
+ * Continuous samples are best-effort and may be rate-limited by the Host;
+ * discrete DOWN/UP/CANCEL edges are preserved whenever queue capacity allows.
+ */
+typedef struct gm_plugin_input_extension_api {
+    /**
+     * Claim one or more GM_PLUGIN_INPUT_CLASS_* values for raw delivery.
+     * @return GM_PLUGIN_OK on success, GM_PLUGIN_EINVAL for an empty/unknown
+     *         mask or NULL/invalid callback, or GM_PLUGIN_ESTATE outside a
+     *         visible plugin cycle.
+     */
+    gm_plugin_result_t (*subscribe)(gm_plugin_input_classes_t classes,
+                                    gm_plugin_input_callback_t callback,
+                                    void *context);
+    /** Disable raw delivery and restore normal cooked handling. Idempotent. */
+    void (*unsubscribe)(void);
+} gm_plugin_input_extension_api_t;
 
 /**
  * Pseudo-random number services.

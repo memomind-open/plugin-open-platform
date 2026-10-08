@@ -15,6 +15,10 @@ table plus independently queried extensions.
 | Head calibration | calibration state machine | LVGL, raw IMU, display control; calibration/storage remain privileged |
 | Notifications/dashboard | card/layout modules and cached data | LVGL, BT, device state; persistent KV is not yet exposed |
 
+Breakout additionally queries the optional [HOGP Input extension](INPUT.md)
+(ID 4) for KEY/REL/ABS/TOUCH control. Without it, button/IMU controls remain
+available; the extension does not change the core event ABI.
+
 Per-pixel plugins lock a Host-owned GRAY_4 framebuffer slice and draw into it
 directly; neither side allocates another framebuffer. Text uses LVGL labels,
 rectangles use `obj_create` plus

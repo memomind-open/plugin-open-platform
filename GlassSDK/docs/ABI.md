@@ -157,6 +157,13 @@ See [GRAPHICS.md](GRAPHICS.md) for rendering rules,
 [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md) for service mappings, and
 [SECURITY.md](SECURITY.md) for the trust boundary.
 
+## Optional HOGP Input
+
+Extension ID `4` exposes foreground KEY/REL/ABS/TOUCH callbacks without
+changing the frozen core ABI. Discover it at runtime and keep existing controls
+when unsupported. See [HOGP Input](INPUT.md) for layout, lifecycle and
+tests.
+
 ## Build memory and stack checks
 
 `build.py` checks ROM and RAM independently. The linker and GMP packer both
