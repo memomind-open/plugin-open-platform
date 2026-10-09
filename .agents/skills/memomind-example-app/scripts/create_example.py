@@ -14,6 +14,12 @@ SKILL = Path(__file__).resolve().parents[1]
 REPO = SKILL.parents[2]
 
 
+def c_string_literal(value):
+    # Fixed-width octal encodes UTF-8 bytes without JSON surrogates, C trigraphs,
+    # or escapes that consume subsequent title characters.
+    return '"' + ''.join('\\%03o' % byte for byte in value.encode('utf-8')) + '"'
+
+
 def bundle_sdk(destination):
     vendor = destination / 'vendor'
     if vendor.is_symlink() or (vendor / 'gm-plugin-web-sdk.esm.js').is_symlink():
@@ -65,7 +71,7 @@ def create(args):
                 'if (screen == 0) { example_call_ui_stop(&s_call_ui); return GM_PLUGIN_ESTATE; }')
             c_source = c_source.replace('        return GM_PLUGIN_ENOMEM;',
                 '        example_call_ui_stop(&s_call_ui);\n        return GM_PLUGIN_ENOMEM;')
-            c_source = c_source.replace('"LVGL UI example"', json.dumps(args.title, ensure_ascii=True))
+            c_source = c_source.replace('"LVGL UI example"', c_string_literal(args.title))
             (stage / (args.name + '.c')).write_text(c_source, encoding='utf-8')
             shutil.copy2(REPO / 'GlassSDK/examples/common/call_ui.h', stage / 'call_ui.h')
             manifest = json.loads((source / 'manifest.json').read_text(encoding='utf-8'))

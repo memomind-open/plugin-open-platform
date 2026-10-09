@@ -6,6 +6,7 @@ import importlib.util
 import io
 import os
 from pathlib import Path
+import re
 import shutil
 import shlex
 import subprocess
@@ -142,6 +143,28 @@ class StarterTests(unittest.TestCase):
         if shutil.which('cc'):
             subprocess.run(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-fsyntax-only',
                             '-I', str(REPO / 'GlassSDK/include'), str(project / 'new-example.c')], check=True)
+
+    @unittest.skipUnless(shutil.which('cc'), 'A C compiler is required for title encoding checks')
+    def test_glass_title_compiles_and_preserves_utf8_bytes(self):
+        title = 'Puppy Pet \U0001f436 / \u732b \x017A "quoted" \\\n??/ end'
+        project = self.create('glass', title)
+        source = project / 'new-example.c'
+        subprocess.run(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror', '-fsyntax-only',
+                        '-I', str(REPO / 'GlassSDK/include'), str(source)], check=True)
+        literal = re.search(r'label_set_text\(title, (.*)\);', source.read_text(encoding='utf-8'))
+        self.assertIsNotNone(literal)
+        # Compile the actual generated literal and check bytes, not escape spelling.
+        probe = self.root / 'title.c'
+        probe.write_text('#include <stdio.h>\nint main(void) {\n'
+                         'const char title[] = ' + literal.group(1) + ';\n'
+                         'return fwrite(title, 1, sizeof(title) - 1, stdout) == '
+                         'sizeof(title) - 1 ? 0 : 1;\n}\n', encoding='utf-8')
+        executable = self.root / 'title-probe'
+        subprocess.run(['cc', '-std=c11', '-Wall', '-Wextra', '-Werror',
+                        str(probe), '-o', str(executable)], check=True)
+        result = subprocess.run([str(executable)], check=True, capture_output=True)
+        self.assertEqual(result.stdout, title.encode('utf-8'))
+        self.assertEqual(json.loads((project / 'manifest.json').read_text(encoding='utf-8'))['name'], title)
 
 
 if __name__ == '__main__':
