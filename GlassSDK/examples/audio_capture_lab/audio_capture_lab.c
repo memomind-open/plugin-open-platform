@@ -1,5 +1,9 @@
+#include "../common/call_ui.h"
+
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_libc.h"
+
+static example_call_ui_t s_call_ui;
 
 #define AUDIO_LAB_STATE_CHANNEL UINT16_C(0x414C)
 #define BUTTON_CHANNEL UINT16_C(0x0100)
@@ -370,6 +374,8 @@ static bool send_button(audio_lab_t *self, const gm_plugin_event_t *event)
 
 static gm_plugin_result_t on_start(void *context)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     audio_lab_t *self = context;
     self->sequence = 0;
     self->elapsed_ms = 0;
@@ -426,6 +432,7 @@ static void on_resume(void *context)
 
 static void on_stop(void *context)
 {
+    example_call_ui_stop(&s_call_ui);
     audio_lab_t *self = context;
     if (self->root != 0) self->ui->obj_clean(self->root);
     self->root = 0;
@@ -461,6 +468,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_EVERSION;
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &s_lab;
+    s_call_ui.host = host;
     plugin->on_start = on_start;
     plugin->on_resume = on_resume;
     plugin->on_event = on_event;

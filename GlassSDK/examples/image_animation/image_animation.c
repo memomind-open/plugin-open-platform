@@ -1,6 +1,10 @@
+#include "../common/call_ui.h"
+
 #include "gm_plugin_lvgl_api.h"
 
 #include "../game/fighter_arena/zen_combat_sprites.h"
+
+static example_call_ui_t s_call_ui;
 
 #define IMAGE_WIDTH ((PF_SPRITE_WIDTH * 2U + 1U) / 3U)
 #define IMAGE_HEIGHT ((PF_SPRITE_HEIGHT * 2U + 1U) / 3U)
@@ -172,6 +176,8 @@ static gm_plugin_lvgl_obj_t *create_background_panel(
 
 static gm_plugin_result_t plugin_start(void *context)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     gm_plugin_lvgl_obj_t *root;
     gm_plugin_lvgl_obj_t *title;
     gm_plugin_lvgl_obj_t *memory_warning;
@@ -276,6 +282,7 @@ static void plugin_loop(void *context, uint32_t elapsed_ms)
 
 static void plugin_stop(void *context)
 {
+    example_call_ui_stop(&s_call_ui);
     gm_plugin_lvgl_obj_t *root;
     (void)context;
     if (s_animation != 0) (void)s_ui->anim_image_stop(s_animation);
@@ -307,6 +314,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_EVERSION;
 
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
+    s_call_ui.host = host;
     plugin->on_start = plugin_start;
     plugin->on_loop = plugin_loop;
     plugin->on_stop = plugin_stop;

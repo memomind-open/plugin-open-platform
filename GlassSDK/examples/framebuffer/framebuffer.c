@@ -1,4 +1,8 @@
+#include "../common/call_ui.h"
+
 #include "gm_plugin.h"
+
+static example_call_ui_t s_call_ui;
 
 static const gm_plugin_host_api_t *s_host;
 
@@ -32,6 +36,7 @@ static void draw_slice_marker(gm_plugin_framebuffer_surface_t *surface,
 
 static gm_plugin_result_t framebuffer_draw(void)
 {
+    if (s_call_ui.active) return GM_PLUGIN_OK;
     gm_plugin_display_info_t display;
     gm_plugin_framebuffer_surface_t surface;
     gm_plugin_result_t result;
@@ -96,8 +101,25 @@ static gm_plugin_result_t framebuffer_draw(void)
 
 static gm_plugin_result_t framebuffer_start(void *context)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     (void)context;
     return framebuffer_draw();
+}
+
+static void framebuffer_stop(void *context)
+{
+    (void)context;
+    example_call_ui_stop(&s_call_ui);
+}
+
+static void framebuffer_loop(void *context, uint32_t elapsed_ms)
+{
+    (void)context;
+    (void)elapsed_ms;
+    if (!s_call_ui.active && s_call_ui.redraw_pending &&
+        framebuffer_draw() == GM_PLUGIN_OK)
+        s_call_ui.redraw_pending = false;
 }
 
 gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
@@ -115,6 +137,9 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_ENOTSUP;
     s_host = host;
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
+    s_call_ui.host = host;
     plugin->on_start = framebuffer_start;
+    plugin->on_loop = framebuffer_loop;
+    plugin->on_stop = framebuffer_stop;
     return GM_PLUGIN_OK;
 }

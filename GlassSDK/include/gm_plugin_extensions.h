@@ -18,6 +18,29 @@
 #define GM_PLUGIN_EXTENSION_LZ4 UINT32_C(2)
 #define GM_PLUGIN_EXTENSION_LIBC UINT32_C(3)
 #define GM_PLUGIN_EXTENSION_INPUT UINT32_C(4)
+#define GM_PLUGIN_EXTENSION_SYSTEM_EVENTS UINT32_C(5)
+
+/** System UI notifications. Delivery continues while an overlay is visible.
+ * No caller identity or phone number is exposed. Drawing remains plugin-owned. */
+#define GM_PLUGIN_SYSTEM_EVENT_CALL_UI UINT16_C(1)
+typedef struct {
+    uint16_t struct_size;
+    uint16_t type;
+    uint32_t timestamp_ms;
+    bool active; /**< true before call UI starts; false after it is destroyed. */
+} gm_plugin_system_event_t;
+typedef void (*gm_plugin_system_event_callback_t)(
+    void *context, const gm_plugin_system_event_t *event);
+typedef struct {
+    /** Subscribe during on_start/on_resume. Replaces the previous callback.
+     * Synchronously delivers the current CALL_UI state before returning.
+     * Events are borrowed and serialized on the display task. This does not
+     * stop loops or prohibit framebuffer writes: the plugin decides how to yield.
+     * The Host revokes the subscription before stop/unload. */
+    gm_plugin_result_t (*subscribe)(gm_plugin_system_event_callback_t on_event,
+                                    void *context);
+    void (*unsubscribe)(void);
+} gm_plugin_system_events_extension_api_t;
 
 /** HOGP input classes that a foreground plugin can claim from cooked routing. */
 typedef uint32_t gm_plugin_input_classes_t;

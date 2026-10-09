@@ -108,3 +108,22 @@ same logic frame as movement.
 
 See [`release/QUICKSTART.md`](release/QUICKSTART.md) for the paired Desktop
 Studio and physical-device verification paths.
+
+## Yielding to phone calls (v31)
+
+On firmware providing `GM_PLUGIN_EXTENSION_SYSTEM_EVENTS` (ID 5), Fighter subscribes
+with `plugin_system_event`, the extension's `on_event` callback. `CALL_UI.active`
+is delivered before telephone UI creation and after its destruction, including
+the current state immediately upon subscription. It contains no caller data.
+The core event and lifecycle ABI are unchanged.
+
+During a call, Fighter stops every framebuffer lock, pixel write, unlock/present
+and button-triggered redraw. Its loop, simulation, controller snapshots and
+Bluetooth event queue continue normally. Controller messages cannot override the
+display suppression flag. After the call UI exits, the next loop redraws the whole
+game without adding an extra simulation step. Plugin stop revokes the subscription.
+
+The Host notification does not restrict framebuffer access or stop the plugin's
+loop. Other developers can choose a different policy. Older firmware/Studio
+without this extension can still run the game but cannot supply call notifications;
+upgrade the glasses firmware to test this behavior on hardware.

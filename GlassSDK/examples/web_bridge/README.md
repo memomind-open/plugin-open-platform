@@ -148,3 +148,17 @@ The plugin sends application replies/events with `bt_send()` through command
 [the binary protocol](../../docs/PROTOCOL.md#plugin-application-service-0x0f)
 for framing, byte order and acknowledgement semantics. This is business data,
 not executable-plugin package transfer.
+
+## Telephone UI
+
+The example subscribes to the optional system-event extension. While telephone
+UI is active it hides its LVGL scene and skips framebuffer writes, but continues
+validating/consuming bitmap frames, sending their acknowledgements and handling
+Bluetooth, input and IMU traffic. In this state a successful `complete` reports
+that the transfer was consumed; its pixels are deliberately not presented.
+If a call interrupts an atomic frame, its remaining tiles are also consumed
+without presentation; atomic drawing resumes with a new frame begun after the
+call. This avoids presenting only the trailing tiles of the interrupted frame.
+On call UI exit the LVGL scene reappears, and subsequent phone commands can draw
+bitmaps again. No full bitmap is cached, so a static bitmap needs to be resent.
+See [System UI notifications](../../docs/SYSTEM_EVENTS.md).

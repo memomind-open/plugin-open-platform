@@ -1,5 +1,6 @@
 #include "gm_plugin.h"
 #include "gm_plugin_libc.h"
+#include "gm_plugin_system_events.h"
 #include "zen_combat_sprites.h"
 #undef PIXEL_FIGHTER_SPRITES_H
 #define pf_sprite_offsets rival_sprite_offsets
@@ -210,6 +211,7 @@ typedef struct {
 typedef struct {
     const gm_plugin_host_api_t *host;
     const gm_plugin_libc_extension_api_t *libc;
+    const gm_plugin_system_events_extension_api_t *system_events;
     fighter_t player;
     fighter_t cpu;
     projectile_t projectiles[PROJECTILE_COUNT];
@@ -254,6 +256,8 @@ typedef struct {
     bool holding_exit;
     bool impact_strong;
     bool cpu_defense_decided;
+    bool call_ui_active;
+    bool redraw_pending;
 } game_t;
 
 static const character_t characters[CHARACTER_COUNT] = {
@@ -1115,6 +1119,7 @@ static gm_plugin_result_t render(game_t *self)
 {
     gm_plugin_framebuffer_surface_t surface;
     uint16_t next_y = 0;
+    if (self->call_ui_active) return GM_PLUGIN_OK;
     while (next_y < self->height) {
         gm_plugin_rect_t dirty;
         uint32_t surface_end;
@@ -1982,6 +1987,19 @@ static void step_game(game_t *self)
     }
 }
 
+/* The developer chooses to yield direct display access to the call UI.
+ * Do not draw even a pause label here: LVGL now owns the visible pixels. */
+static void plugin_system_event(void *opaque, const gm_plugin_system_event_t *event)
+{
+    game_t *self = opaque;
+    if (event == 0 || event->struct_size < sizeof(*event) ||
+        event->type != GM_PLUGIN_SYSTEM_EVENT_CALL_UI) return;
+    if (self->call_ui_active == event->active) return;
+    self->call_ui_active = event->active;
+    /* Only display ownership changes. Keep loop, input and BT queues alive. */
+    if (!event->active) self->redraw_pending = true;
+}
+
 static gm_plugin_result_t plugin_start(void *opaque)
 {
     game_t *self = opaque;
@@ -2015,6 +2033,12 @@ static gm_plugin_result_t plugin_start(void *opaque)
     self->exit_hold_ms = 0U;
     self->input_active = false;
     self->holding_exit = false;
+    self->call_ui_active = false;
+    self->redraw_pending = false;
+    if (self->system_events != 0) {
+        result = self->system_events->subscribe(plugin_system_event, self);
+        if (result != GM_PLUGIN_OK) return result;
+    }
     if (self->host->log != 0)
         self->host->log("fighter_arena: start %ux%u scale=%u\n",
                         (unsigned int)self->width,
@@ -2035,7 +2059,7 @@ static void plugin_loop(void *opaque, uint32_t elapsed_ms)
 {
     game_t *self = opaque;
     uint32_t now = self->host->monotonic_ms();
-    bool render_needed = false;
+    bool render_needed = self->redraw_pending;
     if (elapsed_ms > MAX_CATCHUP_MS) elapsed_ms = MAX_CATCHUP_MS;
     if (self->holding_exit) {
         self->exit_hold_ms += elapsed_ms;
@@ -2064,7 +2088,8 @@ static void plugin_loop(void *opaque, uint32_t elapsed_ms)
         else
             step_game(self);
     }
-    if (render_needed) (void)render(self);
+    if (render_needed && !self->call_ui_active)
+        self->redraw_pending = render(self) != GM_PLUGIN_OK;
     flush_fight_event(self);
 }
 
@@ -2126,6 +2151,9 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
 static void plugin_stop(void *opaque)
 {
     game_t *self = opaque;
+    if (self->system_events != 0) self->system_events->unsubscribe();
+    self->call_ui_active = false;
+    self->redraw_pending = false;
     self->input = 0U;
     self->pause_reason = PAUSE_NONE;
     self->input_active = false;
@@ -2155,6 +2183,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
     game.host = host;
     if (gm_plugin_libc_get(host, &game.libc) != GM_PLUGIN_OK)
         return GM_PLUGIN_ENOTSUP;
+    (void)gm_plugin_system_events_get(host, &game.system_events);
     game.random_state = UINT32_C(0x4152454E);
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &game;

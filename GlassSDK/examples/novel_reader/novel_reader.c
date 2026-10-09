@@ -1,5 +1,9 @@
+#include "../common/call_ui.h"
+
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_libc.h"
+
+static example_call_ui_t s_call_ui;
 
 #define READER_CHANNEL UINT16_C(0x4E52)
 #define READER_EVENT_CHANNEL UINT16_C(0x4E53)
@@ -52,6 +56,8 @@
 #define WINDOW_GUARD_BYTES 512U
 #define IMAGE_MARKER_BYTES 17U
 #define MAX_IMAGE_TILES 64U
+/* Longer than the phone's 6 s tile-ACK timeout. */
+#define IMAGE_RESTORE_IDLE_MS 8000U
 #define PAGE_TEXT 0U
 #define PAGE_IMAGE 1U
 #define IMAGE_STATUS_OK 0U
@@ -99,6 +105,7 @@ typedef struct {
     uint32_t scroll_elapsed;
     uint32_t page_elapsed;
     uint32_t progress_elapsed;
+    uint32_t image_restore_idle_ms;
     uint32_t notice_elapsed;
     uint32_t exit_elapsed;
     int16_t viewport_width;
@@ -322,6 +329,8 @@ static gm_plugin_result_t draw_image_tile(novel_reader_t *self,
                                           uint16_t stride, bool present)
 {
     gm_plugin_framebuffer_surface_t surface;
+    /* Consume and acknowledge valid tiles while yielding the display. */
+    if (s_call_ui.active) return GM_PLUGIN_OK;
     uint16_t next_y = y;
     uint16_t end_y = (uint16_t)(y + height);
     while (next_y < end_y) {
@@ -651,6 +660,7 @@ static void reset_private_data(novel_reader_t *self)
     self->image_ready = 0U;
     self->displaying_image = 0U;
     self->image_id = 0U;
+    self->image_restore_idle_ms = 0U;
     self->image_tile_count = 0U;
     self->image_next_tile = 0U;
     self->image_next_y = 0U;
@@ -874,6 +884,7 @@ static bool handle_image_begin(novel_reader_t *self, const uint8_t *data,
     self->image_tile_count = tile_count;
     self->image_next_tile = 0U;
     self->image_next_y = 0U;
+    self->image_restore_idle_ms = 0U;
     self->image_receiving = 1U;
     self->image_ready = 0U;
     self->waiting_image = 0U;
@@ -915,6 +926,7 @@ static bool handle_image_tile(novel_reader_t *self, const uint8_t *data,
                           IMAGE_STATUS_DRAW_FAILED, false);
         return false;
     }
+    self->image_restore_idle_ms = 0U;
     self->image_next_tile++;
     self->image_next_y = (uint16_t)(y + height);
     status = IMAGE_STATUS_OK;
@@ -1063,6 +1075,8 @@ static gm_plugin_result_t create_ui(novel_reader_t *self)
 
 static gm_plugin_result_t on_start(void *opaque)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     novel_reader_t *self = opaque;
     self->font_mode = FONT_DEFAULT;
     self->speed = DEFAULT_SPEED;
@@ -1078,6 +1092,27 @@ static gm_plugin_result_t on_start(void *opaque)
 static void on_loop(void *opaque, uint32_t elapsed_ms)
 {
     novel_reader_t *self = opaque;
+    if (!s_call_ui.active && s_call_ui.redraw_pending) {
+        /* Finish acknowledging any in-flight transfer, then request the
+         * current image again. Retry if the existing BT queue is busy. */
+        if (!self->active || !self->connected ||
+            self->page_type[self->current_page] != PAGE_IMAGE) {
+            s_call_ui.redraw_pending = false;
+        } else {
+            if (self->image_receiving) {
+                /* A dropped ACK can make the phone abandon this transfer.
+                 * Do not wait forever for a final tile that will never come. */
+                uint32_t remaining = IMAGE_RESTORE_IDLE_MS - self->image_restore_idle_ms;
+                self->image_restore_idle_ms += elapsed_ms < remaining ? elapsed_ms : remaining;
+                if (self->image_restore_idle_ms == IMAGE_RESTORE_IDLE_MS)
+                    self->image_receiving = 0U;
+            }
+            if (!self->image_receiving) {
+                activate_current_page(self);
+                if (self->waiting_image) s_call_ui.redraw_pending = false;
+            }
+        }
+    }
     if (self->notice_elapsed != 0U) {
         if (elapsed_ms >= self->notice_elapsed) {
             self->notice_elapsed = 0U;
@@ -1223,6 +1258,7 @@ static void on_resume(void *opaque)
 
 static void on_stop(void *opaque)
 {
+    example_call_ui_stop(&s_call_ui);
     novel_reader_t *self = opaque;
     reset_private_data(self);
     self->session = 0U;
@@ -1265,6 +1301,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_ENOTSUP;
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &reader;
+    s_call_ui.host = host;
     plugin->on_start = on_start;
     plugin->on_resume = on_resume;
     plugin->on_loop = on_loop;

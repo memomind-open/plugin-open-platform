@@ -1,4 +1,8 @@
+#include "../common/call_ui.h"
+
 #include "gm_plugin_lvgl_api.h"
+
+static example_call_ui_t s_call_ui;
 
 #define SCREEN_MARGIN 20
 #define PANEL_MAX_WIDTH 360
@@ -55,6 +59,8 @@ static gm_plugin_lvgl_obj_t *create_label(input_t *self,
 
 static gm_plugin_result_t input_start(void *context)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     input_t *self = context;
     gm_plugin_display_info_t display;
     gm_plugin_lvgl_obj_t *host_root = self->ui->root_get();
@@ -154,6 +160,7 @@ static bool input_event(void *context, const gm_plugin_event_t *event)
 
 static void input_stop(void *context)
 {
+    example_call_ui_stop(&s_call_ui);
     input_t *self = context;
     gm_plugin_lvgl_obj_t *host_root = self->ui->root_get();
     if (host_root != 0) self->ui->obj_clean(host_root);
@@ -182,6 +189,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
 
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &input;
+    s_call_ui.host = host;
     plugin->on_start = input_start;
     plugin->on_event = input_event;
     plugin->on_stop = input_stop;

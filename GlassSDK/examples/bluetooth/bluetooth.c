@@ -1,5 +1,9 @@
+#include "../common/call_ui.h"
+
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_libc.h"
+
+static example_call_ui_t s_call_ui;
 
 #define TEXT_CHANNEL 1U
 #define MAX_TEXT_BYTES 1024U
@@ -12,6 +16,8 @@ static gm_plugin_lvgl_obj_t *s_label;
 
 static gm_plugin_result_t bluetooth_start(void *context)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     gm_plugin_display_info_t display;
     gm_plugin_lvgl_obj_t *root;
     (void)context;
@@ -73,6 +79,7 @@ static bool bluetooth_event(void *context, const gm_plugin_event_t *event)
 
 static void bluetooth_stop(void *context)
 {
+    example_call_ui_stop(&s_call_ui);
     (void)context;
     s_label = 0;
     {
@@ -103,6 +110,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
                                       GM_PLUGIN_LVGL_API_MIN_VERSION))
         return GM_PLUGIN_EVERSION;
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
+    s_call_ui.host = host;
     plugin->on_start = bluetooth_start;
     plugin->on_event = bluetooth_event;
     plugin->on_stop = bluetooth_stop;
