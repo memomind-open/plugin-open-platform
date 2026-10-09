@@ -1,35 +1,35 @@
 ---
 name: memomind-business-protocol
-description: 实现或核对 MemoMind 独立蓝牙客户端、GM 业务报文、HUD、音频和 HOGP 接入。用于公开业务协议与跨端消息联调，不用于可执行 GMP 安装传输协议。
+description: Implement or verify MemoMind independent Bluetooth clients, GM business messages, HUD, audio, and HOGP integration. Use for public business protocols and cross-platform messaging, not executable GMP installation transport.
 ---
 
-# 公开业务协议
+# Public business protocols
 
-先区分请求使用原生蓝牙客户端、H5 Bridge 还是 GlassSDK Host API。它们的能力与权限不同，不能用某层文档推断另一层已经提供对应接口。
+First determine whether the request uses a native Bluetooth client, the H5 Bridge, or the GlassSDK Host API. Their capabilities and permissions differ; documentation for one layer does not establish that another exposes the same interface.
 
-从 [Bluetooth developer guide](../../../GlassSDK/docs/BLUETOOTH_DEVELOPER_GUIDE.md) 入手，按任务读取：
+Start with the [Bluetooth developer guide](../../../GlassSDK/docs/BLUETOOTH_DEVELOPER_GUIDE.md), then read the relevant documents:
 
-| 任务 | 文档 |
+| Task | Documentation |
 | --- | --- |
-| GM framing、TLV、长度和 checksum | [PROTOCOL](../../../GlassSDK/docs/PROTOCOL.md)、[WIRE_EXAMPLES](../../../GlassSDK/docs/WIRE_EXAMPLES.md) |
-| 独立客户端完整 HOGP 流程 | [HOGP_QUICKSTART](../../../GlassSDK/docs/HOGP_QUICKSTART.md)、[BLE_ACCESSORY_PROTOCOL](../../../GlassSDK/docs/BLE_ACCESSORY_PROTOCOL.md) |
-| HUD 文字、图形与位图 | [HUD_PROTOCOL](../../../GlassSDK/docs/HUD_PROTOCOL.md) |
-| 麦克风 Opus / HFP 播放 | [AUDIO_PROTOCOL](../../../GlassSDK/docs/AUDIO_PROTOCOL.md) |
-| 设备状态与显示控制 | [DEVICE_BUSINESS_PROTOCOL](../../../GlassSDK/docs/DEVICE_BUSINESS_PROTOCOL.md) |
-| H5 与眼镜插件业务消息 | [application messaging](../../../PhoneSDK/docs/web-plugin/application-messaging.md)、[PROTOCOL_COMPATIBILITY](../../../GlassSDK/docs/PROTOCOL_COMPATIBILITY.md) |
+| GM framing, TLVs, lengths, and checksums | [PROTOCOL](../../../GlassSDK/docs/PROTOCOL.md), [WIRE_EXAMPLES](../../../GlassSDK/docs/WIRE_EXAMPLES.md) |
+| Complete HOGP workflow for an independent client | [HOGP_QUICKSTART](../../../GlassSDK/docs/HOGP_QUICKSTART.md), [BLE_ACCESSORY_PROTOCOL](../../../GlassSDK/docs/BLE_ACCESSORY_PROTOCOL.md) |
+| HUD text, graphics, and bitmaps | [HUD_PROTOCOL](../../../GlassSDK/docs/HUD_PROTOCOL.md) |
+| Microphone Opus capture and HFP playback | [AUDIO_PROTOCOL](../../../GlassSDK/docs/AUDIO_PROTOCOL.md) |
+| Device state and display control | [DEVICE_BUSINESS_PROTOCOL](../../../GlassSDK/docs/DEVICE_BUSINESS_PROTOCOL.md) |
+| H5-to-glasses plugin business messages | [application messaging](../../../PhoneSDK/docs/web-plugin/application-messaging.md), [PROTOCOL_COMPATIBILITY](../../../GlassSDK/docs/PROTOCOL_COMPATIBILITY.md) |
 
-## 联调约束
+## Integration constraints
 
-BLE GATT、Classic SPP/iAP2、HFP/SCO 与眼镜到配件的 HOGP 链路分别处理。BLE 连接成功不证明 HFP 音频建立，也不证明固件开放了录音通道。
+Treat BLE GATT, Classic SPP/iAP2, HFP/SCO, and glasses-to-accessory HOGP links separately. A successful BLE connection proves neither that HFP audio is established nor that the firmware exposes a recording channel.
 
-发现服务/特征和真实属性，不能硬编码 attribute handle 或混同文档中的 legacy UUID 表示。先订阅 uplink 再发送，按协商 MTU 与平台写入限制分片；ATT 写完成不是 GM 业务 ACK。
+Discover services, characteristics, and their actual properties. Do not hardcode attribute handles or conflate the documented legacy UUID representations. Subscribe to the uplink before sending, and fragment according to the negotiated MTU and platform write limits. ATT write completion is not a GM business ACK.
 
-按实际协议核对大小端、长度含义、checksum、event ID、响应匹配和异步事件路由。断连时清理半包、pending 请求、HOGP handle 和录音会话；重连重新发现和订阅。
+Check byte order, length semantics, checksums, event IDs, response correlation, and asynchronous event routing against the actual protocol. On disconnection, clear partial frames, pending requests, HOGP handles, and recording sessions. Rediscover and resubscribe after reconnecting.
 
-公开业务载荷、HUD 像素、音频与 HOGP 数据可以按文档实现；可执行 GMP 的安装元数据、传输块、恢复/激活事务不属于公开接入合同。安装使用官方 App，不从私有安装器推导新的公开接口。文档未公开不等于已验证硬件拒绝第三方客户端。
+Public business payloads, HUD pixels, audio, and HOGP data can be implemented from the documentation. Executable GMP installation metadata, transfer blocks, and resume/activation transactions are outside the public integration contract. Use the official App for installation rather than deriving a new public interface from the private installer. A protocol being unpublished does not prove that hardware rejects third-party clients.
 
-## 验证
+## Verification
 
-使用 `GlassSDK/docs/examples/bluetooth_wire.py` 核对参考编解码接口，复算文档示例的每个字节、长度与 checksum。新增解析逻辑验证截断、错误长度、未知类型、分片和断连后的状态清理；利用已有测试框架，不凭空添加必须依赖真实设备的自动测试。
+Use `GlassSDK/docs/examples/bluetooth_wire.py` to check the reference codec interfaces and recalculate every byte, length, and checksum in documented examples. For new parsing logic, verify truncation, invalid lengths, unknown types, fragmentation, and state cleanup after disconnection. Reuse the existing test framework without unnecessarily making automated tests depend on physical devices.
 
-查阅 [PROTOCOL_COVERAGE](../../../GlassSDK/docs/PROTOCOL_COVERAGE.md) 的实现与缺口，注明目标固件版本和实际验证的链路。没有抓包或设备测试时，只报告编解码与模拟结果，不能声称 BLE/HFP 已端到端通过。
+Check implementation coverage and gaps in [PROTOCOL_COVERAGE](../../../GlassSDK/docs/PROTOCOL_COVERAGE.md). State the target firmware version and the links actually verified. Without packet captures or device tests, report only codec and simulation results rather than claiming end-to-end BLE/HFP success.

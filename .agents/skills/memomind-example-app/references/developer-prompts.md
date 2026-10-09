@@ -1,35 +1,35 @@
-# 开发者如何描述需求
+# Describing a development task
 
-在仓库根目录启动 AI 编程工具，先让它读取 `AGENTS.md`；支持技能的工具可直接指定 `$memomind-example-app`。不支持 `$` 调用的工具，要求读取 `.agents/skills/memomind-example-app/SKILL.md` 即可。
+Start the AI coding tool at the repository root and have it read `AGENTS.md`. Tools with skill support can invoke `$memomind-example-app` directly. For tools without `$` invocation, ask them to read `.agents/skills/memomind-example-app/SKILL.md`.
 
-不需要开发者提前选 ABI 或逐个填写协议字段。说明程序在哪里运行、主要交互和验收结果，AI 根据示例提出默认方案并实现。下列请求可直接修改应用名称与业务内容后使用。
+Developers do not need to choose the ABI or fill in every protocol field first. Describe where the application runs, its main interactions, and acceptance criteria; the AI should propose a default approach based on the examples and implement it. Adapt the application names and behavior in the requests below.
 
-## 手机配置、眼镜显示的专注计时器
+## Phone configuration with a glasses focus timer
 
-> 用 $memomind-example-app 开发 focus-timer。手机设置时长，支持开始、暂停、继续和重置；眼镜显示剩余时间与状态。保存设置，重新打开恢复设置，不要求后台继续倒计时。使用已有 web_bridge，在新目录实现，不改原 examples。请交付完整源码、启动命令、配对说明与 MMPKG，测试暂停恢复、结束和重载。
+> Use $memomind-example-app to build focus-timer. Configure the duration on the phone and support start, pause, resume, and reset. Show the remaining time and state on the glasses. Save the selected duration and restore that setting on reopening; background countdown is not required. Use the existing web_bridge and create a new directory while preserving the original examples. Deliver complete source, preview commands, pairing instructions, and an MMPKG. Test pause/resume, completion, and reload.
 
-预期路线：Web 最小工程→状态机与 storage→文字绘制→订阅/定时器清理→Browser Studio→MMPKG。注意计时以时间差计算，不能把定时器触发次数直接当精确时钟；暂停或非前台时行为按需求定义。
+Expected route: Web starter, state machine and storage, text rendering, subscription/timer cleanup, Browser Studio, then MMPKG. Calculate elapsed time from timestamps rather than treating timer callback counts as an accurate clock. Define paused and non-foreground behavior according to the request.
 
-## 独立眼镜小游戏
+## Standalone glasses game
 
-> 用 $memomind-example-app 开发一个眼镜端接球小游戏。参考 breakout 的输入与生命周期，左右转头移动挡板，单击开始/暂停，双击退出，显示得分与重新开始。程序在眼镜独立运行，不需要手机页面。创建新目录和 ID，保留电话 UI 避让。交付源码、GMP、构建和 Studio 操作步骤，说明未做的真机验证。
+> Use $memomind-example-app to build a glasses-only catch game. Refer to breakout for input and lifecycle handling. Turn the head left/right to move the paddle, single-click to start/pause, and double-click to exit. Show the score and support restarting. Run independently on the glasses without a phone page. Create a new directory and identity, and preserve telephone-UI yielding. Deliver source, GMP, build commands, and Studio instructions, with unperformed physical-device checks identified.
 
-预期路线：Glass 游戏参考→输入与非阻塞状态机→按动态屏幕尺寸布局→绘制/电话 UI 策略→单例构建→Desktop Studio。游戏资源与屏幕尺寸不能直接照搬原例子的固定假设。
+Expected route: native game reference, input and nonblocking state machine, layout based on runtime display dimensions, drawing/call-UI policy, targeted build, then Desktop Studio. Do not blindly copy a reference game's fixed asset or display-size assumptions.
 
-## 手机控制眼镜原生程序
+## Phone control of a native glasses application
 
-> 用 $memomind-example-app 开发一个双端遥控演示。手机左右按钮移动眼镜中的方块，眼镜回复位置并显示在手机。参考 fighter-controller 的状态同步思路，使用更简单的自定义协议。支持松手复位、断连和重连，不复用原程序身份。请同时实现两端、说明消息字段与配对 manifest，并交付各自包和 Desktop Studio 联调步骤。
+> Use $memomind-example-app to build a paired remote-control demo. Phone left/right buttons move a square on the glasses, and the glasses reply with the position to display on the phone. Use fighter-controller's state-synchronization approach with a simpler custom protocol. Support input release, disconnection, and reconnection, and use new application identities. Implement both plugins, document message fields and pairing manifests, and deliver their packages and Desktop Studio integration steps.
 
-预期路线：专用 Web/Glass 目录→短消息表→发送/接收权限与配对→双方编解码→失效输入复位→Desktop Studio。不能用 Browser Studio 模拟回复宣称 GMP 已通过。
+Expected route: dedicated Web/Glass directories, a short message specification, send/receive permissions and pairing, codecs on both sides, stale-input reset, then Desktop Studio. Simulated Browser Studio replies do not establish that the GMP has passed integration tests.
 
-## 简化阅读器
+## Simplified reader
 
-> 用 $memomind-example-app 开发一个 TXT 阅读器，参考 novel-reader，仅支持用户选择 UTF-8 TXT、眼镜分页、书签和恢复阅读位置，不做 EPUB 或插图。在新目录实现，保留有界读取与文件权限模型。请交付两端源码、包与验证步骤，说明哪些文件持久化行为需要 App 真机检查。
+> Use $memomind-example-app to build a TXT reader based on novel-reader. Support only user-selected UTF-8 TXT files, glasses pagination, bookmarks, and reading-position restoration; omit EPUB and illustrations. Implement it in new directories while preserving bounded reads and the file-permission model. Deliver both plugins' source, packages, and verification steps, and identify file-persistence behavior that still requires testing in the App on a physical device.
 
-预期路线：沿用 Host files/storage→有界文本窗口→眼镜排版/翻页→进度与清理→专用 GMP 配对。减小业务范围，但不能改成整本书驻留 RAM、缓存短期票据或裸文件 URL。
+Expected route: Host files/storage, bounded text windows, glasses layout/page turns, progress and cleanup, then dedicated GMP pairing. A smaller feature scope must not introduce whole-book RAM storage, cached short-lived tickets, or raw file URLs.
 
-## 完成后继续迭代
+## Continuing after the first delivery
 
-可以继续描述可观察的问题，例如“倒计时字体太小”“断连后按钮还显示成功”“双击退出后再次打开状态错误”。让 AI 在既有程序上复现、修改并执行对应验证，不重新生成目录或只给建议。
+Describe observable issues such as "the countdown text is too small," "the button still reports success after disconnection," or "reopening after double-click exit restores the wrong state." Have the AI reproduce, edit, and verify the existing application rather than regenerating its directory or only providing advice.
 
-交付时应能直接定位业务状态、绘制、协议、manifest 和启动命令。如果运行依赖、API 或设备缺失，AI 应完成能独立完成的部分并指出具体阻塞，不能把占位 UI 算完整程序。
+The handoff should make application state, rendering, protocol code, the manifest, and startup commands easy to find. If a dependency, API, or device is unavailable, the AI should complete the independent work and identify the specific blocker rather than treating a placeholder UI as a complete application.

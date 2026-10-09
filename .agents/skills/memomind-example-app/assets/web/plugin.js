@@ -28,7 +28,7 @@ buttons[0].addEventListener('click', () => perform(async () => {
   await gm.storage.set(storageKey, next);
   count = next;
   countOutput.textContent = String(count);
-  status.textContent = '已保存；重新加载可恢复计数。';
+  status.textContent = 'Saved. Reload to restore the count.';
 }));
 
 buttons[1].addEventListener('click', () => perform(async () => {
@@ -37,7 +37,7 @@ buttons[1].addEventListener('click', () => perform(async () => {
     id: 1, x: 20, y: 20, width: 300, height: 60,
     border: 1, radius: 8, text: `Count: ${count}`,
   });
-  status.textContent = '宿主已确认文字指令，请查看虚拟屏或眼镜。';
+  status.textContent = 'The host confirmed the text command. Check the virtual display or glasses.';
 }));
 
 async function start() {
@@ -47,10 +47,10 @@ async function start() {
     const saved = await gm.storage.get(storageKey);
     count = Number.isSafeInteger(saved.value) && saved.value >= 0 ? saved.value : 0;
     countOutput.textContent = String(count);
-    status.textContent = '宿主已连接，可以开始操作。';
+    status.textContent = 'Connected to the host. Ready to use.';
     setBusy(false);
   } catch (error) {
-    status.textContent = `${error.code || 'ERROR'}: ${error.message || String(error)}；请检查宿主与权限后重新加载。`;
+    status.textContent = `${error.code || 'ERROR'}: ${error.message || String(error)}. Check the host and permissions, then reload.`;
   }
 }
 

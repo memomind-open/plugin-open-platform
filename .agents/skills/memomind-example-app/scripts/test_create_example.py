@@ -53,7 +53,7 @@ class StarterTests(unittest.TestCase):
             env=environment, capture_output=True, text=True, encoding='utf-8',
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('正在连接宿主', (target / 'index.html').read_text(encoding='utf-8'))
+        self.assertIn('Connecting to the host', (target / 'index.html').read_text(encoding='utf-8'))
         self.assertIn('createGMPlugin', (target / 'vendor/gm-plugin-web-sdk.esm.js').read_text(encoding='utf-8'))
 
     def test_existing_directory_and_user_files_are_preserved(self):

@@ -1,36 +1,36 @@
 ---
 name: memomind-plugin-delivery
-description: 构建、打包和检查 MemoMind Web/Glass 插件、审核附件、DevKit 与公开 SDK 分发产物。用于 .mmpkg/.gmp 或 Studio 交付准备，不包含未授权提交、发布或私有 Desktop Studio 编译。
+description: Build, package, and check MemoMind Web/Glass plugins, review attachments, DevKit bundles, and public SDK distribution artifacts. Use for .mmpkg/.gmp or Studio delivery preparation; it does not authorize commits, publication, or private Desktop Studio builds.
 ---
 
-# 构建与交付
+# Build and delivery
 
-先明确交付的是 Web `.mmpkg`、Glass `.gmp`、DevKit ZIP 还是 Studio 导出的组合应用 ZIP；核对源文件、manifest、版本与用户要求的范围。文档路径相对本文件，构建命令的目录如下。
+First identify the deliverable: a Web `.mmpkg`, Glass `.gmp`, DevKit ZIP, or combined application ZIP exported by Studio. Check sources, manifests, versions, and the requested scope. Document paths are relative to this file; working directories for build commands are stated below.
 
-新程序的源目录、dist、预览参数和常见错误见 [应用运行与验证](../memomind-example-app/references/run-and-verify.md)。PhoneSDK `build.py` 没有单项目筛选参数；新程序交付优先直接构建该工程并调用 packager，避免重写无关分发包。
+For new applications, see [running and verification](../memomind-example-app/references/run-and-verify.md) for source directories, dist output, preview arguments, and common errors. PhoneSDK `build.py` has no single-project filter. Prefer building the new project directly and invoking the packager to avoid rewriting unrelated distribution packages.
 
-## 构建入口
+## Build entry points
 
-- 仓库根：`python3 build.py --help` 查看参数，`python3 build.py web` / `python3 build.py glass` 选择端；只有需要全量交付时才使用全量构建。
-- `GlassSDK/`：`python3 build.py build --example <relative-path>` 构建单插件；独立工程使用 `--project`，细节见 [GlassSDK README](../../../GlassSDK/README.md)。首次构建可能下载锁定工具链，不替换其版本/校验来绕过问题。
-- `PhoneSDK/`：`python3 build.py --help` 查看发现、构建及输出参数。单个 H5 工程先运行自己的构建，再用 `npm run pack:plugin -- /absolute/plugin/dist /absolute/release/plugin.mmpkg` 打包，输出不能位于输入目录中。静态示例的输入应是其实际部署目录。
+- Repository root: run `python3 build.py --help` for options. Select a platform with `python3 build.py web` or `python3 build.py glass`; use a full build only when the delivery needs it.
+- `GlassSDK/`: build one plugin with `python3 build.py build --example <relative-path>`. Use `--project` for an independent project; see the [GlassSDK README](../../../GlassSDK/README.md). The first build may download a pinned toolchain; do not replace its version or checksum to bypass failures.
+- `PhoneSDK/`: use `python3 build.py --help` for discovery, build, and output behavior. For a single H5 project, run its own build first, then package it with `npm run pack:plugin -- /absolute/plugin/dist /absolute/release/plugin.mmpkg`. The output must be outside the input directory. For static examples, use their actual deployable directory as input.
 
-## 包与审核附件
+## Packages and review attachments
 
-Web 打包规则见 [package format](../../../PhoneSDK/docs/web-plugin/package-format.md)：manifest、entry、权限和文件哈希须与最终输出一致；不手改压缩包、hash 或 signature 来掩盖验证失败。
+Web packaging rules are in [package format](../../../PhoneSDK/docs/web-plugin/package-format.md). The manifest, entry point, permissions, and file hashes must match the final output. Do not manually edit archives, hashes, or signatures to hide validation failures.
 
-Glass 构建生成 `.gmp`、`.review.json`、`.review-source.enc`，必须保持同次构建的一组产物。读 [REVIEW_PACKAGES](../../../GlassSDK/docs/REVIEW_PACKAGES.md)：Studio 使用已生成附件，不重新收集当前工作区；修改源码/依赖后先重新构建。外部依赖须满足 SDK/toolchain/source root 的收集边界，不静默漏掉构建输入。
+Glass builds produce `.gmp`, `.review.json`, and `.review-source.enc`; keep the matching set from the same build. Read [REVIEW_PACKAGES](../../../GlassSDK/docs/REVIEW_PACKAGES.md): Studio uses existing attachments rather than collecting the current working tree again. Rebuild after changing sources or dependencies. External dependencies must satisfy the SDK/toolchain/source-root collection boundaries rather than silently disappearing from the captured inputs.
 
-公开分发使用公钥加密审核源码，不复制私钥或内部审核工具到公开仓库。加密、CRC、hash 或重建通过不等于审核通过、签名可信或 native 内存沙箱。
+Public distribution encrypts review sources with a public key. Do not copy private keys or internal reviewer tools into the public repository. Encryption, CRCs, hashes, or successful rebuilds do not establish review approval, trusted signing, or a native memory sandbox.
 
-DevKit 见 [devkit ZIP](../../../PhoneSDK/docs/web-plugin/devkit-zip.md)，对应命令为 `PhoneSDK/` 的 `npm run build:devkit`。检查实际 ZIP 内容及引用文件，不顺带修改发布版本或其他包。
+For DevKit, read [devkit ZIP](../../../PhoneSDK/docs/web-plugin/devkit-zip.md) and run `npm run build:devkit` from `PhoneSDK/`. Inspect actual ZIP contents and referenced files without incidentally changing release versions or other packages.
 
-## 预览与交付证据
+## Preview and delivery evidence
 
-读 [Studio README](../../../Studio/README.md)、[INSTALLATION](../../../GlassSDK/docs/INSTALLATION.md) 与 [LAN install](../../../PhoneSDK/docs/web-plugin/lan-install.md)。Desktop Studio 可导入 GMP/MMPKG/组合 ZIP，Browser Studio 仅模拟 Web Bridge。保持 SDK 与 Studio 布局及插件扫描深度约定。
+Read the [Studio README](../../../Studio/README.md), [INSTALLATION](../../../GlassSDK/docs/INSTALLATION.md), and [LAN install](../../../PhoneSDK/docs/web-plugin/lan-install.md). Desktop Studio imports GMP, MMPKG, and combined ZIP packages; Browser Studio simulates only the Web Bridge. Preserve the SDK/Studio layout and plugin discovery depth conventions.
 
-构建会写入部分已跟踪分发目录。构建前后比较 git status，核对本次生成的包和附件，不覆盖用户已有改动，不顺带替换 Studio EXE/安装包。需要私有 Desktop Studio 源码才能完成的工作，说明缺失依赖和可完成部分。
+Builds write to some tracked distribution directories. Compare git status before and after building and check the packages and attachments generated for this task. Preserve existing user changes and avoid incidental replacement of Studio executables/installers. When a task requires private Desktop Studio source, state the missing dependency and complete the independent work that is possible.
 
-按任务执行定向测试；公共 PhoneSDK 变更用 `npm run verify`，Glass 打包/ABI 改动选择相关 `tests/`。仅编辑技能文档时验证技能结构、文档链接和 diff 即可，不全量重建 SDK。
+Run targeted tests appropriate to the task. Public PhoneSDK changes use `npm run verify`; Glass packaging/ABI changes use relevant `tests/`. For skill-documentation-only edits, validate skill structure, document links, and the diff without rebuilding the entire SDK.
 
-最终给出包路径、对应源版本/工作区状态、已执行检查、模拟器/真机结果及待验证项。未部署不写已发布，未真机验证不写硬件通过；签名、线上送审和市场分发支持以当前文档与实现为准，不从规划推断已实现。
+Report package paths, corresponding source revision/working-tree state, checks actually run, simulator/device results, and unverified items. Do not report publication without deployment or hardware success without physical-device verification. Determine signing, online review, and marketplace support from current documentation and implementation rather than treating plans as shipped capabilities.

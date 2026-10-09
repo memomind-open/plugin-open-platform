@@ -1,45 +1,45 @@
 ---
 name: memomind-example-app
-description: 根据开发者需求，从 MemoMind examples 开始完成可运行的新插件或双端应用，包括示例选型、最小工程、业务实现、配对、预览和打包。用于计时器、游戏、阅读器、桌面、宠物等类似示例的程序开发。
+description: Build runnable MemoMind plugins or paired applications from developer requirements and existing examples, including example selection, project creation, implementation, pairing, preview, and packaging. Use for timers, games, readers, dashboards, pets, and similar example-based applications.
 ---
 
-# 从需求到可运行的示例应用
+# From a requirement to a runnable application
 
-此技能负责应用开发全程。先读仓库根 `AGENTS.md`，根据 [示例选型与开发路线](references/example-recipes.md) 选实现方式，再按实际涉及的端读取 [Glass 技能](../memomind-glass-plugin/SKILL.md) / [Web 技能](../memomind-web-plugin/SKILL.md)；普通 H5 插件不需要先学习原始 GM 蓝牙封包。
+Use this skill for the complete application workflow. Read the root `AGENTS.md`, choose an approach using [example selection and development recipes](references/example-recipes.md), then load the relevant [Glass skill](../memomind-glass-plugin/SKILL.md) or [Web skill](../memomind-web-plugin/SKILL.md). Ordinary H5 plugins do not require learning raw GM Bluetooth framing first.
 
-开发者可直接使用 [需求示例](references/developer-prompts.md) 中的计时器、小游戏、遥控和阅读器请求。
+Developers can adapt the timer, game, controller, and reader requests in [sample task prompts](references/developer-prompts.md).
 
-## 开始与默认选择
+## Starting point and defaults
 
-把需求整理成应用位置（手机/眼镜/双端）、主要交互、数据来源、持久化需求和可观察验收。用户未指定时，优先沿用最接近的示例架构，说明选择并直接实现；只有会改变核心体验或需要缺失的外部接口时再询问。
+Translate the request into where the application runs (phone, glasses, or both), its main interactions, data sources, persistence requirements, and observable acceptance criteria. When unspecified, follow the architecture of the closest example, explain the choice, and implement it. Ask only when a missing decision changes the core experience or an external interface is required but unavailable.
 
-- 眼镜独立运行、本地游戏或原生高效绘制：Glass 插件。
-- 手机拥有状态，眼镜显示文字/Canvas 与输入：Web 插件 + 现有 `web_bridge`，通常无需新写 GMP。
-- 两端有专用状态/流协议：Web + 专用 Glass 配对，先定义消息再实现。
-- 仅手机功能：Web 插件，删去不需要的 deviceRequirements 和权限，不凭空要求眼镜。
+- Independent glasses execution, local games, or efficient native rendering: a Glass plugin.
+- Phone-owned state with text/Canvas rendering and input on the glasses: a Web plugin with the existing `web_bridge`; a new GMP is usually unnecessary.
+- A dedicated state or streaming protocol between the two platforms: a Web plugin paired with a dedicated Glass plugin; define the messages before implementation.
+- Phone-only functionality: a Web plugin with unnecessary device requirements and permissions removed; do not introduce a glasses dependency.
 
-开发新程序时创建新目录与独立 ID，不覆盖参考示例；修改现有 example 的请求按原目录实现，不强制复制。最小工程使用本技能工具：从仓库根运行
+For a new application, create a new directory and independent identity while preserving the reference example. For a request to modify an existing example, work in that directory without forcing a copy. To generate a minimal project, run this tool from the repository root:
 
 ```sh
 python3 .agents/skills/memomind-example-app/scripts/create_example.py \
   --kind web --name focus-timer --id com.example.focus-timer --title "Focus Timer"
-# 原生 LVGL 最小工程：把 web 改为 glass，使用独立目录名和 ID。
+# For a native LVGL starter, use glass instead of web and choose its own name and ID.
 ```
 
-工具拒绝覆盖已有目录；Web 工程捆绑当前本地 SDK，Glass 工程使用当前 lvgl_ui 并复制电话 UI 共享头文件。它只生成可运行起点，**不会生成需求中的完整业务**。需要复杂例子的资产/协议时按路线读取并移植，不把完整巨型例子当空白模板。
+The tool refuses to overwrite an existing directory. Web projects bundle the current local SDK; Glass projects use the current lvgl_ui example and copy its shared call-UI header. It creates a runnable starting point, **not the complete requested application**. For complex assets or protocols, read and adapt the relevant example rather than using a large application as an empty template.
 
-## 完成实现
+## Completing the implementation
 
-1. 先让最小页面/原生 UI 跑通一次，再增加状态、交互和真实数据。沿用当前公开 API，不重新手写 Bridge handshake，不把显示在手机 DOM 的效果算成眼镜显示完成。
-2. 新身份更新 manifest、页面标题、状态存储键及必要的包元数据。复制例子时检查相对 include/import、vendored SDK、资源路径与设备配对 ID；不要全局替换原例子字符串或虚报仍未实现的协议能力。
-3. 跨端开发按 [双端协议与联调](references/paired-app.md) 同时核对双方；标准 display/device API 沿用已有 Web Bridge 协议。
-4. 移植所需功能，删掉新工程中不用的权限、远端域名、音频/图像资产和 UI；保留源示例本身。网络与存储失败显示真实错误，用户取消、拒权和断连可恢复。不要把演示数据写成真实结果。
-5. 业务逻辑先做定向验证，再预览和打包；用户要求做程序时交付实现与可运行包，不停在设计或提示词。不要为了新应用顺带修改 SDK ABI、私有 Studio 或其他示例。
+1. Get the minimal page or native UI running once, then add state, interactions, and real data. Use current public APIs without reimplementing the Bridge handshake. A result displayed only in the phone DOM does not establish that glasses rendering works.
+2. Update the new identity in the manifest, page title, storage keys, and relevant package metadata. When copying an example, check relative includes/imports, the vendored SDK, asset paths, and device pairing IDs. Avoid global string replacements or claiming protocol capabilities that are not implemented.
+3. For paired applications, check both implementations using [paired protocols and integration](references/paired-app.md). Standard display/device APIs reuse the existing Web Bridge protocols.
+4. Adapt the required features and remove unused permissions, remote domains, audio/image assets, and UI from the new project. Preserve the source example. Show real network and storage failures, and make cancellation, permission denial, and disconnection recoverable. Do not present demonstration data as real results.
+5. Verify business logic with targeted checks, then preview and package the application. A request to build a program calls for code and a runnable package, not just a design or prompt. Avoid incidental changes to the SDK ABI, private Studio, or unrelated examples.
 
-生成器回归检查：从仓库根运行 `python3 .agents/skills/memomind-example-app/scripts/test_create_example.py`，覆盖真实 Web 打包、覆盖拒绝、SDK 单项目刷新与 Glass 头文件可编译性；它不替代应用业务验收。
+Generator regression checks: run `python3 .agents/skills/memomind-example-app/scripts/test_create_example.py` from the repository root. They cover real Web packaging, overwrite refusal, per-project SDK refresh, and Glass header compilation; application behavior still needs its own acceptance checks.
 
-## 验收与交接
+## Acceptance and handoff
 
-按 [运行、测试与排错](references/run-and-verify.md) 使用对应目录命令，区分源目录与构建 dist、Browser Studio 与 Desktop Studio。检查 manifest 与模块/资源都在最终包内。
+Follow [running, testing, and troubleshooting](references/run-and-verify.md) for commands in the correct directory. Distinguish source directories from built dist output and Browser Studio from Desktop Studio. Confirm that the manifest, modules, and assets are present in the final package.
 
-给开发者新目录、启动命令、应选择的 GMP（如有）、包路径、已检查结果与待真机项目。附一段该应用如何继续改动的简短说明，例如业务状态、绘制、协议各在哪个文件；不要求开发者重新读完整 SDK 手册才能启动。
+Give the developer the new directory, startup commands, the GMP to select (if applicable), package paths, completed checks, and outstanding device checks. Briefly identify where to modify application state, rendering, and protocol handling so the developer can run and extend the application without rereading the entire SDK manual.

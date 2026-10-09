@@ -1,23 +1,23 @@
-# 运行、测试与排错
+# Running, testing, and troubleshooting
 
-以下示例命令从仓库根执行；替换 `<name>` 为真实目录名后给开发者可直接执行的命令。
+Run the following commands from the repository root. Replace `<name>` with the actual directory name before giving executable commands to the developer.
 
-Windows PowerShell 将 `python3` 换成 `py`；包含空格的路径加引号。生成工具需要 Python 3.8+，Web 生成/刷新还需要 PhoneSDK 支持的 Node 18+，无需先安装 npm 依赖。
+In Windows PowerShell, replace `python3` with `py` and quote paths containing spaces. The generator requires Python 3.8+; Web creation/SDK refresh also requires PhoneSDK's supported Node 18+. No npm dependency installation is required for generation.
 
-## Web 静态工程
+## Static Web projects
 
 ```sh
 node PhoneSDK/tools/run-browser-studio.mjs --plugin examples/<name> --port 4173
 node PhoneSDK/tools/build-mmpkg.mjs PhoneSDK/examples/<name> PhoneSDK/dist/<name>.mmpkg
 ```
 
-注意 launcher 的相对 `--plugin` 路径按 PhoneSDK 根解析，packager 的位置参数按命令的当前目录解析；不要把 launcher 参数误写成 `PhoneSDK/examples/<name>`。端口占用用 `--port 4174`，不要杀不相关进程。
+The launcher's relative `--plugin` path is resolved from the PhoneSDK root; packager positional paths are resolved from the command's working directory. Do not pass `PhoneSDK/examples/<name>` to the launcher. If the port is occupied, use `--port 4174` instead of terminating unrelated processes.
 
-打开 launcher 输出的地址，按当前程序需要的权限在宿主授权对话框中勾选并启动；必需权限未勾选时启动会被拒绝，这不是 Bridge 卡死。运行预览后检查手机页面、虚拟眼镜绘制、错误状态与重载。生成的最小 Web 工程有计数保存和文本同步按钮，不含复杂业务；以它验证 SDK ready、storage 和 display，再替换业务代码。
+Open the address printed by the launcher. Select the permissions needed by the application in the host's consent dialog and start it. Missing required approvals prevent startup; this is not a stuck Bridge. Check the phone page, virtual glasses display, error states, and reload behavior. The generated Web starter saves a counter and provides a text-sync button. Use it to verify SDK ready, storage, and display behavior before replacing the application logic.
 
-## Web Vite 工程
+## Vite Web projects
 
-在新项目目录按其 lockfile 安装依赖，运行实际 package scripts。以 tic-tac-toe 风格为例：
+In the new project directory, install dependencies using its lockfile and run its actual package scripts. For a tic-tac-toe-style project:
 
 ```sh
 npm ci
@@ -25,42 +25,42 @@ npm test
 npm run build
 ```
 
-然后回到仓库根：
+Then return to the repository root:
 
 ```sh
 node PhoneSDK/tools/run-browser-studio.mjs --plugin examples/<name>/dist
 node PhoneSDK/tools/build-mmpkg.mjs PhoneSDK/examples/<name>/dist PhoneSDK/dist/<name>.mmpkg
 ```
 
-Vite 的 public/manifest.json 与静态资产要进入 dist，资源使用相对路径。Vite 自带 dev server 不是 Bridge 宿主；不要仅在普通浏览器看 DOM 就宣布设备 API 已运行。
+The Vite public/manifest.json and static assets must reach dist, with relative resource paths. Vite's own dev server is not a Bridge host; inspecting the DOM in a normal browser does not establish that device APIs work.
 
-## Glass 工程
+## Glass projects
 
 ```sh
 python3 GlassSDK/build.py build --example <name>
 ```
 
-GMP 在 `GlassSDK/build-host/.build/<name>/<name>.gmp`，审核 sidecar 同目录。打开预编译 Desktop Studio、Import workspace 选择仓库根、刷新并选择程序。Studio 对集合目录下的一到三层插件支持扫描；更深目录或独立工程通过 Import package 导入，不以构建可递归推断 Studio 无深度限制。
+The GMP is at `GlassSDK/build-host/.build/<name>/<name>.gmp`, alongside its review sidecars. Open prebuilt Desktop Studio, choose the repository root through Import workspace, refresh, and select the application. Studio scans plugins one to three levels below collection directories. For deeper directories or standalone projects, use Import package; recursive build discovery does not imply unlimited Studio scan depth.
 
-使用本技能生成器的 `--output /tmp/...` 时，采用 `--project /tmp/...` 构建，输出在工程自己的 `.build/`；需要临时输出可通过 GlassSDK `--build-dir` 指定。不要在验证技能时重建并覆盖仓库的全部 GMP。
+When generating with `--output /tmp/...`, build with `--project /tmp/...`; output goes into the project's own `.build/`. GlassSDK `--build-dir` can select a temporary output root. Do not rebuild and overwrite every repository GMP merely to validate a skill.
 
-## 验证范围
+## Verification scope
 
-业务算法、协议编码/解码和生命周期行为使用定向测试；公共 SDK 修改才运行 PhoneSDK `npm run verify`。新增 example 的行为不一定被根测试自动发现，查看 package.json 的 test glob，必要时明确执行新测试路径。
+Use targeted tests for business algorithms, codecs, and lifecycle behavior. Run PhoneSDK `npm run verify` for public SDK changes. Root tests may not automatically discover behavior tests for a new example; inspect the package.json test glob and explicitly run the new test path when necessary.
 
-新 Glass 目录会被 `test_system_native.py` 扫描，它的 C mock 针对现有例子和 flags 编写。新程序若使用额外 Host 能力，核对或扩展 mock 的真实行为，不让通用扫例子测试被新程序破坏，也不能直接跳过新增例子。
+`test_system_native.py` scans new Glass directories, but its C mock targets existing examples and flags. If a new program uses additional Host capabilities, check or extend the mock's actual behavior. Do not let the new program break the example-scanning test or simply skip the new example.
 
-对完成的程序至少核对启动、主要交互、存储恢复（若有）、拒权/不支持、停止/重载、断连与显示恢复（若相关）。布局变化查看手机窄屏和虚拟眼镜内容；光学、录音和 IMU 手感另列真机项目。
+For a completed application, check startup, main interactions, persistence restoration where applicable, denied/unsupported capabilities, stop/reload, disconnection, and display restoration as relevant. For layout changes, inspect a narrow phone viewport and the virtual glasses display. List optics, recording, and IMU feel as separate physical-device checks.
 
-## 常见阻塞的定位
+## Common blockers
 
-| 现象 | 优先核对 |
+| Symptom | Check first |
 | --- | --- |
-| Bridge 一直不 ready | 在 Studio/App 内启动；SDK 用 relative vendor 模块；没有直接打开 index.html 或只开 Vite server |
-| 新程序刷新后看不到 | manifest 在正确目录，目录深度符合 Studio 扫描，构建成功且输出路径匹配；Vite 构建 dist |
-| MMPKG 校验失败 | 打包最终目录，entry 存在，权限对象与 scope 合法，输出不在输入目录，未夹带 node_modules/源码工程 |
-| API 拒绝或 CAPABILITY_UNAVAILABLE | 当前 capability、实际批准权限、scope、宿主支持与会话；用 permission-debug 核对，不改成永远成功 |
-| H5 动了但眼镜不动 | 检查准确 GMP 配对、协议版本/ID、设备连接与发送失败；自定义消息不能只测 Browser Studio |
-| 新 Glass 工程找不到头文件 | shared call_ui/素材路径和当前目录层级，独立工程 source-root/include-dir 边界 |
-| 原生构建栈/RAM 超限 | 大局部数组、VLA、静态缓存、指针表；查看 .su 与链接段，不提高红线 |
-| 录音只有电脑能用 | 确认 Host 音频接口与模拟源；不能拿电脑麦克风模拟结果当眼镜录音通过 |
+| Bridge never becomes ready | Run inside Studio/App with a relative vendor SDK module; do not open index.html directly or use only a Vite server. |
+| New application is missing after refresh | Correct manifest location, supported Studio discovery depth, successful build, and matching output path; build dist for Vite. |
+| MMPKG validation fails | Package the final directory, ensure entry exists, validate permission objects/scopes, keep output outside input, and exclude node_modules/source project trees. |
+| API denial or CAPABILITY_UNAVAILABLE | Current capabilities, actual approvals, scope, host support, and session. Use permission-debug rather than forcing successful responses. |
+| H5 updates but glasses do not | Correct GMP pairing, protocol versions/IDs, device connection, and send errors. Custom messaging requires more than Browser Studio checks. |
+| Headers missing in a new Glass project | Shared call_ui/asset paths, directory depth, and standalone source-root/include-dir boundaries. |
+| Native build exceeds stack/RAM limits | Large local arrays, VLAs, static caches, and pointer tables. Inspect .su files and linked segments rather than raising limits. |
+| Recording works only on a computer | Host audio support and the simulated source. A computer microphone result does not verify glasses recording. |
