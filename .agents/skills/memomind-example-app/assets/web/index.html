@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>MemoMind Starter</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="plugin.js"></script>
+</head>
+<body>
+  <main>
+    <h1>MemoMind Starter</h1>
+    <p>计数：<output id="count">0</output></p>
+    <button id="increment" type="button" disabled>加一并保存</button>
+    <button id="sync" type="button" disabled>同步到眼镜</button>
+    <p id="status" role="status">正在连接宿主…</p>
+  </main>
+</body>
+</html>

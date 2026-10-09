@@ -1,0 +1,5 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; }
+main { max-width: 36rem; padding: 1.5rem; margin: auto; }
+button { padding: .75rem; margin: .25rem 0; font: inherit; }
+#status { overflow-wrap: anywhere; }
