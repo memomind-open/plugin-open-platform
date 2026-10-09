@@ -1,6 +1,10 @@
+#include "../common/call_ui.h"
+
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_libc.h"
 #include "memo_sprites.h"
+
+static example_call_ui_t s_call_ui;
 
 #define PET_STATE_CHANNEL UINT16_C(0x4D50)
 #define BUTTON_CHANNEL UINT16_C(0x0100)
@@ -517,6 +521,7 @@ static void draw_animation(gm_plugin_framebuffer_surface_t *surface,
 
 static gm_plugin_result_t render(pet_t *self)
 {
+    if (s_call_ui.active) return GM_PLUGIN_OK;
     uint16_t next_y = 0;
     while (next_y < self->height) {
         gm_plugin_framebuffer_surface_t surface;
@@ -618,6 +623,8 @@ static bool receive_state(pet_t *self, const uint8_t *data, uint32_t length)
 
 static gm_plugin_result_t on_start(void *opaque)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     pet_t *self = opaque;
     gm_plugin_display_info_t display;
     gm_plugin_result_t result = self->host->display_get_info(&display);
@@ -648,7 +655,7 @@ static gm_plugin_result_t on_start(void *opaque)
 static void on_loop(void *opaque, uint32_t elapsed_ms)
 {
     pet_t *self = opaque;
-    bool render_needed = false;
+    bool render_needed = s_call_ui.redraw_pending && !s_call_ui.active;
     if (elapsed_ms >= 320U - self->frame_accumulator)
         self->frame_accumulator = 320U;
     else
@@ -666,7 +673,8 @@ static void on_loop(void *opaque, uint32_t elapsed_ms)
             }
         }
     }
-    if (render_needed) (void)render(self);
+    if (render_needed && !s_call_ui.active && render(self) == GM_PLUGIN_OK)
+        s_call_ui.redraw_pending = false;
 }
 
 static bool on_event(void *opaque, const gm_plugin_event_t *event)
@@ -706,6 +714,7 @@ static void on_resume(void *opaque)
 
 static void on_stop(void *opaque)
 {
+    example_call_ui_stop(&s_call_ui);
     pet_t *self = opaque;
     if (self->root != 0) self->ui->obj_clean(self->root);
     self->root = 0;
@@ -738,6 +747,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_ENOTSUP;
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &s_pet;
+    s_call_ui.host = host;
     plugin->on_start = on_start;
     plugin->on_resume = on_resume;
     plugin->on_loop = on_loop;

@@ -1,6 +1,10 @@
+#include "../common/call_ui.h"
+
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_extensions.h"
 #include "gm_plugin_libc.h"
+
+static example_call_ui_t s_call_ui;
 
 #define WEB_BRIDGE_MAX_ELEMENTS 16U
 #define WEB_BRIDGE_PROTOCOL_VERSION 1U
@@ -400,6 +404,10 @@ static gm_plugin_result_t draw_bitmap(web_bridge_context_t *self,
         (uint32_t)destination.y + destination.height > display.height)
         return GM_PLUGIN_EINVAL;
 
+    /* Keep frame validation, ordering and BT acknowledgements running.
+     * The next phone frame supplies fresh pixels after the call UI closes. */
+    if (s_call_ui.active ||
+        (self->frame_active && s_call_ui.redraw_pending)) return GM_PLUGIN_OK;
     next_y = (uint16_t)destination.y;
     end_y = (uint16_t)(destination.y + destination.height);
     while (next_y < end_y) {
@@ -555,6 +563,10 @@ static void handle_frame_begin(web_bridge_context_t *self,
             self->frame_next_tile = 0;
             self->frame_elapsed_ms = 0;
             self->frame_active = true;
+            /* Once a call interrupts a frame, consume its remaining tiles
+             * without presenting a partial image. Only a fresh frame begun
+             * after the call may draw again. No extra framebuffer is needed. */
+            s_call_ui.redraw_pending = s_call_ui.active;
         }
     }
     (void)send_frame_status(self, frame_id, UINT16_MAX,
@@ -738,6 +750,8 @@ static bool is_firmware_direction_gesture(gm_plugin_imu_gesture_t gesture)
 
 static gm_plugin_result_t web_bridge_start(void *opaque)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     web_bridge_context_t *self = opaque;
     gm_plugin_imu_modes_t imu_modes = GM_PLUGIN_IMU_ENABLE_GESTURES;
     gm_plugin_result_t result;
@@ -895,6 +909,7 @@ static bool web_bridge_event(void *opaque, const gm_plugin_event_t *event)
 
 static void web_bridge_stop(void *opaque)
 {
+    example_call_ui_stop(&s_call_ui);
     web_bridge_context_t *self = opaque;
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
     clear_scene(self);
@@ -952,6 +967,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
 
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &context;
+    s_call_ui.host = host;
     plugin->on_start = web_bridge_start;
     plugin->on_loop = web_bridge_loop;
     plugin->on_event = web_bridge_event;

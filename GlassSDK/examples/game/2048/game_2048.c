@@ -1,5 +1,9 @@
+#include "../../common/call_ui.h"
+
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_libc.h"
+
+static example_call_ui_t s_call_ui;
 
 #define BOARD_SIZE 4U
 #define CELL_COUNT (BOARD_SIZE * BOARD_SIZE)
@@ -351,6 +355,8 @@ static gm_plugin_result_t create_ui(game_2048_t *self)
 
 static gm_plugin_result_t plugin_start(void *opaque)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     game_2048_t *self = opaque;
     gm_plugin_result_t result = create_ui(self);
     if (result == GM_PLUGIN_OK) reset_game(self);
@@ -398,6 +404,7 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
 
 static void plugin_stop(void *opaque)
 {
+    example_call_ui_stop(&s_call_ui);
     game_2048_t *self = opaque;
     self->ui->obj_clean(self->ui->root_get());
 }
@@ -428,6 +435,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
     game.random_state = UINT32_C(0x32303438);
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &game;
+    s_call_ui.host = host;
     plugin->on_start = plugin_start;
     plugin->on_event = plugin_event;
     plugin->on_stop = plugin_stop;

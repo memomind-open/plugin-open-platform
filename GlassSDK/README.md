@@ -215,6 +215,7 @@ included in the published SDK.
 | Document | Purpose |
 | --- | --- |
 | [INSTALLATION.md](docs/INSTALLATION.md) | Install, start, stop, replace, and remove `.gmp` packages |
+| [SYSTEM_EVENTS.md](docs/SYSTEM_EVENTS.md) | Optional call UI notifications and developer-owned framebuffer yielding |
 | [ABI.md](docs/ABI.md) | ABI compatibility, lifecycle, callbacks, memory, and Host services |
 | [GRAPHICS.md](docs/GRAPHICS.md) | Shared LVGL and direct framebuffer rendering |
 | [SECURITY.md](docs/SECURITY.md) | Package integrity, trust, and isolation limits |

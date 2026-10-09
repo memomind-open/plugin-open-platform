@@ -1,7 +1,11 @@
+#include "../../common/call_ui.h"
+
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_libc.h"
 #include "gm_plugin_input.h"
 #include "breakout_translations.h"
+
+static example_call_ui_t s_call_ui;
 
 #define COLS 15
 #define ROWS 3
@@ -850,6 +854,8 @@ static gm_plugin_result_t on_load(void *opaque)
 
 static gm_plugin_result_t on_start(void *opaque)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     breakout_t *self = opaque;
     gm_plugin_result_t result;
     gm_plugin_display_info_t display;
@@ -1001,6 +1007,7 @@ static void on_resume(void *opaque)
 
 static void on_stop(void *opaque)
 {
+    example_call_ui_stop(&s_call_ui);
     breakout_t *self = opaque;
     self->touch_axes = 0;
     self->input_active = 0;
@@ -1039,6 +1046,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &game;
     plugin->on_load = on_load;
+    s_call_ui.host = host;
     plugin->on_start = on_start;
     plugin->on_resume = on_resume;
     plugin->on_loop = on_loop;

@@ -1,5 +1,9 @@
+#include "../common/call_ui.h"
+
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_libc.h"
+
+static example_call_ui_t s_call_ui;
 
 #define CONTROL_COMMAND_CHANNEL UINT16_C(0x4443)
 #define CONTROL_STATE_CHANNEL UINT16_C(0x4444)
@@ -481,6 +485,8 @@ static bool receive_command(display_lab_t *self,
 
 static gm_plugin_result_t on_start(void *context)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     display_lab_t *self = context;
     char locale[GM_PLUGIN_LOCALE_TAG_MAX] = {0};
     gm_plugin_result_t result;
@@ -596,6 +602,7 @@ static void on_loop(void *context, uint32_t elapsed_ms)
 
 static void on_stop(void *context)
 {
+    example_call_ui_stop(&s_call_ui);
     display_lab_t *self = context;
     self->restore_active = false;
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
@@ -637,6 +644,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_EVERSION;
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &s_lab;
+    s_call_ui.host = host;
     plugin->on_start = on_start;
     plugin->on_resume = on_resume;
     plugin->on_loop = on_loop;

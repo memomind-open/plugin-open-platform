@@ -1,6 +1,10 @@
+#include "../common/call_ui.h"
+
 #include "gm_plugin_lvgl_api.h"
 #include "gm_plugin_libc.h"
 #include "head_sprites.h"
+
+static example_call_ui_t s_call_ui;
 
 #define SAMPLE_INTERVAL_MS 50U
 #define LOG_INTERVAL_MS 250U
@@ -151,6 +155,7 @@ static void decode_sprite(void)
 
 static gm_plugin_result_t render_sprite(void)
 {
+    if (s_call_ui.active) return GM_PLUGIN_EBUSY;
     uint16_t next_y = (uint16_t)s_sprite_y;
     uint16_t sprite_bottom = (uint16_t)(s_sprite_y + HEAD_SPRITE_HEIGHT);
     while (next_y < sprite_bottom) {
@@ -274,6 +279,8 @@ static bool create_ui(void)
 
 static gm_plugin_result_t imu_start(void *context)
 {
+    gm_plugin_result_t call_result = example_call_ui_start(&s_call_ui);
+    if (call_result != GM_PLUGIN_OK) return call_result;
     gm_plugin_result_t result;
     (void)context;
     s_sample_elapsed_ms = SAMPLE_INTERVAL_MS;
@@ -320,9 +327,12 @@ static void imu_loop(void *context, uint32_t elapsed_ms)
             sample_updated = true;
         }
     }
-    if (s_sprite_dirty) {
+    if (!s_call_ui.active && (s_sprite_dirty || s_call_ui.redraw_pending)) {
         decode_sprite();
-        if (render_sprite() == GM_PLUGIN_OK) s_sprite_dirty = false;
+        if (render_sprite() == GM_PLUGIN_OK) {
+            s_sprite_dirty = false;
+            s_call_ui.redraw_pending = false;
+        }
     }
     if (sample_updated && s_log_elapsed_ms >= LOG_INTERVAL_MS) {
         s_log_elapsed_ms = 0;
@@ -352,6 +362,7 @@ static bool imu_event(void *context, const gm_plugin_event_t *event)
 
 static void imu_stop(void *context)
 {
+    example_call_ui_stop(&s_call_ui);
     (void)context;
     (void)s_host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
     s_lvgl->obj_clean(s_lvgl->root_get());
@@ -388,6 +399,7 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
                                       GM_PLUGIN_LVGL_API_MIN_VERSION))
         return GM_PLUGIN_EVERSION;
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
+    s_call_ui.host = host;
     plugin->on_start = imu_start;
     plugin->on_loop = imu_loop;
     plugin->on_event = imu_event;
