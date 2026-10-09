@@ -12,7 +12,7 @@ For new applications, see [running and verification](../memomind-example-app/ref
 ## Build entry points
 
 - Repository root: run `python3 build.py --help` for options. Select a platform with `python3 build.py web` or `python3 build.py glass`; use a full build only when the delivery needs it.
-- `GlassSDK/`: build one plugin with `python3 build.py build --example <relative-path>`. Use `--project` for an independent project; see the [GlassSDK README](../../../GlassSDK/README.md). The first build may download a pinned toolchain; do not replace its version or checksum to bypass failures.
+- `GlassSDK/`: build one plugin with `python3 build.py build --example <relative-path>`. Use `--example` inside SDK/examples so output reaches the Studio workspace catalog. `--project` writes to a project-local `.build` by default; import that standalone GMP explicitly with its matching manifest beside it. Use `--project` for an independent project; see the [GlassSDK README](../../../GlassSDK/README.md). The first build may download a pinned toolchain; do not replace its version or checksum to bypass failures.
 - `PhoneSDK/`: use `python3 build.py --help` for discovery, build, and output behavior. For a single H5 project, run its own build first, then package it with `npm run pack:plugin -- /absolute/plugin/dist /absolute/release/plugin.mmpkg`. The output must be outside the input directory. For static examples, use their actual deployable directory as input.
 
 ## Packages and review attachments

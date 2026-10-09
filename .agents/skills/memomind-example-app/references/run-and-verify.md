@@ -40,15 +40,15 @@ The Vite public/manifest.json and static assets must reach dist, with relative r
 python3 GlassSDK/build.py build --example <name>
 ```
 
-The GMP is at `GlassSDK/build-host/.build/<name>/<name>.gmp`, alongside its review sidecars. Open prebuilt Desktop Studio, choose the repository root through Import workspace, refresh, and select the application. Studio scans plugins one to three levels below collection directories. For deeper directories or standalone projects, use Import package; recursive build discovery does not imply unlimited Studio scan depth.
+For a nested example, use its relative path (such as `game/my-game`); the GMP is at `GlassSDK/build-host/.build/<relative-path>/<directory-basename>.gmp`, alongside its review sidecars. Use `--example` for projects inside `GlassSDK/examples`: `--project` defaults to a different output root that workspace scanning does not read. Open prebuilt Desktop Studio, choose the repository root through Import workspace, refresh, and select the application. Keep new projects directly under SDK/examples for compatibility with distributed Studio versions; supported scan depth depends on the release. For deeper directories or standalone projects, use Import package; recursive build discovery does not imply unlimited Studio scan depth.
 
-When generating with `--output /tmp/...`, build with `--project /tmp/...`; output goes into the project's own `.build/`. GlassSDK `--build-dir` can select a temporary output root. Do not rebuild and overwrite every repository GMP merely to validate a skill.
+For a standalone project outside SDK/examples, build with `--project /tmp/<name>`; output goes to `/tmp/<name>/.build/<name>/<name>.gmp`. Use Import package for that GMP and place its matching source manifest beside it so Studio can read pairing metadata. GlassSDK `--build-dir` can select a temporary output root. Do not rebuild and overwrite every repository GMP merely to validate a skill.
 
 ## Selecting a paired application in Desktop Studio
 
-For custom paired applications, build both the Web package and the dedicated GMP. Use [pairing preflight and diagnosis](paired-app.md#pairing-preflight) before handoff. In Studio, import the repository workspace, refresh both catalogs, then explicitly choose the matching application in both selectors. A remembered default Web Bridge selection can remain after Refresh even when the correct GMP exists.
+For custom paired applications, build both the Web package and the dedicated GMP. Follow the [discovery and automatic matching acceptance](paired-app.md#discovery-and-automatic-matching) before handoff: first confirm the companion is in Studio's catalog, then select the phone application and verify that Studio automatically chooses a compatible provider. A manually selected pair is useful for diagnosis but does not establish that automatic matching works. Refresh may preserve an explicit glasses selection; switching the phone selection can trigger matching again.
 
-Check the selected paths and declared protocols, clear any incompatibility warning, and run one application action across the pair before exporting a new combined ZIP/QR. For a glasses-only program, disable/clear the phone component instead of selecting an unrelated Web application. For a phone-only program, disable the glasses component. A source file or a successful single-side build does not establish paired runtime success.
+Check the selected paths and declared protocols, clear any incompatibility warning, and run one application action across the pair before exporting a new combined ZIP/QR. For a glasses-only program, disable/clear the phone component. For a phone-only program, disable the glasses component. A source file, successful single-side build, or metadata checker does not establish discovery or paired runtime success.
 
 ## Verification scope
 
@@ -63,10 +63,10 @@ For a completed application, check startup, main interactions, persistence resto
 | Symptom | Check first |
 | --- | --- |
 | Bridge never becomes ready | Run inside Studio/App with a relative vendor SDK module; do not open index.html directly or use only a Vite server. |
-| New application is missing after refresh | Correct manifest location, supported Studio discovery depth, successful build, and matching output path; build dist for Vite. |
+| New application is missing after refresh | Confirm the same workspace on the Studio machine, source manifest and expected GMP path, then refresh. A project-local .build output from --project is not the workspace output. Compare displayed versions/paths and use Import package to isolate discovery from pairing; build dist for Vite. |
 | MMPKG validation fails | Package the final directory, ensure entry exists, validate permission objects/scopes, keep output outside input, and exclude node_modules/source project trees. |
 | API denial or CAPABILITY_UNAVAILABLE | Current capabilities, actual approvals, scope, host support, and session. Use permission-debug rather than forcing successful responses. |
-| Missing protocol / unhandled custom channel | Inspect the actual selected pair. Select the dedicated GMP rather than Default Web Bridge; check the packaged manifest, build output, handlers, and freshly exported ZIP. Do not remove requirements to suppress the warning. |
+| Missing protocol / unhandled custom channel | First confirm the dedicated GMP is in the catalog; if absent, diagnose discovery. If present, check the actual pair, packaged requirements, provider metadata, handlers, and freshly exported ZIP. Do not remove requirements to suppress the warning. |
 | H5 updates but glasses do not | Correct GMP pairing, protocol versions/IDs, device connection, and send errors. Custom messaging requires more than Browser Studio checks. |
 | Headers missing in a new Glass project | Shared call_ui/asset paths, directory depth, and standalone source-root/include-dir boundaries. |
 | Native build exceeds stack/RAM limits | Large local arrays, VLAs, static caches, and pointer tables. Inspect .su files and linked segments rather than raising limits. |

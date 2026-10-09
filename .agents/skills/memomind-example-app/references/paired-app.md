@@ -31,7 +31,7 @@ python3 .agents/skills/memomind-example-app/scripts/check_pair.py \
   --gmp GlassSDK/build-host/.build/<app>/<app>.gmp
 ```
 
-Use the actual filename, including a version suffix when applicable. `--web` also accepts a source directory/manifest during development. For delivery, pass the built MMPKG to catch stale packaged requirements. `--gmp` checks file existence and header name/version/ABI against the Glass manifest. It does not prove source freshness, full GMP validity, handler implementation, permission coverage, or the current Studio selection. Runtime validation remains necessary.
+Use the actual filename, including a version suffix when applicable. `--web` also accepts a source directory/manifest during development. For delivery, pass the built MMPKG to catch stale packaged requirements. `--gmp` checks file existence and header name/version/ABI against the Glass manifest. It does not prove source freshness, full GMP validity, handler implementation, permission coverage, Studio discovery, automatic selection, or the current Studio selection. Runtime validation remains necessary.
 
 The checker exits unsuccessfully for missing/old protocols, a required plugin mismatch, or mismatched GMP identity metadata. A different `preferredPluginId` alone is advisory when all required protocols are provided. Rebuild after changes; do not delete requirements or falsely advertise protocols to make the check pass.
 
@@ -41,11 +41,28 @@ Checker regression tests: `python3 .agents/skills/memomind-example-app/scripts/t
 
 For example, a Web package requiring `gm.puppy-pet` and sending channel `19793` cannot communicate with the default `GM Web Bridge`, which implements gm.scene rather than that custom pet protocol. "Missing protocol gm.puppy-pet" describes a manifest mismatch; "Glass plugin did not handle channel 19793" means the selected running plugin did not consume the payload. Neither message establishes that a companion source directory is absent.
 
-1. Read the actual phone MMPKG manifest and the Glass manifest corresponding to the selected GMP. Record both IDs, versions, paths, required protocols, and provided protocols.
-2. If the correct companion source exists but its GMP is absent, build that specific example and confirm the expected output. If the binary exists, check discovery/layout and the selected path rather than generating another companion blindly.
-3. Import the repository workspace, refresh both catalogs, and explicitly select the application's Web component and its matching Glass component. Studio preserves a previous explicit selection for diagnostics; Refresh may leave Default Web Bridge selected.
-4. For an imported standalone GMP, keep its matching manifest available beside it. Unknown compatibility caused by missing metadata is distinct from a known missing protocol.
-5. Confirm the incompatible warning is gone and execute one real action through the selected pair. Re-export the combined ZIP/QR after changing the selection; the old export may still contain the wrong GMP.
+1. If the expected glasses application is missing from the catalog, diagnose discovery using the sequence below. Do not tell the developer to select a nonexistent option or create another companion before checking existing files.
+2. If it is listed, read the actual phone MMPKG manifest and the Glass manifest corresponding to the selected GMP. Record both IDs, versions, paths, required protocols, and provided protocols. Then test automatic matching; use explicit selection only to isolate a remaining selection problem.
+3. For an imported standalone GMP, keep its matching manifest beside it. Unknown compatibility caused by missing metadata is distinct from a known missing protocol.
+4. Confirm the incompatible warning is gone and execute one real action through the selected pair. Re-export the combined ZIP/QR after changing the selection; the old export may still contain the wrong GMP.
+
+## Discovery and automatic matching
+
+Treat source creation, building, Studio discovery, automatic matching, and runtime messaging as separate acceptance steps. A preferred ID only ranks discovered providers that satisfy the requirements; it cannot build or discover a missing package. Sharing a package name or ID is not enough.
+
+1. **Build into the workspace catalog layout.** From the repository root, use `python3 GlassSDK/build.py build --example <relative-path>` for `GlassSDK/examples/<relative-path>`. Confirm both that source directory's manifest and `GlassSDK/build-host/.build/<relative-path>/<basename>.gmp` exist. In contrast, `--project <directory>` defaults to `<directory>/.build/<basename>/<basename>.gmp`; that nested project-local output is not a workspace catalog location. Use Import package plus a neighboring manifest for standalone output. A build listing reports expected paths, not successful builds or Studio discovery.
+2. **Verify files on the machine running Studio.** Import the exact repository root containing both SDKs and refresh the glasses catalog. On a separate Windows machine, check that machine's local or network-share paths, not only files visible to the AI on Linux. Compare displayed names/versions and selected paths with the current manifest. Older displayed versions suggest stale discovery or a different copy; they do not prove which cause applies. Check discovery errors in the runtime log. Scan depth is release-dependent; prefer a direct SDK/examples child for new projects.
+3. **Isolate discovery when an option is absent.** Import the exact built GMP through Import package, with its matching manifest available. If that succeeds but workspace refresh still omits it, investigate the workspace path, layout, access, and Studio release. If import fails, report the package/load error. Do not remove protocol requirements to bypass either failure. Keep sources, GMP, and review attachments from the same build when transferring to another machine.
+4. **Exercise automatic matching.** Once the candidate is visible with readable protocol metadata, choose the phone application and verify the matching glasses name, ID, and path are selected automatically with compatible/recommended status. Refresh can preserve an explicit glasses choice; switching the phone selection can trigger matching again. Record the actual Studio release and observed behavior rather than assuming private source changes are present in the distributed executable. If only manual selection works, report automatic matching as unresolved.
+5. **Exercise the pair.** Send one real application action, verify the glasses display/state and any expected reply, then export the combined ZIP/QR. Record discovered, automatically selected, and runtime-verified results separately. If Desktop Studio is unavailable, mark those checks pending and give concrete paths and commands; a local metadata pass does not complete them.
+
+For example, on Windows PowerShell, run these read-only checks from the imported repository root (replace `my-app`):
+
+```powershell
+Get-Location
+Get-Content .\GlassSDK\examples\my-app\manifest.json
+Get-Item .\GlassSDK\build-host\.build\my-app\my-app.gmp | Select-Object FullName, Length, LastWriteTime
+```
 
 ## Data and failure handling
 

@@ -1,16 +1,59 @@
 """Behavior checks for the starter generator; temporary projects only, no SDK rebuild."""
 import json
+import argparse
+import contextlib
+import importlib.util
+import io
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 
 SCRIPT = Path(__file__).with_name('create_example.py')
 REPO = SCRIPT.resolve().parents[4]
+
+
+class GlassBuildRoutingTests(unittest.TestCase):
+    def test_workspace_examples_use_catalog_output_and_standalone_requires_import(self):
+        spec = importlib.util.spec_from_file_location('create_example', SCRIPT)
+        generator = importlib.util.module_from_spec(spec)
+        with mock.patch.object(sys, 'dont_write_bytecode', True):
+            spec.loader.exec_module(generator)
+        with tempfile.TemporaryDirectory(prefix='memomind-routing-') as temporary:
+            root = Path(temporary)
+            repo = root / 'repository with spaces'
+            for relative in ('lvgl_ui/lvgl_ui.c', 'lvgl_ui/manifest.json', 'common/call_ui.h'):
+                destination = repo / 'GlassSDK/examples' / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(REPO / 'GlassSDK/examples' / relative, destination)
+            cases = (
+                (None, '--example', 'new-example', repo / 'GlassSDK/build-host/.build/new-example/new-example.gmp'),
+                (repo / 'GlassSDK/examples/game/nested', '--example', 'game/nested', repo / 'GlassSDK/build-host/.build/game/nested/nested.gmp'),
+                (root / 'standalone', '--project', str(root / 'standalone'), root / 'standalone/.build/standalone/standalone.gmp'),
+            )
+            with mock.patch.object(generator, 'REPO', repo):
+                for target, flag, value, package in cases:
+                    with self.subTest(target=target):
+                        output = io.StringIO()
+                        args = argparse.Namespace(kind='glass', name='new-example', id='com.example.new', title='New example', output=target)
+                        with contextlib.redirect_stdout(output):
+                            generator.create(args)
+                        lines = output.getvalue().splitlines()
+                        command = next(line[7:]
+                                       for line in lines if line.startswith('Build: '))
+                        self.assertEqual(shlex.split(command), ['python3', 'GlassSDK/build.py', 'build', flag, value])
+                        self.assertIn('Expected GMP after build: ' + str(package), lines)
+                        project = target or repo / 'GlassSDK/examples/new-example'
+                        self.assertTrue((project / 'manifest.json').is_file())
+                        self.assertFalse(package.exists(), 'Generation must not claim a built package')
+                        if flag == '--project':
+                            self.assertIn('Import package', output.getvalue())
 
 
 @unittest.skipUnless(shutil.which('node'), 'Node 18+ is required for Web generation')

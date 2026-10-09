@@ -82,7 +82,18 @@ def create(args):
         print('Package: node PhoneSDK/tools/build-mmpkg.mjs ' + display_target + ' <release-path>.mmpkg')
         print('Pair with com.gm.example.web-bridge in Desktop Studio; a generated LVGL Glass starter does not implement gm.scene.')
     else:
-        print('Build: python3 GlassSDK/build.py build --project ' + display_target)
+        try:
+            example = target.resolve().relative_to((REPO / 'GlassSDK/examples').resolve())
+        except ValueError:
+            print('Build: python3 GlassSDK/build.py build --project ' + display_target)
+            package = target / '.build' / target.name / (target.name + '.gmp')
+            print('After building, use Import package for this standalone GMP; keep its matching manifest.json beside it.')
+        else:
+            print('Build: python3 GlassSDK/build.py build --example ' + shlex.quote(example.as_posix()))
+            package = REPO / 'GlassSDK/build-host/.build' / example / (example.name + '.gmp')
+            print('After building, import this repository as the Studio workspace and refresh the glasses catalog.')
+        print('Expected GMP after build: ' + str(package))
+        print('Verify the application appears in the glasses catalog before checking pairing; generation alone does not build it.')
         print('Glasses-only starter: disable the phone component in Studio. Custom pairing requires a matching phone implementation and message handlers.')
     print('This is a runnable starter, not a completed application.')
 

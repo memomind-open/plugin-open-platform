@@ -25,7 +25,7 @@ For a new application, start with `memomind-example-app` to choose an architectu
 - The root build uses Python. PhoneSDK uses the npm workflow defined by its `package.json` and lockfile. This repository does not provide the website repository's pnpm quality/harness commands or its routing, account, and branch-role gates.
 - SDK, example, and Studio directory relationships affect discovery and pairing. Preserve the layout documented in the root README.
 
-For application tasks, explicitly choose phone-only, glasses-only, Web with existing Web Bridge, or a custom pair. Custom paired delivery requires both implementations and built packages, matching protocol metadata, and concrete Studio selection instructions. An explicit single-platform request stays single-platform; disable the unused Studio component. See the application skill for pairing preflight and the distinction between metadata compatibility and runtime verification.
+For application tasks, explicitly choose phone-only, glasses-only, Web with existing Web Bridge, or a custom pair. Custom paired delivery requires both implementations and built packages, matching protocol metadata, Studio discovery and automatic matching checks, and concrete package paths. A metadata pass does not establish that Studio can discover or automatically select the companion. An explicit single-platform request stays single-platform; disable the unused Studio component. See the application skill for pairing preflight and the distinction between metadata compatibility and runtime verification.
 
 ## Implementation and acceptance
 
