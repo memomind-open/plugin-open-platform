@@ -28,6 +28,10 @@ Handle suspended/stopped/failed states and runtime reconstruction. Clean up subs
 
 After changing the SDK, check whether vendored copies in examples are affected. Use `npm run sync:example-sdk` when needed for the seven explicitly listed maintained examples, then review the generated changes. That command does not discover new projects. Refresh a new application individually with the application generator's `--refresh-sdk <project>` mode so it does not continue running an old SDK.
 
+## Companion and Studio selection
+
+If this application uses only standard display/device operations, identify the existing Web Bridge as its companion. If it sends custom channels, locate or implement the dedicated Glass provider and verify its actual handlers; a `deviceRequirements` declaration does not create that provider. Check the [actual paired package and selection](../memomind-example-app/references/paired-app.md) before reporting success. Provide both package paths and selector names, and explain that refreshing Studio can preserve an older explicit selection.
+
 ## Verification and delivery
 
 Select existing Node tests for the affected code, such as `node --test packages/web-sdk/test/sdk.test.mjs`. For public contract or cross-package changes, run `npm run verify` (tests and workspace checks). When dependencies need installing, use the lockfile with `npm ci` without incidental upgrades.

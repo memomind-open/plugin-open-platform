@@ -44,6 +44,12 @@ The GMP is at `GlassSDK/build-host/.build/<name>/<name>.gmp`, alongside its revi
 
 When generating with `--output /tmp/...`, build with `--project /tmp/...`; output goes into the project's own `.build/`. GlassSDK `--build-dir` can select a temporary output root. Do not rebuild and overwrite every repository GMP merely to validate a skill.
 
+## Selecting a paired application in Desktop Studio
+
+For custom paired applications, build both the Web package and the dedicated GMP. Use [pairing preflight and diagnosis](paired-app.md#pairing-preflight) before handoff. In Studio, import the repository workspace, refresh both catalogs, then explicitly choose the matching application in both selectors. A remembered default Web Bridge selection can remain after Refresh even when the correct GMP exists.
+
+Check the selected paths and declared protocols, clear any incompatibility warning, and run one application action across the pair before exporting a new combined ZIP/QR. For a glasses-only program, disable/clear the phone component instead of selecting an unrelated Web application. For a phone-only program, disable the glasses component. A source file or a successful single-side build does not establish paired runtime success.
+
 ## Verification scope
 
 Use targeted tests for business algorithms, codecs, and lifecycle behavior. Run PhoneSDK `npm run verify` for public SDK changes. Root tests may not automatically discover behavior tests for a new example; inspect the package.json test glob and explicitly run the new test path when necessary.
@@ -60,6 +66,7 @@ For a completed application, check startup, main interactions, persistence resto
 | New application is missing after refresh | Correct manifest location, supported Studio discovery depth, successful build, and matching output path; build dist for Vite. |
 | MMPKG validation fails | Package the final directory, ensure entry exists, validate permission objects/scopes, keep output outside input, and exclude node_modules/source project trees. |
 | API denial or CAPABILITY_UNAVAILABLE | Current capabilities, actual approvals, scope, host support, and session. Use permission-debug rather than forcing successful responses. |
+| Missing protocol / unhandled custom channel | Inspect the actual selected pair. Select the dedicated GMP rather than Default Web Bridge; check the packaged manifest, build output, handlers, and freshly exported ZIP. Do not remove requirements to suppress the warning. |
 | H5 updates but glasses do not | Correct GMP pairing, protocol versions/IDs, device connection, and send errors. Custom messaging requires more than Browser Studio checks. |
 | Headers missing in a new Glass project | Shared call_ui/asset paths, directory depth, and standalone source-root/include-dir boundaries. |
 | Native build exceeds stack/RAM limits | Large local arrays, VLAs, static caches, and pointer tables. Inspect .su files and linked segments rather than raising limits. |

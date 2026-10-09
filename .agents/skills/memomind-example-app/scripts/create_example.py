@@ -80,9 +80,10 @@ def create(args):
     if args.kind == 'web':
         print('Preview: node PhoneSDK/tools/run-browser-studio.mjs --plugin ' + display_target)
         print('Package: node PhoneSDK/tools/build-mmpkg.mjs ' + display_target + ' <release-path>.mmpkg')
-        print('Pair with com.gm.example.web-bridge in Desktop Studio.')
+        print('Pair with com.gm.example.web-bridge in Desktop Studio; a generated LVGL Glass starter does not implement gm.scene.')
     else:
         print('Build: python3 GlassSDK/build.py build --project ' + display_target)
+        print('Glasses-only starter: disable the phone component in Studio. Custom pairing requires a matching phone implementation and message handlers.')
     print('This is a runnable starter, not a completed application.')
 
 

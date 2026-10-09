@@ -33,6 +33,10 @@ Preserve the frozen core ABI. Use a separate extension ID for incompatible exten
 
 Memory and stack limits come from the ABI and build tools: Flash <=512000 B, static RAM <102400 B, and each static function stack frame <=1024 B. These checks do not prove total call-stack or dynamic-heap safety. Avoid large local arrays, VLAs, and unbudgeted dynamic allocations.
 
+## Companion and Studio selection
+
+State whether this is glasses-only or part of a paired application. A standalone program needs no phone plugin; instruct the developer to disable/clear the phone component in Studio. A custom paired application needs its actual phone implementation, matching manifest requirements, implemented message handlers, and both built packages. Use the [pairing preflight and handoff](../memomind-example-app/references/paired-app.md) to check the intended pair. A generated LVGL starter does not automatically implement Web Bridge protocols or a phone companion.
+
 ## Verification
 
 Build a single example from `GlassSDK/`, such as `python3 build.py build --example game/2048`. New plugins follow the existing manifest/C source layout without adding an example-local CMakeLists.

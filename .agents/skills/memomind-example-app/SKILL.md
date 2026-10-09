@@ -18,6 +18,10 @@ Translate the request into where the application runs (phone, glasses, or both),
 - A dedicated state or streaming protocol between the two platforms: a Web plugin paired with a dedicated Glass plugin; define the messages before implementation.
 - Phone-only functionality: a Web plugin with unnecessary device requirements and permissions removed; do not introduce a glasses dependency.
 
+Before implementation, state the delivery mode: **phone-only**, **glasses-only**, **Web with existing Web Bridge**, or **custom paired application**. List the required components and the component that owns state/rendering. A request for a complete phone-controlled pet/game/reader normally needs both components unless the existing Web Bridge implements every required operation. An explicit single-platform request stays single-platform; explain any unavailable companion behavior instead of silently expanding it.
+
+For a custom pair, create or locate both implementations, build both packages, and hand over their exact selection names and paths. If the task is limited to one side, identify the required existing companion and verify that it is available. An absent or unimplemented companion is an incomplete integration, not a successful delivery.
+
 For a new application, create a new directory and independent identity while preserving the reference example. For a request to modify an existing example, work in that directory without forcing a copy. To generate a minimal project, run this tool from the repository root:
 
 ```sh
@@ -26,7 +30,7 @@ python3 .agents/skills/memomind-example-app/scripts/create_example.py \
 # For a native LVGL starter, use glass instead of web and choose its own name and ID.
 ```
 
-The tool refuses to overwrite an existing directory. Web projects bundle the current local SDK; Glass projects use the current lvgl_ui example and copy its shared call-UI header. It creates a runnable starting point, **not the complete requested application**. For complex assets or protocols, read and adapt the relevant example rather than using a large application as an empty template.
+The tool refuses to overwrite an existing directory. Web projects bundle the current local SDK; Glass projects use the current lvgl_ui example and copy its shared call-UI header. It creates a runnable starting point, **not the complete requested application**. `--kind web` targets the existing Web Bridge; `--kind glass` creates a standalone LVGL program. Running both commands does **not** create a compatible custom pair: the generated Glass starter does not implement gm.scene or a custom message handler. For complex assets or protocols, read and adapt the relevant example rather than using a large application as an empty template.
 
 ## Completing the implementation
 
@@ -40,6 +44,13 @@ Generator regression checks: run `python3 .agents/skills/memomind-example-app/sc
 
 ## Acceptance and handoff
 
+For a custom pair, completion requires both source trees, a built MMPKG and GMP, matching declared protocols/versions, and implemented handlers for the channels used. Run the [pairing preflight](references/paired-app.md#pairing-preflight) against the actual Web package and Glass manifest/GMP. This checks metadata only; inspect codecs, permissions, and runtime behavior separately. Do not complete the task while reporting "Missing protocol", an unhandled custom channel, or a required companion that was never built.
+
+For a standalone Glass program, explicitly instruct the developer to disable/clear the phone component in Studio. Do not pair an arbitrary phone application with it just because both selectors have entries.
+
+
 Follow [running, testing, and troubleshooting](references/run-and-verify.md) for commands in the correct directory. Distinguish source directories from built dist output and Browser Studio from Desktop Studio. Confirm that the manifest, modules, and assets are present in the final package.
 
 Give the developer the new directory, startup commands, the GMP to select (if applicable), package paths, completed checks, and outstanding device checks. Briefly identify where to modify application state, rendering, and protocol handling so the developer can run and extend the application without rereading the entire SDK manual.
+
+For Studio handoff, record a concrete selection table: phone name/ID/package path, glasses name/ID/GMP path, and expected protocol IDs/versions. Explain that Refresh does not necessarily replace a previous explicit selection. Have the developer select the intended pair before exporting its combined ZIP or QR. If Studio cannot be run in the current environment, report integration as pending and give these exact steps rather than declaring end-to-end success.
