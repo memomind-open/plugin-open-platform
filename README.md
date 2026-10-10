@@ -83,6 +83,23 @@ Studio included in `PhoneSDK` and in the PhoneSDK DevKit ZIP. Browser Studio is 
 lightweight Bridge and display simulator; Desktop Studio is the recommended
 tool when a real `.gmp` must run together with a Web plugin.
 
+## AI-assisted development
+
+Read [AGENTS.md](AGENTS.md) for repository boundaries, task-specific document
+routing, and verification guidance. Project skills under `.agents/skills/` cover
+example-based application development, native glasses plugins, Web plugins,
+public Bluetooth business protocols, and plugin build/delivery. AI tools with project-skill discovery can select these
+skills; other tools can read the linked `SKILL.md` files directly.
+
+To start a new app with AI, describe where it runs, its main interactions, and
+what should work when finished. For example: “Use `$memomind-example-app` to build
+a focus timer: configure it on the phone, show the countdown on the glasses,
+and save the selected duration. Deliver the code, preview commands, and package.”
+The skill includes example selection, runnable Web/Glass starters, pairing,
+and verification guidance. See [the application skill](.agents/skills/memomind-example-app/SKILL.md)
+for the starter generator and development workflow, or use the
+[developer task examples](.agents/skills/memomind-example-app/references/developer-prompts.md).
+
 ## Public support boundary
 
 The SDK headers, JavaScript packages, examples, package formats, transport

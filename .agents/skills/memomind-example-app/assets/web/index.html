@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>MemoMind Starter</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="plugin.js"></script>
+</head>
+<body>
+  <main>
+    <h1>MemoMind Starter</h1>
+    <p>Count: <output id="count">0</output></p>
+    <button id="increment" type="button" disabled>Increment and save</button>
+    <button id="sync" type="button" disabled>Sync to glasses</button>
+    <p id="status" role="status">Connecting to the host...</p>
+  </main>
+</body>
+</html>
