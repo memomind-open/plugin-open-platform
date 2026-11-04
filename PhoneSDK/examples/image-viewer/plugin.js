@@ -1,6 +1,6 @@
 import { i18n, t, localizedError } from './i18n.js';
 import { createGMPlugin } from './vendor/gm-plugin-web-sdk.esm.js';
-import { WIDTH, HEIGHT, composeImage, decodeImage, readImageBlob } from './image.js';
+import { WIDTH, HEIGHT, ALIGNMENTS, composeImage, decodeImage, readImageBlob } from './image.js';
 import { ImageTransfer } from './protocol.js';
 import { compressLz4 } from './lz4.js';
 import { pickImageFile, waitForFilePickerReturn, throwIfAborted } from './files.js';
@@ -18,6 +18,10 @@ const slots = Array(10).fill(null);
 // Keep saved references even if a temporary read/decode failure prevents restore.
 let fileIds = Array(10).fill(null), selectedSlot = 0;
 const key = 'pixel-image-viewer.slots.v1';
+const alignmentKey = 'pixel-image-viewer.alignments.v1';
+const alignmentSelect = document.querySelector('#alignment');
+let alignments = [];
+const slotAlignment = i => alignments[i] || 'center';
 let ready = false, connected = false, active = true, operation, subscriptionId, transfer;
 const listeners = [];
 let operationKind, pickerOpen = false, initializing = false, closed = false;
@@ -64,6 +68,8 @@ function render() {
   card.querySelector('.pick').disabled = busy;
   card.querySelector('.send').disabled = busy || !connected || !slots[selectedSlot];
   addSlot.disabled = busy;
+  alignmentSelect.disabled = busy;
+  alignmentSelect.value = slotAlignment(selectedSlot);
   const slotButtons = [...slotList.querySelectorAll('.slot')];
   let added = false;
   while (slotButtons.length < slots.length) {
@@ -104,7 +110,7 @@ function cancelWork(key) {
   operation?.abort(localizedError(key));
   transfer?.cancel();
 }
-async function prepare(file, signal) {
+async function prepare(file, signal, alignment = 'center') {
   const blob = await readImageBlob(gm, file, signal);
   throwIfAborted(signal);
   report(() => t('notice.decoding'));
@@ -112,7 +118,7 @@ async function prepare(file, signal) {
   try {
     throwIfAborted(signal);
     const canvas = document.createElement('canvas');
-    const bytes = composeImage(decoded.image, decoded.width, decoded.height, canvas);
+    const bytes = composeImage(decoded.image, decoded.width, decoded.height, canvas, alignment);
     return { file, canvas, bytes, compressed: compressLz4(bytes), width: decoded.width, height: decoded.height };
   } finally { decoded.close(); }
 }
@@ -157,7 +163,7 @@ async function pick(i, signal) {
     throwIfAborted(signal);
     if (!file) { report(() => t('notice.pickCancelled')); return; }
     report(() => t('notice.reading'));
-    const item = await prepare(file, signal);
+    const item = await prepare(file, signal, slotAlignment(i));
     const previousId = fileIds[i];
     const ids = [...fileIds];
     ids[i] = file.fileId;
@@ -199,6 +205,22 @@ card.querySelector('.pick').addEventListener('click', () => {
 card.querySelector('.send').addEventListener('click', () => {
   const i = selectedSlot;
   void run(signal => send(i, signal), 'send');
+});
+alignmentSelect.addEventListener('change', () => {
+  const i = selectedSlot, alignment = alignmentSelect.value;
+  if (!ready || !active || initializing || operation || !ALIGNMENTS.includes(alignment)) { render(); return; }
+  void run(async signal => {
+    // Rebuild both preview and wire payload before publishing the new setting.
+    const item = slots[i] ? await prepare(slots[i].file, signal, alignment) : null;
+    throwIfAborted(signal);
+    const next = [...alignments];
+    next[i] = alignment;
+    await gm.storage.set(alignmentKey, next);
+    alignments = next;
+    if (item) showSlot(i, item);
+    progress.value = 0;
+    report('');
+  }, 'alignment');
 });
 addSlot.addEventListener('click', () => void run(appendSlot, 'slots'));
 showPreview();
@@ -258,6 +280,9 @@ async function initialize() {
     } catch (error) { deviceError = error; }
     active = (await gm.runtime.getLifecycleState()).state === 'running';
     await run(async signal => {
+      const savedAlignments = (await gm.storage.get(alignmentKey)).value;
+      alignments = Array.isArray(savedAlignments)
+        ? savedAlignments.map(value => ALIGNMENTS.includes(value) ? value : 'center') : [];
       const saved = (await gm.storage.get(key)).value;
       if (Array.isArray(saved)) {
         fileIds = Array.from({ length: Math.max(10, saved.length) }, (_, i) => typeof saved[i] === 'string' ? saved[i] : null);
@@ -273,7 +298,7 @@ async function initialize() {
         const file = files.find(entry => entry.fileId === id);
         try {
           if (!file) throw localizedError('error.missingFile');
-          showSlot(i, await prepare(file, signal));
+          showSlot(i, await prepare(file, signal, slotAlignment(i)));
         } catch (error) { failures.push({ slot: i + 1, error }); }
       }
       report(() => failures.length ? t('notice.restoreErrors', { errors: failures.map(f => t('notice.slotError', { slot: f.slot, error: errorText(f.error) })).join('; ') }) : '', failures.length > 0);

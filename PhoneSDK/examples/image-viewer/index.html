@@ -2,12 +2,23 @@
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title data-i18n="app.title">Pixel Image Viewer</title><link rel="stylesheet" href="style.css"></head>
 <body><main>
-  <header><h1 data-i18n="app.title">Pixel Image Viewer</h1><span class="version">v0.1.13</span><span id="connection" role="status">Connecting to host…</span></header>
+  <header><h1 data-i18n="app.title">Pixel Image Viewer</h1><span class="version">v0.1.15</span><span id="connection" role="status">Connecting to host…</span></header>
   <section class="slot-picker" aria-label="Image slots" data-i18n-aria="ui.slots">
     <div id="slot-list" role="group" aria-label="Choose an image slot" data-i18n-aria="ui.chooseSlot"><button id="add-slot" type="button" disabled aria-label="Add an image slot" data-i18n-aria="ui.addSlot" title="Add an image slot" data-i18n-title="ui.addSlot">+</button></div>
   </section>
   <section class="card">
-    <div class="image-actions"><button class="pick" disabled>Choose image</button><button class="send" disabled data-i18n="ui.send">Send to glasses</button></div>
+    <div class="image-actions"><button class="pick" disabled>Choose image</button><button class="send" disabled data-i18n="ui.send">Send to glasses</button>
+    <select id="alignment" disabled aria-label="Image alignment" data-i18n-aria="ui.alignment">
+      <option value="top-left" data-i18n="alignment.top-left">Top left</option>
+      <option value="top-center" data-i18n="alignment.top-center">Top center</option>
+      <option value="top-right" data-i18n="alignment.top-right">Top right</option>
+      <option value="middle-left" data-i18n="alignment.middle-left">Middle left</option>
+      <option value="center" data-i18n="alignment.center" selected>Center</option>
+      <option value="middle-right" data-i18n="alignment.middle-right">Middle right</option>
+      <option value="bottom-left" data-i18n="alignment.bottom-left">Bottom left</option>
+      <option value="bottom-center" data-i18n="alignment.bottom-center">Bottom center</option>
+      <option value="bottom-right" data-i18n="alignment.bottom-right">Bottom right</option>
+    </select></div>
     <div class="feedback" aria-label="Connection and transfer status" data-i18n-aria="ui.connectionStatus">
       <p class="name" hidden>No image selected</p>
       <p id="status" role="status" aria-live="polite">Initializing…</p>
@@ -17,5 +28,5 @@
     <div class="viewport"><canvas width="600" height="350" aria-label="600 × 350 pixel-perfect green preview" data-i18n-aria="ui.canvas"></canvas></div>
     <details class="image-info"><summary data-i18n="ui.info">Image details</summary><p class="geometry">600 × 350 physical pixels · Green · No scaling</p></details>
   </section>
-  <footer><details><summary data-i18n="ui.rules">Display rules and supported formats</summary><p data-i18n="ui.rulesBody">600 × 350 pixel-perfect green preview, without scaling or interpolation. Small images are centered on black; excess width or height is cropped from the right or bottom. Switching slots only changes the preview. Tap Send to transfer it to the glasses.</p><p data-i18n="ui.formats">Supports PNG, JPEG, BMP and WebP, subject to the phone decoder. Transparency is composited on black. Imported files stay in the plugin’s private storage; the glasses keep only the current frame.</p></details></footer>
+  <footer><details><summary data-i18n="ui.rules">Display rules and supported formats</summary><p data-i18n="ui.rulesBody">600 × 350 pixel-perfect green preview, without scaling or interpolation. Small images use the selected alignment on black (center by default); excess width or height is cropped from the right or bottom. Switching slots only changes the preview. Tap Send to transfer it to the glasses.</p><p data-i18n="ui.formats">Supports PNG, JPEG, BMP and WebP, subject to the phone decoder. Transparency is composited on black. Imported files stay in the plugin’s private storage; the glasses keep only the current frame.</p></details></footer>
 </main><script type="module" src="plugin.js"></script></body></html>
