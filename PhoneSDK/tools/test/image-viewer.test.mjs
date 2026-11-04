@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { webcrypto } from 'node:crypto';
-import { WIDTH, HEIGHT, FRAME_BYTES, placement, composeImage, rgbaToGray4, readImageBlob } from '../../examples/image-viewer/image.js';
+import { WIDTH, HEIGHT, FRAME_BYTES, ALIGNMENTS, placement, composeImage, rgbaToGray4, readImageBlob } from '../../examples/image-viewer/image.js';
 import { pickImageFile, openImageRead, waitForFilePickerReturn, imageMime } from '../../examples/image-viewer/files.js';
 import { ImageTransfer, OP, packet, parseAck, hash, RESPONSE_CHANNEL } from '../../examples/image-viewer/protocol.js';
 import { compressLz4 } from '../../examples/image-viewer/lz4.js';
@@ -216,4 +216,42 @@ test('incompressible frames and legacy receivers use exact raw bytes with explic
     assert.ok(calls.some(c=>c[1]===OP.begin));assert.ok(!calls.some(c=>c[1]===OP.beginLz4));
     transfer.close();
   }
+});
+
+
+test('all nine alignments reach preview and compressed wire pixels without scaling', async () => {
+  for (const [width, height] of [[101, 51], [800, 101], [101, 800], [900, 500]]) {
+    for (const [index, alignment] of ALIGNMENTS.entries()) {
+      const w = Math.min(width, WIDTH), h = Math.min(height, HEIGHT);
+      const dx = [0, Math.floor((WIDTH-w)/2), WIDTH-w][index % 3];
+      const dy = [0, Math.floor((HEIGHT-h)/2), HEIGHT-h][Math.floor(index/3)];
+      assert.deepEqual(placement(width,height,alignment), {sx:0,sy:0,width:w,height:h,dx,dy});
+      const rgba = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
+      let preview;
+      const ctx = {
+        fillRect() { rgba.fill(0); },
+        drawImage(image,sx,sy,cw,ch,x,y,dw,dh) {
+          assert.deepEqual([sx,sy,cw,ch,x,y,dw,dh], [0,0,w,h,dx,dy,w,h]);
+          for(let row=y;row<y+dh;row++) for(let col=x;col<x+dw;col++) rgba.fill(255,(row*WIDTH+col)*4,(row*WIDTH+col+1)*4);
+        },
+        getImageData() {return {data:rgba};},
+        putImageData(image) {preview=image.data;}
+      };
+      const bytes=composeImage({},width,height,{getContext:()=>ctx},alignment);
+      const compressed=compressLz4(bytes);
+      const {gm,calls}=fixture({lz4:true});
+      const transfer=new ImageTransfer(gm);
+      await transfer.send(bytes,()=>{},undefined,compressed);
+      const wire=Uint8Array.from(calls.filter(c=>c[1]===OP.chunk).flatMap(c=>[...c.subarray(12)]));
+      const decoded=decodeRawLz4(wire,FRAME_BYTES);
+      assert.deepEqual(decoded,bytes);
+      for(let y=0;y<HEIGHT;y++) for(let x=0;x<WIDTH;x++) {
+        const i=y*WIDTH+x, expected=x>=dx&&x<dx+w&&y>=dy&&y<dy+h?15:0;
+        assert.equal((decoded[i>>1]>>((i&1)?0:4))&15,expected);
+        assert.equal(preview[i*4+1],expected*17);
+      }
+      transfer.close();
+    }
+  }
+  assert.throws(()=>placement(100,50,'invalid'), /alignment/);
 });

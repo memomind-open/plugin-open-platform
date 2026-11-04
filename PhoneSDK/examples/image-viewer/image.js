@@ -4,18 +4,22 @@ export const WIDTH = 600;
 export const HEIGHT = 350;
 export const FRAME_BYTES = WIDTH * HEIGHT / 2;
 
+export const ALIGNMENTS = ['top-left', 'top-center', 'top-right', 'middle-left', 'center', 'middle-right', 'bottom-left', 'bottom-center', 'bottom-right'];
+
 // Source and destination extents are identical: never resample a source pixel.
-export function placement(width, height) {
+export function placement(width, height, alignment = 'center') {
   if (!Number.isSafeInteger(width) || width < 1 || !Number.isSafeInteger(height) || height < 1) {
     throw localizedError('error.dimensions');
   }
+  const index = ALIGNMENTS.indexOf(alignment);
+  if (index < 0) throw new RangeError('Invalid image alignment');
   const w = Math.min(width, WIDTH);
   const h = Math.min(height, HEIGHT);
   return { sx: 0, sy: 0, width: w, height: h,
-    dx: Math.floor((WIDTH - w) / 2), dy: Math.floor((HEIGHT - h) / 2) };
+    dx: Math.floor((WIDTH - w) * (index % 3) / 2), dy: Math.floor((HEIGHT - h) * Math.floor(index / 3) / 2) };
 }
 
-export function composeImage(image, width, height, canvas) {
+export function composeImage(image, width, height, canvas, alignment = 'center') {
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -23,7 +27,7 @@ export function composeImage(image, width, height, canvas) {
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  const p = placement(width, height);
+  const p = placement(width, height, alignment);
   ctx.drawImage(image, p.sx, p.sy, p.width, p.height, p.dx, p.dy, p.width, p.height);
   const rgba = ctx.getImageData(0, 0, WIDTH, HEIGHT);
   const bytes = rgbaToGray4(rgba.data);

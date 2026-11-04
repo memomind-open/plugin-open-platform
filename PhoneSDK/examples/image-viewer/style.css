@@ -43,8 +43,8 @@ progress { display: block; flex: 1 1 0; min-width: 32px; width: 0; height: 5px; 
 .slot.filled[aria-pressed="true"]::after { background: #10261b; }
 #add-slot { background: transparent; border-style: dashed; font-size: 20px; padding: 0; }
 .card { min-width: 0; padding: 8px; background: #141e29; border: 1px solid #29394b; border-radius: 9px; }
-.image-actions { display: grid; grid-template-columns: 1fr 1.2fr; gap: 8px; }
-.image-actions button { min-width: 0; }
+.image-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.1fr); gap: 6px; }
+.image-actions button { min-width: 0; white-space: nowrap; padding-inline: 6px; }
 .send { background: #9de3c2; color: #10261b; border-color: #9de3c2; }
 .name { flex: 1; min-width: 0; margin: 0; font-size: 11px; color: #c8d2da; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .viewport { overflow: auto; background: #000; border: 1px solid #394657; border-radius: 3px; width: 100%; }
@@ -55,3 +55,11 @@ summary { cursor: pointer; font-size: 11px; color: #a6b5c3; }
 footer { margin-top: 10px; }
 @media (min-width: 600px) { #slot-list { grid-template-columns: repeat(11, minmax(0, 1fr)); } }
 @media (max-width: 360px) { h1 { font-size: 14px; } }
+
+#alignment { width: 100%; min-width: 0; min-height: 36px; font: inherit; color: inherit; background: #22364a; border: 1px solid #435a6e; border-radius: 6px; padding: 5px; }
+#alignment:focus-visible { outline: 2px solid #99f2cb; outline-offset: 2px; }
+#alignment:disabled { opacity: .42; }
+
+@media (max-width: 420px) {
+  .image-actions button, #alignment { font-size: 11px; padding-inline: 3px; }
+}

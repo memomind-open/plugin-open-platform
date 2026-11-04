@@ -1,6 +1,16 @@
 // Plugin UI intentionally stays English, independent of host/system locale.
 export const messages = {
   "en": {
+    "ui.alignment": "Image alignment",
+    "alignment.top-left": "Top left",
+    "alignment.top-center": "Top center",
+    "alignment.top-right": "Top right",
+    "alignment.middle-left": "Middle left",
+    "alignment.center": "Center",
+    "alignment.middle-right": "Middle right",
+    "alignment.bottom-left": "Bottom left",
+    "alignment.bottom-center": "Bottom center",
+    "alignment.bottom-right": "Bottom right",
     "app.title": "Pixel Image Viewer",
     "ui.cancel": "Cancel",
     "ui.retry": "Check connection",
@@ -18,7 +28,7 @@ export const messages = {
     "ui.canvas": "600 × 350 pixel-perfect green preview",
     "ui.info": "Image details",
     "ui.rules": "Display rules and supported formats",
-    "ui.rulesBody": "600 × 350 pixel-perfect green preview, without scaling or interpolation. Small images are centered on black; excess width or height is cropped from the right or bottom. Switching slots only changes the preview. Tap Send to transfer it to the glasses.",
+    "ui.rulesBody": "600 × 350 pixel-perfect green preview, without scaling or interpolation. Small images use the selected alignment on black (center by default); excess width or height is cropped from the right or bottom. Switching slots only changes the preview. Tap Send to transfer it to the glasses.",
     "ui.formats": "Supports PNG, JPEG, BMP and WebP, subject to the phone decoder. Transparency is composited on black. Imported files stay in the plugin’s private storage; the glasses keep only the current frame.",
     "connection.loading": "Connecting to host…",
     "connection.on": "Glasses connected",
