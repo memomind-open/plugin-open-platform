@@ -24,3 +24,8 @@ Version 7 restores all 28 native rotation masks (including I/S/Z at 180 degrees)
 the strict IMU movement debounce and one simulation step per timer callback.
 The countdown width includes its borders and uses actual time. The preview
 paints above the instructions, and scores no longer wrap at 65,536.
+
+Version 8 commits head-exit once the countdown completes. Simulation, rendering
+and game input stop until Host stop, even if callbacks continue or the head is
+lowered. Suspend/resume cannot cancel a committed exit; a new start resets it.
+The countdown cadence and cancellation before completion remain unchanged.

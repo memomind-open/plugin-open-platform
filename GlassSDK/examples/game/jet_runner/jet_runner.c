@@ -519,6 +519,8 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
     button = event->data.button.button;
     if (action == GM_PLUGIN_BUTTON_ACTION_TRIGGER &&
         button == GM_PLUGIN_BUTTON_BACK) {
+        self->exit_ui.active = false;
+        self->exit_ui.committed = true;
         self->host->app_exit();
         return true;
     }

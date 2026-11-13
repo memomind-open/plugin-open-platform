@@ -15,9 +15,9 @@ when previewing or exporting them independently.
 
 | Plugin | Restored details at 600x350 |
 | --- | --- |
-| Jet Runner v6 | Header labels centered vertically; centered footer; original 11-language text; content-height 260-pixel result panel; antialiased circular hold-exit overlay retained until Host stop; BACK exit; 20-pixel accessory target movement; fractional collision bounds; restart-time pitch calibration; accumulated frame duration capped at 100ms |
+| Jet Runner v7 | Header labels centered vertically; centered footer; original 11-language text; content-height 260-pixel result panel; antialiased circular hold-exit overlay retained until Host stop; committed BACK exit; 20-pixel accessory target movement; fractional collision bounds; restart-time pitch calibration; accumulated frame duration capped at 100ms |
 | Breakout v10 | 28-pixel bricks centered at x=66; bottom-row brick slots; vertical background grid; native paddle/trail styles and one-frame trail lag; content-sized score label, 130-pixel score reservation and 386/64 hint/timer widths; content-sized pause/result panels including padding and borders; fractional collisions; native delta-time integration; original localized text; antialiased circular hold overlay retained until Host stop; 20-pixel accessory steps; firmware head-exit countdown cadence |
-| Tetris v7 | 60x60 preview at (340,8), 10-pixel preview cells; 388-pixel instruction area; original 11-language text and dark instruction color; preview above instructions and hidden while looking up to exit; countdown width includes borders; all 28 native rotation masks; native IMU debounce, 100ms simulation steps and clear animation; 32-bit score |
+| Tetris v8 | 60x60 preview at (340,8), 10-pixel preview cells; 388-pixel instruction area; original 11-language text and dark instruction color; preview above instructions and hidden while looking up to exit; countdown width includes borders; committed head-exit after countdown; all 28 native rotation masks; native IMU debounce, 100ms simulation steps and clear animation; 32-bit score |
 
 ## Second source audit (2026-11-12)
 
@@ -88,6 +88,16 @@ cycle resets the latch. Regression checks reproduce the failure on the old
 ports and verify delayed stop, release/click/BACK events, extra loops,
 suspend/resume and subsequent restart on the corrected ports. This does not
 establish a device recording of the final transition.
+
+The follow-up exit audit found two uncovered paths: Jet Runner BACK did not
+set the committed state, and Tetris head-exit could request exit every second
+while continuing simulation between requests. Jet Runner v7 / Tetris v8 now
+commit those paths before `app_exit()`. Until Host stop, further loops, queued
+buttons and suspend/resume neither advance the game nor write game UI or use
+IMU services. A new visible cycle restores normal simulation and controls.
+The recording-Host regression covers normal play, BACK during an unfinished
+hold, Tetris line clearing, and game-over restart input. The countdown remains
+cancellable before completion, with its existing cadence and simulation.
 
 After the source audit, visual feedback from both Studio and glasses exposed
 visible polygonal corners in the polyline exit ring. Breakout v9 / Jet Runner

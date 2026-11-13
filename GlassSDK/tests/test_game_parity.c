@@ -18,7 +18,7 @@ struct _lv_obj_t {
 };
 static struct _lv_obj_t objects[1024];
 static unsigned count = 1, fail_at, exits, unsubscribed;
-static unsigned images;
+static unsigned images, ui_writes, imu_calls;
 static uint32_t clock_ms;
 static int16_t pitch, gyro_x, gyro_y;
 static bool deny_imu, old_host, call_active;
@@ -38,6 +38,7 @@ static void *notify_context;
 static gm_plugin_lvgl_obj_t *root(void) { return &objects[0]; }
 static gm_plugin_lvgl_obj_t *create(gm_plugin_lvgl_obj_t *parent)
 {
+    ++ui_writes;
     assert(parent);
     if (fail_at && count >= fail_at) return NULL;
     assert(count < 1024);
@@ -47,26 +48,26 @@ static gm_plugin_lvgl_obj_t *create(gm_plugin_lvgl_obj_t *parent)
     return obj;
 }
 static void clean(gm_plugin_lvgl_obj_t *obj)
-{ assert(obj == root()); count = 1; }
+{ ++ui_writes; assert(obj == root()); count = 1; }
 static void pos(gm_plugin_lvgl_obj_t *obj, int32_t x, int32_t y)
-{ assert(obj); obj->x=x; obj->y=y; }
+{ ++ui_writes; assert(obj); obj->x=x; obj->y=y; }
 static void size(gm_plugin_lvgl_obj_t *obj, int32_t w, int32_t h)
-{ assert(obj); assert(w>=0 && h>=0); obj->w=w; obj->h=h; }
+{ ++ui_writes; assert(obj); assert(w>=0 && h>=0); obj->w=w; obj->h=h; }
 static void align_obj(gm_plugin_lvgl_obj_t *obj, gm_plugin_lvgl_align_t a, int32_t x, int32_t y)
-{ assert(obj); obj->alignment=a; obj->x=x; obj->y=y; }
+{ ++ui_writes; assert(obj); obj->alignment=a; obj->x=x; obj->y=y; }
 static void add(gm_plugin_lvgl_obj_t *obj, uint32_t flag)
-{ assert(obj); obj->flags |= flag; }
+{ ++ui_writes; assert(obj); obj->flags |= flag; }
 static void clear(gm_plugin_lvgl_obj_t *obj, uint32_t flag)
-{ assert(obj); obj->flags &= ~flag; }
+{ ++ui_writes; assert(obj); obj->flags &= ~flag; }
 static void style(gm_plugin_lvgl_obj_t *obj, gm_plugin_lvgl_style_prop_t p,
                   gm_plugin_lvgl_style_value_t v, gm_plugin_lvgl_selector_t selector)
-{ (void)selector; assert(obj && p<128); obj->style[p]=v; if(p==1) obj->w=v.num; }
+{ ++ui_writes; (void)selector; assert(obj && p<128); obj->style[p]=v; if(p==1) obj->w=v.num; }
 static void text(gm_plugin_lvgl_obj_t *obj, const char *s)
-{ assert(obj && s); assert(strlen(s)<sizeof(obj->text)); strcpy(obj->text,s); }
+{ ++ui_writes; assert(obj && s); assert(strlen(s)<sizeof(obj->text)); strcpy(obj->text,s); }
 static void mode(gm_plugin_lvgl_obj_t *obj, gm_plugin_lvgl_label_mode_t v)
-{ assert(obj); (void)v; }
+{ ++ui_writes; assert(obj); (void)v; }
 static void points(gm_plugin_lvgl_obj_t *obj, const gm_plugin_lvgl_point_t *p, uint16_t n)
-{ assert(obj); obj->points=p; obj->point_count=n; }
+{ ++ui_writes; assert(obj); obj->points=p; obj->point_count=n; }
 static gm_plugin_lvgl_obj_t *create_image(gm_plugin_lvgl_obj_t *parent,
                                          const gm_plugin_lvgl_image_dsc_t *image)
 {
@@ -100,10 +101,10 @@ static void log_message(const char *format, ...) { (void)format; }
 static gm_plugin_result_t get_info(gm_plugin_display_info_t *d)
 { memset(d,0,sizeof(*d)); d->width=display_w; d->height=display_h; return GM_PLUGIN_OK; }
 static gm_plugin_result_t read_imu(gm_plugin_imu_sample_t *s)
-{ memset(s,0,sizeof(*s)); s->pitch_degrees=pitch;
+{ ++imu_calls; memset(s,0,sizeof(*s)); s->pitch_degrees=pitch;
   s->gyro_raw[0]=gyro_x; s->gyro_raw[1]=gyro_y; return GM_PLUGIN_OK; }
 static gm_plugin_result_t enable_imu(gm_plugin_imu_modes_t m)
-{ return deny_imu && m ? GM_PLUGIN_ENOTSUP:GM_PLUGIN_OK; }
+{ ++imu_calls; return deny_imu && m ? GM_PLUGIN_ENOTSUP:GM_PLUGIN_OK; }
 static gm_plugin_result_t language(char *s) { strcpy(s,locale); return GM_PLUGIN_OK; }
 static void send_call(bool active)
 {
@@ -238,6 +239,90 @@ static void audit_edge_cases(void)
     reset_game(&game);
 #endif
 }
+
+#if defined(TEST_JET_RUNNER) || defined(TEST_TETRIS)
+static void assert_waiting_for_stop(unsigned expected_exits)
+{
+    unsigned char frozen_game[sizeof(game)];
+    unsigned writes_before=ui_writes, imu_before=imu_calls;
+    memcpy(frozen_game,&game,sizeof(game));
+    /* Keep dispatching callbacks after app_exit, without delivering on_stop. */
+    pitch=31; gyro_x=20; gyro_y=-20;
+    for(unsigned i=0;i<25;++i) tick(100);
+    assert(exits==expected_exits);
+    assert(memcmp(frozen_game,&game,sizeof(game))==0);
+    assert(ui_writes==writes_before && imu_calls==imu_before);
+
+    button(GM_PLUGIN_BUTTON_BACK,GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+    button(GM_PLUGIN_BUTTON_UP,GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+    button(GM_PLUGIN_BUTTON_DOWN,GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+    button(GM_PLUGIN_BUTTON_LEFT,GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+    button(GM_PLUGIN_BUTTON_RIGHT,GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+    button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_SINGLE);
+    button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_DOUBLE);
+    button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_LONG);
+    button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_VERY_LONG);
+    button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_RELEASE);
+    pitch=0; gyro_x=gyro_y=0; tick(100);
+    plugin.on_suspend(plugin.context);
+    plugin.on_resume(plugin.context); tick(100);
+    assert(exits==expected_exits);
+    assert(memcmp(frozen_game,&game,sizeof(game))==0);
+    assert(ui_writes==writes_before && imu_calls==imu_before);
+}
+
+static void audit_pending_exit(void)
+{
+    for(unsigned scenario=0;scenario<3;++scenario) {
+        unsigned old_exits=exits;
+        pitch=0; gyro_x=gyro_y=0;
+        assert(plugin.on_start(plugin.context)==GM_PLUGIN_OK);
+#ifdef TEST_JET_RUNNER
+        if(scenario==1) {
+            button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_LONG);
+            tick(801); /* BACK while the cancellable hold overlay is visible. */
+        } else if(scenario==2) {
+            finish(&game); /* Queued clicks must not restart after BACK. */
+        }
+        button(GM_PLUGIN_BUTTON_BACK,GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+#else
+        pitch=31; tick(100);
+        for(unsigned second=0;second<3;++second) {
+            for(unsigned i=0;i<10;++i) tick(100);
+            assert(exits==old_exits); /* Preserve the native 3, 2, 1 cadence. */
+        }
+        assert(game.exit_seconds==0 && !hidden(game.exit_label));
+        for(unsigned i=0;i<9;++i) tick(100);
+        if(scenario==1) {
+            memset(game.board[ROWS-1],1,COLS);
+            assert(begin_line_clear(&game));
+        } else if(scenario==2) {
+            memset(game.board,1,sizeof(game.board)); spawn(&game);
+            assert(game.game_over);
+        }
+        tick(100);
+#endif
+        assert(exits==old_exits+1);
+        assert_waiting_for_stop(old_exits+1);
+        plugin.on_stop(plugin.context);
+        assert(plugin.on_start(plugin.context)==GM_PLUGIN_OK);
+#ifdef TEST_JET_RUNNER
+        int32_t before=game.obstacles[0].x_q;
+        tick(100); assert(game.obstacles[0].x_q<before);
+        button(GM_PLUGIN_BUTTON_UP,GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+        assert(game.accessory_offset_y==-20);
+#else
+        int8_t before=game.piece.y;
+        for(unsigned i=0;i<3;++i) tick(100);
+        assert(game.piece.y==before+1);
+        button(GM_PLUGIN_BUTTON_DOWN,GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+        assert(game.piece.y==before+2);
+#endif
+        assert(exits==old_exits+1);
+        plugin.on_stop(plugin.context);
+    }
+}
+#endif
 
 int main(void)
 {
@@ -417,6 +502,9 @@ int main(void)
 #endif
         plugin.on_stop(plugin.context);
     }
+#if defined(TEST_JET_RUNNER) || defined(TEST_TETRIS)
+    audit_pending_exit();
+#endif
     puts("Firmware game layout, exit, input, failure cleanup and lifecycle passed");
     return 0;
 }

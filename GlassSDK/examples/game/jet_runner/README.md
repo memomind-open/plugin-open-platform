@@ -16,6 +16,9 @@ image states. Older Hosts render the same pixels through horizontal runs.
 Version 6 retains the exit overlay after hold completion until the asynchronous
 Host stop arrives. Queued input and loop callbacks cannot reveal the game again.
 
+Version 7 also commits BACK exits before requesting Host stop. Simulation and
+input stay frozen during the wait, including suspend/resume and repeated BACK.
+
 - Look up/down or press the accessory up/down buttons: fly
 - Hold an accessory up/down button to keep moving in that direction
 - Single/double click after collision: restart

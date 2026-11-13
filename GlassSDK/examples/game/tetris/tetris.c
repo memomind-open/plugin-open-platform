@@ -76,6 +76,7 @@ typedef struct {
     bool fast_drop;
     bool clearing_lines;
     bool exiting;
+    bool exit_committed; /* Freeze callbacks until the asynchronous Host stop. */
 } tetris_t;
 
 static tetris_t game;
@@ -591,6 +592,7 @@ static gm_plugin_result_t plugin_start(void *opaque)
     }
     result = create_ui(self);
     if (result == GM_PLUGIN_OK) {
+        self->exit_committed = false;
         reset_game(self);
     } else {
         (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
@@ -603,6 +605,7 @@ static gm_plugin_result_t plugin_start(void *opaque)
 static void plugin_loop(void *opaque, uint32_t elapsed_ms)
 {
     tetris_t *self = opaque;
+    if (self->exit_committed) return;
     gm_plugin_imu_sample_t imu;
     uint32_t interval;
     uint32_t now = self->host->monotonic_ms();
@@ -624,6 +627,7 @@ static void plugin_loop(void *opaque, uint32_t elapsed_ms)
             if (now - self->exit_ms >= 1000U) {
                 self->exit_ms = now;
                 if (self->exit_seconds == 0U) {
+                    self->exit_committed = true;
                     self->host->app_exit();
                     return;
                 }
@@ -673,6 +677,7 @@ static void plugin_loop(void *opaque, uint32_t elapsed_ms)
 static void plugin_suspend(void *opaque)
 {
     tetris_t *self = opaque;
+    if (self->exit_committed) return;
     self->fast_drop = false;
     self->exiting = false;
     self->exit_ms = 0;
@@ -686,6 +691,7 @@ static void plugin_suspend(void *opaque)
 static void plugin_resume(void *opaque)
 {
     tetris_t *self = opaque;
+    if (self->exit_committed) return;
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW |
                                 GM_PLUGIN_IMU_ENABLE_GESTURES);
 }
@@ -696,6 +702,7 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
     gm_plugin_button_t button;
     gm_plugin_button_action_t action;
     if (event == 0 || event->type != GM_PLUGIN_EVENT_BUTTON) return false;
+    if (self->exit_committed) return true;
     button = event->data.button.button;
     action = event->data.button.action;
 
