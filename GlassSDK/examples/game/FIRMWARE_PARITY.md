@@ -16,8 +16,8 @@ when previewing or exporting them independently.
 | Plugin | Restored details at 600x350 |
 | --- | --- |
 | Jet Runner v7 | Header labels centered vertically; centered footer; original 11-language text; content-height 260-pixel result panel; antialiased circular hold-exit overlay retained until Host stop; committed BACK exit; 20-pixel accessory target movement; fractional collision bounds; restart-time pitch calibration; accumulated frame duration capped at 100ms |
-| Breakout v10 | 28-pixel bricks centered at x=66; bottom-row brick slots; vertical background grid; native paddle/trail styles and one-frame trail lag; content-sized score label, 130-pixel score reservation and 386/64 hint/timer widths; content-sized pause/result panels including padding and borders; fractional collisions; native delta-time integration; original localized text; antialiased circular hold overlay retained until Host stop; 20-pixel accessory steps; firmware head-exit countdown cadence |
-| Tetris v8 | 60x60 preview at (340,8), 10-pixel preview cells; 388-pixel instruction area; original 11-language text and dark instruction color; preview above instructions and hidden while looking up to exit; countdown width includes borders; committed head-exit after countdown; all 28 native rotation masks; native IMU debounce, 100ms simulation steps and clear animation; 32-bit score |
+| Breakout v11 | 28-pixel bricks centered at x=66; bottom-row brick slots; vertical background grid; native paddle/trail styles and one-frame trail lag; content-sized score label, 130-pixel score reservation and 386/64 hint/timer widths; content-sized pause/result panels including padding and borders; fractional collisions; native delta-time integration; original localized text; antialiased circular hold overlay retained until Host stop; all exit paths committed before Host exit; 20-pixel accessory steps; firmware head-exit countdown cadence |
+| Tetris v9 | 60x60 preview at (340,8), 10-pixel preview cells; 388-pixel instruction area; original 11-language text and dark instruction color; preview above instructions and hidden while looking up to exit; countdown width includes borders; committed head-exit after countdown; all 28 native rotation masks; native IMU debounce, 100ms simulation steps with fractional-time retention and clear animation; 32-bit score |
 
 ## Second source audit (2026-11-12)
 
@@ -98,6 +98,18 @@ IMU services. A new visible cycle restores normal simulation and controls.
 The recording-Host regression covers normal play, BACK during an unfinished
 hold, Tetris line clearing, and game-over restart input. The countdown remains
 cancellable before completion, with its existing cadence and simulation.
+
+Breakout v11 extends committed exits to head-exit, BACK and restart failure.
+Its earlier `exiting == 2` guard stopped physics but still allowed cooked clicks
+to write UI and suspend/resume to reactivate callbacks. Regression now covers
+BACK/head-exit during play, pause and game over, BACK during a hold, failed
+restart, and raw input after a pending exit.
+
+Tetris v9 retains the remainder below 100ms across callbacks. Clearing the
+accumulator previously made 16ms callbacks advance a step every 112ms, slowing
+the game systematically. Fixed 16/33/60ms and jittered callback tests check
+gravity, fast drop and line clearing. Delayed callbacks still advance at most
+one step and discard missed whole steps, without accumulating catch-up work.
 
 After the source audit, visual feedback from both Studio and glasses exposed
 visible polygonal corners in the polyline exit ring. Breakout v9 / Jet Runner

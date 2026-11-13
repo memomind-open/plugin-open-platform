@@ -612,7 +612,9 @@ static void plugin_loop(void *opaque, uint32_t elapsed_ms)
     if (elapsed_ms > 200U) elapsed_ms = 200U;
     self->frame_accumulator += elapsed_ms;
     if (self->frame_accumulator < FRAME_MS) return;
-    self->frame_accumulator = 0;
+    /* Keep fractional time across callbacks; discard missed whole ticks after
+     * a stall so a callback still advances simulation by at most one step. */
+    self->frame_accumulator %= FRAME_MS;
     if (self->host->imu_read(&imu) == GM_PLUGIN_OK) {
         int32_t gx = imu.gyro_raw[0];
         int32_t gy = imu.gyro_raw[1];

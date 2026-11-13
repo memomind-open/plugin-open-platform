@@ -240,7 +240,6 @@ static void audit_edge_cases(void)
 #endif
 }
 
-#if defined(TEST_JET_RUNNER) || defined(TEST_TETRIS)
 static void assert_waiting_for_stop(unsigned expected_exits)
 {
     unsigned char frozen_game[sizeof(game)];
@@ -273,7 +272,12 @@ static void assert_waiting_for_stop(unsigned expected_exits)
 
 static void audit_pending_exit(void)
 {
-    for(unsigned scenario=0;scenario<3;++scenario) {
+#ifdef TEST_BREAKOUT
+    const unsigned scenarios=8;
+#else
+    const unsigned scenarios=3;
+#endif
+    for(unsigned scenario=0;scenario<scenarios;++scenario) {
         unsigned old_exits=exits;
         pitch=0; gyro_x=gyro_y=0;
         assert(plugin.on_start(plugin.context)==GM_PLUGIN_OK);
@@ -285,6 +289,27 @@ static void audit_pending_exit(void)
             finish(&game); /* Queued clicks must not restart after BACK. */
         }
         button(GM_PLUGIN_BUTTON_BACK,GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+#elif defined(TEST_BREAKOUT)
+        /* BACK/head-exit while running, paused, or over; BACK during a hold;
+         * and an allocation failure when restarting after game over. */
+        if(scenario<6 && scenario%3==1)
+            button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_SINGLE);
+        if((scenario<6 && scenario%3==2) || scenario==7)
+            finish_game(&game,0);
+        if(scenario==6) {
+            button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_LONG);
+            tick(801);
+        }
+        if(scenario==7) {
+            fail_at=4;
+            button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_SINGLE);
+            fail_at=0;
+        } else if(scenario>=3 && scenario<6) {
+            pitch=31; tick(50);
+            for(unsigned i=0;i<80;++i) tick(50);
+        } else {
+            button(GM_PLUGIN_BUTTON_BACK,GM_PLUGIN_BUTTON_ACTION_TRIGGER);
+        }
 #else
         pitch=31; tick(100);
         for(unsigned second=0;second<3;++second) {
@@ -311,6 +336,11 @@ static void audit_pending_exit(void)
         tick(100); assert(game.obstacles[0].x_q<before);
         button(GM_PLUGIN_BUTTON_UP,GM_PLUGIN_BUTTON_ACTION_TRIGGER);
         assert(game.accessory_offset_y==-20);
+#elif defined(TEST_BREAKOUT)
+        int32_t before=game.ball_x;
+        tick(50); assert(game.ball_x!=before);
+        button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_SINGLE);
+        assert(game.paused);
 #else
         int8_t before=game.piece.y;
         for(unsigned i=0;i<3;++i) tick(100);
@@ -321,6 +351,52 @@ static void audit_pending_exit(void)
         assert(exits==old_exits+1);
         plugin.on_stop(plugin.context);
     }
+}
+
+#ifdef TEST_TETRIS
+static void assert_tetris_cadence(const uint32_t *intervals, unsigned count)
+{
+    uint32_t elapsed=0;
+    reset_game(&game);
+    int8_t initial_y=game.piece.y;
+    for(unsigned i=0;i<50;++i) {
+        elapsed+=intervals[i%count];
+        tick(intervals[i%count]);
+        /* Gravity follows elapsed time even when callbacks do not divide 100ms. */
+        assert(game.piece.y==initial_y+(int8_t)(elapsed/NORMAL_DROP_MS));
+        assert(game.drop_accumulator==(elapsed/FRAME_MS*FRAME_MS)%NORMAL_DROP_MS);
+    }
+}
+
+static void audit_tetris_cadence(void)
+{
+    const uint32_t fixed[]={16,33,60};
+    const uint32_t jitter[]={16,33,60,17,74};
+    pitch=0; gyro_x=gyro_y=0;
+    assert(plugin.on_start(plugin.context)==GM_PLUGIN_OK);
+    for(unsigned i=0;i<sizeof(fixed)/sizeof(*fixed);++i)
+        assert_tetris_cadence(&fixed[i],1);
+    assert_tetris_cadence(jitter,sizeof(jitter)/sizeof(*jitter));
+
+    reset_game(&game);
+    int8_t initial_y=game.piece.y;
+    button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_LONG);
+    for(unsigned i=0;i<10;++i) tick(60);
+    assert(game.piece.y==initial_y+6); /* Six fast-drop steps in 600ms. */
+
+    reset_game(&game);
+    memset(game.board[ROWS-1],1,COLS);
+    assert(begin_line_clear(&game));
+    for(unsigned i=0;i<21;++i) tick(33);
+    assert(game.clearing_lines && game.clear_animation_ms==600);
+    tick(33); assert(!game.clearing_lines && game.score==100);
+
+    reset_game(&game);
+    tick(60); tick(2000); /* A stalled callback still advances only one step. */
+    assert(game.drop_accumulator==100);
+    tick(40); assert(game.drop_accumulator==200); /* Preserve the 60ms remainder. */
+    tick(1); assert(game.drop_accumulator==200); /* No queued catch-up steps. */
+    plugin.on_stop(plugin.context);
 }
 #endif
 
@@ -502,8 +578,9 @@ int main(void)
 #endif
         plugin.on_stop(plugin.context);
     }
-#if defined(TEST_JET_RUNNER) || defined(TEST_TETRIS)
     audit_pending_exit();
+#ifdef TEST_TETRIS
+    audit_tetris_cadence();
 #endif
     puts("Firmware game layout, exit, input, failure cleanup and lifecycle passed");
     return 0;

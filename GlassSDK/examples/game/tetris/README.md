@@ -29,3 +29,8 @@ Version 8 commits head-exit once the countdown completes. Simulation, rendering
 and game input stop until Host stop, even if callbacks continue or the head is
 lowered. Suspend/resume cannot cancel a committed exit; a new start resets it.
 The countdown cadence and cancellation before completion remain unchanged.
+
+Version 9 retains the fractional remainder of the 100ms simulation clock across
+Host callbacks. Regular 16/33/60ms callbacks and jitter no longer slow gravity,
+fast drop or line clearing. A stalled callback still advances only one step,
+discarding missed whole steps without discarding the fractional remainder.

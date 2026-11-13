@@ -944,6 +944,16 @@ static gm_plugin_result_t on_start(void *opaque)
     return result;
 }
 
+/* Callbacks guard committed exits at entry. The hold helper may already have
+ * committed its overlay before reaching this common Host request path. */
+static void request_exit(breakout_t *self)
+{
+    self->exiting = 2;
+    self->exit_ui.active = false;
+    self->exit_ui.committed = true;
+    self->host->app_exit();
+}
+
 static void on_loop(void *opaque, uint32_t elapsed_ms)
 {
     breakout_t *self = opaque;
@@ -952,7 +962,7 @@ static void on_loop(void *opaque, uint32_t elapsed_ms)
     uint32_t seconds = active_elapsed_ms(self, now) / 1000U;
     if (elapsed_ms > 150U) elapsed_ms = 150U;
     if (firmware_exit_complete(&self->exit_ui, self->ui, now)) {
-        self->host->app_exit();
+        request_exit(self);
         return;
     }
     self->frame_accumulator += elapsed_ms;
@@ -962,7 +972,7 @@ static void on_loop(void *opaque, uint32_t elapsed_ms)
         self->frame_accumulator = 0;
         if (frame(self, now, frame_ms)) {
             /* Host may unload the plugin in app_exit. Do not touch it again. */
-            self->host->app_exit();
+            request_exit(self);
             return;
         }
     }
@@ -994,10 +1004,7 @@ static bool on_event(void *opaque, const gm_plugin_event_t *event)
     if (action == GM_PLUGIN_BUTTON_ACTION_TRIGGER) {
         /* Mouse secondary click is cooked as BACK, not direction RIGHT. */
         if (button == GM_PLUGIN_BUTTON_BACK) {
-            if (self->exiting != 2U) {
-                self->exiting = 2;
-                self->host->app_exit();
-            }
+            request_exit(self);
             return true;
         }
         if (button == GM_PLUGIN_BUTTON_SCROLL_UP ||
@@ -1019,7 +1026,7 @@ static bool on_event(void *opaque, const gm_plugin_event_t *event)
     }
     if (action != GM_PLUGIN_BUTTON_ACTION_SINGLE) return false;
     if (self->ended != 0U) {
-        if (restart(self) != GM_PLUGIN_OK) self->host->app_exit();
+        if (restart(self) != GM_PLUGIN_OK) request_exit(self);
     } else if (self->paused != 0U) {
         self->paused_total_ms += self->host->monotonic_ms() - self->pause_ms;
         self->paused = 0;

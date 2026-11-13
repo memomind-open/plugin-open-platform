@@ -150,6 +150,14 @@ int main(void)
     e.key=GM_PLUGIN_INPUT_KEY_MOUSE_RIGHT; e.phase=GM_PLUGIN_INPUT_PHASE_DOWN;
     on_input(&s,&e); assert(exits==1 && s.exiting==2);
     on_input(&s,&e); assert(exits==1);
+    before=positions;
+    int subscribed_before=subscriptions;
+    on_suspend(&s); on_resume(&s);
+    assert(subscriptions==subscribed_before);
+    sample(&s, GM_PLUGIN_INPUT_KEY_REL_X, GM_PLUGIN_INPUT_AXIS_X, -12);
+    e.key=GM_PLUGIN_INPUT_KEY_MOUSE_LEFT; on_input(&s,&e);
+    e.key=GM_PLUGIN_INPUT_KEY_MOUSE_RIGHT; on_input(&s,&e);
+    assert(positions==before && exits==1 && !s.paused);
     puts("Input ABI/discovery, Breakout REL/ABS/KEY/TOUCH, fallback and lifecycle passed");
     return 0;
 }

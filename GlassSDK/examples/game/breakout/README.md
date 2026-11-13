@@ -51,6 +51,10 @@ image states. Older Hosts render the same pixels through horizontal runs.
 Version 10 retains the exit overlay after hold completion until the asynchronous
 Host stop arrives. Queued input and loop callbacks cannot reveal the game again.
 
+Version 11 commits every exit path, including head-exit, BACK and a failed
+restart. Loops, cooked/raw input and suspend/resume stay frozen until Host stop;
+they cannot update the game UI, restart play or issue another exit request.
+
 Input extension ID 4 is optional. All four classes are subscribed at once.
 Unsupported firmware, an absent table,
 or failed subscription leaves head and button controls working. The Host pauses
