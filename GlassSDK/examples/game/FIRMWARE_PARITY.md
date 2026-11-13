@@ -15,8 +15,8 @@ when previewing or exporting them independently.
 
 | Plugin | Restored details at 600x350 |
 | --- | --- |
-| Jet Runner v7 | Header labels centered vertically; centered footer; original 11-language text; content-height 260-pixel result panel; antialiased circular hold-exit overlay retained until Host stop; committed BACK exit; 20-pixel accessory target movement; fractional collision bounds; restart-time pitch calibration; accumulated frame duration capped at 100ms |
-| Breakout v11 | 28-pixel bricks centered at x=66; bottom-row brick slots; vertical background grid; native paddle/trail styles and one-frame trail lag; content-sized score label, 130-pixel score reservation and 386/64 hint/timer widths; content-sized pause/result panels including padding and borders; fractional collisions; native delta-time integration; original localized text; antialiased circular hold overlay retained until Host stop; all exit paths committed before Host exit; 20-pixel accessory steps; firmware head-exit countdown cadence |
+| Jet Runner v8 | Header labels centered vertically; centered footer; original 11-language text; content-height 260-pixel result panel; antialiased circular hold-exit overlay using the required LVGL API 1.1 images, retained until Host stop; committed BACK exit; 20-pixel accessory target movement; fractional collision bounds; restart-time pitch calibration; accumulated frame duration capped at 100ms |
+| Breakout v12 | 28-pixel bricks centered at x=66; bottom-row brick slots; vertical background grid; native paddle/trail styles and one-frame trail lag; content-sized score label, 130-pixel score reservation and 386/64 hint/timer widths; content-sized pause/result panels including padding and borders; fractional collisions; native delta-time integration; original localized text; antialiased circular hold overlay using the required LVGL API 1.1 images, retained until Host stop; all exit paths committed before Host exit; 20-pixel accessory steps; firmware head-exit countdown cadence |
 | Tetris v9 | 60x60 preview at (340,8), 10-pixel preview cells; 388-pixel instruction area; original 11-language text and dark instruction color; preview above instructions and hidden while looking up to exit; countdown width includes borders; committed head-exit after countdown; all 28 native rotation masks; native IMU debounce, 100ms simulation steps with fractional-time retention and clear animation; 32-bit score |
 
 ## Second source audit (2026-11-12)
@@ -116,12 +116,21 @@ visible polygonal corners in the polyline exit ring. Breakout v9 / Jet Runner
 v5 replace it with a supersampled analytic annulus: 48px diameter, 4px stroke,
 16 alpha levels, clockwise half-circle with rounded caps, then a full circle.
 `common/generate_exit_art.py` produces the original icon and both ring states
-as aligned indexed images (three LVGL objects on 1.1 Hosts). Older LVGL 1.0
-Hosts use equivalent horizontal pixel runs; this fallback needs more Host UI
-objects. Regenerate with Python and Pillow. Runtime needs neither dependency.
+as aligned indexed images. Jet Runner v8 / Breakout v12 require the plugin LVGL
+API 1.1 and its `image_create` entry. The former API 1.0 fallback, which created
+682 pixel-run objects in addition to containers and text, has been removed
+along with its generated run tables. The exit UI now always has five objects:
+one overlay, one label and three images. Version/table-size/function checks
+reject incompatible Hosts at entry, before UI creation. The recording-Host
+tests verify the five-object budget across repeated game restarts and cleanup
+after allocation failures. The underlying firmware LVGL library version is
+separate from this plugin interface requirement.
+
+Regenerate with Python and Pillow. Runtime needs neither dependency.
 `tests/test_exit_art.py` checks radial coverage, symmetry, stroke bounds and
-image/fallback pixel equivalence. The generated image pixels were visually
-inspected enlarged; this is not a claim of updated Studio/device validation.
+the unchanged image payloads. The generated image pixels were visually
+inspected enlarged before removal of the fallback; this is not a claim of
+updated Studio/device validation.
 
 ## Deliberate adaptations and verification limits
 
@@ -170,7 +179,7 @@ CC=gcc CFLAGS="-fsanitize=address,undefined -g" python3 GlassSDK/tests/test_inpu
 The parity fixture calls the actual game entry points with a recording Host.
 It checks layout, text, hold timing after slow frames, release cancellation,
 BACK, input, suspend/resume, stop/restart, failed creation, denied IMU,
-unsupported displays, telephone UI and older Hosts without system events.
+unsupported displays, telephone UI and Hosts without optional system events.
 It does not render actual LVGL pixels or validate Bluetooth radio delivery.
 
 Build only these examples from `GlassSDK/`:

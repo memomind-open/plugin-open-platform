@@ -11,13 +11,18 @@ pitch when restarting, and caps the accumulated frame duration at 100ms.
 Scores use 32 bits, matching the native game's practical range.
 
 Version 5 replaces the visibly polygonal hold-exit ring with antialiased circular
-image states. Older Hosts render the same pixels through horizontal runs.
+image states.
 
 Version 6 retains the exit overlay after hold completion until the asynchronous
 Host stop arrives. Queued input and loop callbacks cannot reveal the game again.
 
 Version 7 also commits BACK exits before requesting Host stop. Simulation and
 input stay frozen during the wait, including suspend/resume and repeated BACK.
+
+Version 8 requires the plugin LVGL API 1.1 image interface. The exit UI uses
+five objects: one overlay, one label and three images. The API 1.0 pixel-object
+fallback has been removed; incompatible Hosts are rejected before UI creation.
+This requirement is the plugin interface version, not the LVGL library version.
 
 - Look up/down or press the accessory up/down buttons: fly
 - Hold an accessory up/down button to keep moving in that direction

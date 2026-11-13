@@ -128,7 +128,7 @@ static gm_plugin_result_t discover(gm_plugin_extension_id_t id,const void **api)
     return *api ? GM_PLUGIN_OK:GM_PLUGIN_ENOTSUP;
 }
 static gm_plugin_lvgl_api_t ui={
-    .struct_size=sizeof(ui),.api_version=GM_PLUGIN_LVGL_API_MIN_VERSION,
+    .struct_size=sizeof(ui),.api_version=GM_PLUGIN_LVGL_API_VERSION,
     .root_get=root,.obj_create=create,.obj_clean=clean,
     .obj_set_pos=pos,.obj_set_size=size,.obj_align=align_obj,
     .obj_add_flag=add,.obj_clear_flag=clear,.style_set=style,
@@ -150,6 +150,45 @@ static bool hidden(gm_plugin_lvgl_obj_t *o)
 { return (o->flags&GM_PLUGIN_LVGL_FLAG_HIDDEN)!=0; }
 static gm_plugin_lvgl_obj_t *find_text(const char *s)
 { for(unsigned i=1;i<count;++i) if(strcmp(objects[i].text,s)==0) return &objects[i]; return NULL; }
+
+#if defined(TEST_JET_RUNNER) || defined(TEST_BREAKOUT)
+static void audit_exit_image_requirements(gm_plugin_host_api_t *host)
+{
+    gm_plugin_descriptor_t candidate={0}; candidate.struct_size=sizeof(candidate);
+    unsigned writes_before=ui_writes;
+    ui.api_version=GM_PLUGIN_LVGL_API_MIN_VERSION;
+    assert(gm_plugin_entry(host,&candidate)==GM_PLUGIN_EVERSION);
+    ui.api_version=GM_PLUGIN_LVGL_API_VERSION;
+
+    /* A genuinely truncated table lets ASan catch an out-of-bounds read of
+     * image_create before validating the 1.1 table size. */
+    gm_plugin_lvgl_api_t *short_ui=malloc(GM_PLUGIN_LVGL_API_MIN_SIZE);
+    assert(short_ui);
+    memcpy(short_ui,&ui,GM_PLUGIN_LVGL_API_MIN_SIZE);
+    short_ui->struct_size=GM_PLUGIN_LVGL_API_MIN_SIZE;
+    host->graphics.lvgl=short_ui;
+    assert(gm_plugin_entry(host,&candidate)==GM_PLUGIN_EVERSION);
+    host->graphics.lvgl=&ui;
+    free(short_ui);
+
+    ui.image_create=NULL;
+    assert(gm_plugin_entry(host,&candidate)==GM_PLUGIN_EVERSION);
+    ui.image_create=create_image;
+    assert(count==1 && ui_writes==writes_before && notify_call==NULL);
+}
+
+static void assert_exit_object_count(void)
+{
+    unsigned exit_objects=0;
+    for(unsigned i=1;i<count;++i) {
+        for(gm_plugin_lvgl_obj_t *obj=&objects[i];obj;obj=obj->parent) {
+            if(obj==game.exit_ui.overlay) { ++exit_objects; break; }
+        }
+    }
+    /* Overlay + label + three images, without pixel-object descendants. */
+    assert(exit_objects==5);
+}
+#endif
 
 #ifdef TEST_BREAKOUT
 static void assert_text_fits(gm_plugin_lvgl_obj_t *panel)
@@ -408,6 +447,9 @@ int main(void)
     host.display_get_info=get_info; host.imu_enable=enable_imu; host.imu_read=read_imu;
     host.monotonic_ms=now; host.app_exit=exit_app; host.locale_get=language;
     host.extension_get=discover; host.log=log_message;
+#if defined(TEST_JET_RUNNER) || defined(TEST_BREAKOUT)
+    audit_exit_image_requirements(&host);
+#endif
     plugin.struct_size=sizeof(plugin);
     assert(gm_plugin_entry(&host,&plugin)==GM_PLUGIN_OK);
     assert(plugin.on_start(plugin.context)==GM_PLUGIN_OK);
@@ -514,6 +556,24 @@ int main(void)
     assert(plugin.on_start(plugin.context)==GM_PLUGIN_OK);
 #if defined(TEST_JET_RUNNER) || defined(TEST_BREAKOUT)
     assert(images==3); /* Two antialiased ring states and the original icon. */
+    assert_exit_object_count();
+    unsigned initial_objects=count;
+    for(unsigned restart_count=0;restart_count<5;++restart_count) {
+        images=0;
+#ifdef TEST_BREAKOUT
+        finish_game(&game,0);
+#else
+        finish(&game);
+#endif
+        button(GM_PLUGIN_BUTTON_PRIMARY,GM_PLUGIN_BUTTON_ACTION_SINGLE);
+        assert_exit_object_count();
+        assert(count==initial_objects);
+#ifdef TEST_BREAKOUT
+        assert(images==3); /* Breakout rebuilds UI on each game restart. */
+#else
+        assert(images==0); /* Jet Runner reuses UI on each game restart. */
+#endif
+    }
 #endif
     unsigned object_count=count;
     plugin.on_stop(plugin.context);
@@ -525,16 +585,6 @@ int main(void)
         assert(count==1 && notify_call==NULL);
     }
     fail_at=0;
-#if defined(TEST_JET_RUNNER) || defined(TEST_BREAKOUT)
-    ui.api_version=GM_PLUGIN_LVGL_API_MIN_VERSION;
-    for(unsigned i=40;i<=400;i+=40) {
-        fail_at=i;
-        assert(plugin.on_start(plugin.context)==GM_PLUGIN_ENOMEM);
-        assert(count==1 && notify_call==NULL);
-    }
-    fail_at=0;
-    ui.api_version=GM_PLUGIN_LVGL_API_VERSION;
-#endif
 #ifdef TEST_TETRIS
     ui.font_get_line_height=NULL;
     assert(plugin.on_start(plugin.context)==GM_PLUGIN_ENOTSUP && notify_call==NULL);

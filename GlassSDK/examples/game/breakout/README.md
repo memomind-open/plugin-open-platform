@@ -46,7 +46,7 @@ the three-frame ball trail, fractional collision checks and native delta-time
 paddle/ball integration. The score label follows its text width as in firmware.
 
 Version 9 replaces the visibly polygonal hold-exit ring with antialiased circular
-image states. Older Hosts render the same pixels through horizontal runs.
+image states.
 
 Version 10 retains the exit overlay after hold completion until the asynchronous
 Host stop arrives. Queued input and loop callbacks cannot reveal the game again.
@@ -54,6 +54,12 @@ Host stop arrives. Queued input and loop callbacks cannot reveal the game again.
 Version 11 commits every exit path, including head-exit, BACK and a failed
 restart. Loops, cooked/raw input and suspend/resume stay frozen until Host stop;
 they cannot update the game UI, restart play or issue another exit request.
+
+Version 12 requires the plugin LVGL API 1.1 image interface. Each UI rebuild
+creates only five exit-UI objects: one overlay, one label and three images.
+The API 1.0 pixel-object fallback has been removed; incompatible Hosts are
+rejected before UI creation. This is the plugin interface version, not the
+LVGL library version.
 
 Input extension ID 4 is optional. All four classes are subscribed at once.
 Unsupported firmware, an absent table,

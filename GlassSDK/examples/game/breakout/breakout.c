@@ -1098,9 +1098,10 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
     if (gm_plugin_libc_get(host, &game.libc) != GM_PLUGIN_OK)
         return GM_PLUGIN_ENOTSUP;
     if (game.ui == 0 ||
-        game.ui->struct_size < GM_PLUGIN_LVGL_API_MIN_SIZE ||
+        game.ui->struct_size < GM_PLUGIN_LVGL_API_1_1_SIZE ||
         !GM_PLUGIN_VERSION_COMPATIBLE(game.ui->api_version,
-                                      GM_PLUGIN_LVGL_API_MIN_VERSION))
+                                      GM_PLUGIN_VERSION(1U, 1U)) ||
+        game.ui->image_create == 0)
         return GM_PLUGIN_EVERSION;
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
     plugin->context = &game;

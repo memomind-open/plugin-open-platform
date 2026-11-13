@@ -1,7 +1,8 @@
-"""Check the shipped ring pixels, including the LVGL 1.0 fallback.
+"""Check the shipped LVGL API 1.1 images used by the hold-exit UI.
 
 This verifies raster geometry, not the device/Studio compositor.
 """
+import hashlib
 import math
 from pathlib import Path
 import re
@@ -10,10 +11,14 @@ import unittest
 ART = Path(__file__).resolve().parents[1] / 'examples/game/common/firmware_exit_art.h'
 
 
-def decode(name, side):
+def image_bytes(name):
     source = ART.read_text(encoding='utf-8')
     body = source.split(f'{name}_pixels[] = {{', 1)[1].split('};', 1)[0]
-    data = bytes(int(s, 16) for s in re.findall(r'0x([0-9A-F]{2})', body))
+    return bytes(int(s, 16) for s in re.findall(r'0x([0-9A-F]{2})', body))
+
+
+def decode(name, side):
+    data = image_bytes(name)
     assert len(data) == 64 + side * side // 2
     pixels = []
     for byte in data[64:]:
@@ -59,21 +64,16 @@ class ExitArtTests(unittest.TestCase):
         self.assertEqual(half[24*48+46][3], 255)
         self.assertEqual(half[24*48+1][3], 0)
 
-    def test_legacy_runs_match_image_pixels(self):
-        source = ART.read_text(encoding='utf-8')
-        for name, side in [('firmware_exit_icon', 18), ('firmware_exit_half', 48), ('firmware_exit_full', 48)]:
-            pixels = decode(name, side)
-            body = source.split(f'{name}[] = {{', 1)[1].split('};', 1)[0]
-            rows = re.findall(r'\{(\d+), (\d+), (\d+), 0x([0-9A-F]+), (\d+)\}', body)
-            raster = [(0, 0)] * (side*side)
-            for sx, sy, sw, sg, sa in rows:
-                x, y, width, green, alpha = int(sx), int(sy), int(sw), int(sg, 16), int(sa)
-                self.assertLessEqual(x+width, side)
-                for i in range(width):
-                    self.assertEqual(raster[y*side+x+i][1], 0)
-                    raster[y*side+x+i] = (green, alpha)
-            expected = [(p[1]&0xF0, p[3]) if p[3] else (0,0) for p in pixels]
-            self.assertEqual(raster, expected)
+    def test_image_payloads_preserve_shipped_art(self):
+        # Keep the exact palettes and pixels when removing the object fallback.
+        expected = {
+            'firmware_exit_icon': '1ab0239a0fcaa04594ab95ffdc4c04a58e5b418c25f9b08ba78bb8d9b2d62626',
+            'firmware_exit_half': '37b0ac362f142264d2a1830c5158614ef6efe243143431f0cdf01772a039fc9a',
+            'firmware_exit_full': '6800e53977ca3ac03bc102bda29374af27a145d5d84402f63e4e913cab3df368',
+        }
+        for name, digest in expected.items():
+            with self.subTest(image=name):
+                self.assertEqual(hashlib.sha256(image_bytes(name)).hexdigest(), digest)
 
 
 if __name__ == '__main__':
