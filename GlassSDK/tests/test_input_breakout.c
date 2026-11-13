@@ -81,14 +81,14 @@ int main(void)
     button.data.button.action=GM_PLUGIN_BUTTON_ACTION_TRIGGER;
     button.data.button.button=GM_PLUGIN_BUTTON_RIGHT;
     subscribe_input(&s); assert(!s.input_active);
-    assert(on_event(&s,&button)); assert(s.paddle_x==132*Q);
+    assert(on_event(&s,&button)); assert(s.paddle_x==120*Q);
     s.input=&api; subscribe_result=GM_PLUGIN_ENOTSUP;
     subscribe_input(&s); assert(!s.input_active);
-    assert(on_event(&s,&button)); assert(s.paddle_x==164*Q);
+    assert(on_event(&s,&button)); assert(s.paddle_x==140*Q);
     subscribe_result=GM_PLUGIN_OK; subscribe_input(&s);
     assert(s.input_active && callback==on_input && callback_context==&s);
     sample(&s, GM_PLUGIN_INPUT_KEY_REL_X, GM_PLUGIN_INPUT_AXIS_X, 12);
-    assert(s.paddle_x==176*Q);
+    assert(s.paddle_x==152*Q);
     sample(&s, GM_PLUGIN_INPUT_KEY_REL_X, GM_PLUGIN_INPUT_AXIS_X, INT32_MAX);
     assert(s.paddle_x==500*Q);
     sample(&s, GM_PLUGIN_INPUT_KEY_REL_X, GM_PLUGIN_INPUT_AXIS_X, INT32_MIN);
@@ -111,9 +111,9 @@ int main(void)
     e.key=GM_PLUGIN_INPUT_KEY_ABS_X; e.norm_value=120;
     on_input(&s,&e); assert(s.paddle_x==120*Q);
     e.key=GM_PLUGIN_INPUT_KEY_RIGHT; e.phase=GM_PLUGIN_INPUT_PHASE_DOWN;
-    on_input(&s,&e); assert(s.paddle_x==152*Q);
-    e.phase=GM_PLUGIN_INPUT_PHASE_REPEAT; on_input(&s,&e); assert(s.paddle_x==184*Q);
-    e.phase=GM_PLUGIN_INPUT_PHASE_UP; on_input(&s,&e); assert(s.paddle_x==184*Q);
+    on_input(&s,&e); assert(s.paddle_x==140*Q);
+    e.phase=GM_PLUGIN_INPUT_PHASE_REPEAT; on_input(&s,&e); assert(s.paddle_x==160*Q);
+    e.phase=GM_PLUGIN_INPUT_PHASE_UP; on_input(&s,&e); assert(s.paddle_x==160*Q);
     const gm_plugin_input_key_t confirms[]={GM_PLUGIN_INPUT_KEY_MOUSE_LEFT,
         GM_PLUGIN_INPUT_KEY_SELECT, GM_PLUGIN_INPUT_KEY_GAMEPAD_A, GM_PLUGIN_INPUT_KEY_TOUCH_TAP};
     for (unsigned i=0;i<sizeof(confirms)/sizeof(*confirms);++i) {
@@ -125,11 +125,11 @@ int main(void)
     e.source=GM_PLUGIN_INPUT_SOURCE_DIGITIZER; e.key=GM_PLUGIN_INPUT_KEY_TOUCH_DOWN;
     e.phase=GM_PLUGIN_INPUT_PHASE_DOWN; e.x=100; e.y=50; on_input(&s,&e);
     e.key=GM_PLUGIN_INPUT_KEY_TOUCH_MOVE; e.phase=GM_PLUGIN_INPUT_PHASE_MOVE; e.x=125;
-    on_input(&s,&e); assert(s.paddle_x==209*Q);
+    on_input(&s,&e); assert(s.paddle_x==185*Q);
     e.phase=GM_PLUGIN_INPUT_PHASE_CANCEL; on_input(&s,&e); assert(!s.touch_axes);
     e.phase=GM_PLUGIN_INPUT_PHASE_MOVE; e.key=GM_PLUGIN_INPUT_KEY_ABS_Y;
     e.axis=GM_PLUGIN_INPUT_AXIS_Y; e.value=100; on_input(&s,&e);
-    e.value=120; on_input(&s,&e); assert(s.paddle_x==229*Q); /* 1-D vertical slider */
+    e.value=120; on_input(&s,&e); assert(s.paddle_x==205*Q); /* 1-D vertical slider */
     e.value=INT32_MIN; on_input(&s,&e); assert(s.paddle_x==0);
     e.value=INT32_MAX; on_input(&s,&e); assert(s.paddle_x==500*Q);
     int before=positions;
@@ -150,6 +150,14 @@ int main(void)
     e.key=GM_PLUGIN_INPUT_KEY_MOUSE_RIGHT; e.phase=GM_PLUGIN_INPUT_PHASE_DOWN;
     on_input(&s,&e); assert(exits==1 && s.exiting==2);
     on_input(&s,&e); assert(exits==1);
+    before=positions;
+    int subscribed_before=subscriptions;
+    on_suspend(&s); on_resume(&s);
+    assert(subscriptions==subscribed_before);
+    sample(&s, GM_PLUGIN_INPUT_KEY_REL_X, GM_PLUGIN_INPUT_AXIS_X, -12);
+    e.key=GM_PLUGIN_INPUT_KEY_MOUSE_LEFT; on_input(&s,&e);
+    e.key=GM_PLUGIN_INPUT_KEY_MOUSE_RIGHT; on_input(&s,&e);
+    assert(positions==before && exits==1 && !s.paused);
     puts("Input ABI/discovery, Breakout REL/ABS/KEY/TOUCH, fallback and lifecycle passed");
     return 0;
 }

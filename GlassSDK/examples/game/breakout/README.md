@@ -28,8 +28,38 @@ Controls:
   coordinate unit per pixel. First sample anchors; UP/CANCEL/suspend resets it.
   Pressure does not move the paddle. Raw contact DOWN/UP is not synthesized into
   a tap; use the Host-recognized TOUCH_TAP gesture;
-- keep the head raised for three seconds: exit the plugin application;
-- long-press: show a two-second exit countdown; release to cancel.
+- keep the head raised through the firmware's 3, 2, 1 countdown to exit;
+  the first number appears after one second, so completion takes about four
+  seconds from detecting the raised head;
+- long-press: show the original icon and hold text; the ring advances at about
+  0.8/1.6 seconds and exits after 2 seconds from LONG; release cancels it.
+
+Version 6 restores the native board details, header, content-sized panels and
+20-pixel accessory steps. See [firmware parity](../FIRMWARE_PARITY.md).
+
+Version 7 includes the panel borders in text layout measurements. This prevents
+the restart instruction from wrapping unexpectedly and being clipped on the
+Game Over panel. Text font and spacing now explicitly match the measurements.
+
+Version 8 restores the initial ball/paddle positions before the first frame,
+the three-frame ball trail, fractional collision checks and native delta-time
+paddle/ball integration. The score label follows its text width as in firmware.
+
+Version 9 replaces the visibly polygonal hold-exit ring with antialiased circular
+image states.
+
+Version 10 retains the exit overlay after hold completion until the asynchronous
+Host stop arrives. Queued input and loop callbacks cannot reveal the game again.
+
+Version 11 commits every exit path, including head-exit, BACK and a failed
+restart. Loops, cooked/raw input and suspend/resume stay frozen until Host stop;
+they cannot update the game UI, restart play or issue another exit request.
+
+Version 12 requires the plugin LVGL API 1.1 image interface. Each UI rebuild
+creates only five exit-UI objects: one overlay, one label and three images.
+The API 1.0 pixel-object fallback has been removed; incompatible Hosts are
+rejected before UI creation. This is the plugin interface version, not the
+LVGL library version.
 
 Input extension ID 4 is optional. All four classes are subscribed at once.
 Unsupported firmware, an absent table,

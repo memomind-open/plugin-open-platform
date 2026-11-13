@@ -9,7 +9,7 @@ static example_call_ui_t s_call_ui;
 #define COLS 10
 #define ROWS 20
 #define PIECES 7
-#define FRAME_MS 50U
+#define FRAME_MS 100U
 #define NORMAL_DROP_MS 300U
 #define FAST_DROP_MS 100U
 #define MOVE_FILTER_MS 100U
@@ -22,10 +22,10 @@ static example_call_ui_t s_call_ui;
 #define INFO_MIN_WIDTH 120
 #define MIN_CELL_SIZE 6
 #define PREVIEW_SIDE 4
-#define PREVIEW_GAP 32
-#define PREVIEW_TOP 20
-#define PREVIEW_MAX_CELL_SIZE 17
-#define PREVIEW_PADDING 8
+#define PREVIEW_GAP 14
+#define PREVIEW_TOP 8
+#define PREVIEW_MAX_CELL_SIZE 10
+#define PREVIEW_PADDING 10
 #define CLEAR_FLASH_STEP_MS 120U
 #define CLEAR_FLASH_STEPS 3U
 #define CLEAR_WIPE_MS 300U
@@ -62,10 +62,10 @@ typedef struct {
     uint32_t frame_accumulator;
     uint32_t drop_accumulator;
     uint32_t clear_animation_ms;
-    uint32_t move_wait_ms;
+    uint32_t last_move_ms;
     uint32_t exit_ms;
     uint8_t exit_seconds;
-    uint16_t score;
+    uint32_t score;
     int16_t screen_width;
     int16_t screen_height;
     int16_t board_width;
@@ -75,6 +75,8 @@ typedef struct {
     bool game_over;
     bool fast_drop;
     bool clearing_lines;
+    bool exiting;
+    bool exit_committed; /* Freeze callbacks until the asynchronous Host stop. */
 } tetris_t;
 
 static tetris_t game;
@@ -107,13 +109,13 @@ static const tetris_strings_t *select_strings(const char *tag)
 
 /* 7 pieces x 4 rotations. One bit per cell instead of 448 byte matrices. */
 static const uint16_t shapes[PIECES][4] = {
-    {0x0F00U, 0x2222U, 0x00F0U, 0x4444U},
+    {0x0F00U, 0x2222U, 0x0F00U, 0x4444U},
     {0x8E00U, 0x6440U, 0x0E20U, 0x44C0U},
     {0x2E00U, 0x4460U, 0x0E80U, 0xC440U},
     {0x6600U, 0x6600U, 0x6600U, 0x6600U},
-    {0x6C00U, 0x4620U, 0x06C0U, 0x8C40U},
+    {0x6C00U, 0x4620U, 0x6C00U, 0x8C40U},
     {0x4E00U, 0x4640U, 0x0E40U, 0x4C40U},
-    {0xC600U, 0x2640U, 0x0C60U, 0x4C80U},
+    {0xC600U, 0x2640U, 0xC600U, 0x4C80U},
 };
 
 #define number gm_plugin_lvgl_style_number
@@ -131,7 +133,7 @@ static void style_box(tetris_t *self, gm_plugin_lvgl_obj_t *object,
 {
     set_style(self, object, GM_PLUGIN_LVGL_STYLE_BG_COLOR, color(fill));
     set_style(self, object, GM_PLUGIN_LVGL_STYLE_BG_OPA, number(fill ? 255 : 0));
-    set_style(self, object, GM_PLUGIN_LVGL_STYLE_BORDER_COLOR, color(0xFF));
+    set_style(self, object, GM_PLUGIN_LVGL_STYLE_BORDER_COLOR, color(0xF0));
     set_style(self, object, GM_PLUGIN_LVGL_STYLE_BORDER_OPA, number(255));
     set_style(self, object, GM_PLUGIN_LVGL_STYLE_BORDER_WIDTH, number(border));
     set_style(self, object, GM_PLUGIN_LVGL_STYLE_RADIUS, number(0));
@@ -167,8 +169,8 @@ static void show_exit_countdown(tetris_t *self, uint8_t seconds)
                                 0, 0, self->screen_width - 32,
                                 GM_PLUGIN_LVGL_TEXT_FLAG_NONE);
         self->ui->obj_set_size(self->exit_label,
-                               (int16_t)size.x + 16,
-                               (int16_t)size.y + 8);
+                               (int16_t)size.x + 18, /* 8px padding + 1px border per side */
+                               34);
         self->ui->obj_align(self->exit_label,
                             GM_PLUGIN_LVGL_ALIGN_TOP_MID, 0, 0);
     }
@@ -339,7 +341,7 @@ static void finish_line_clear(tetris_t *self)
     int8_t write_row = ROWS - 1;
     for (read_row = ROWS - 1; read_row >= 0; --read_row) {
         if (self->clear_rows[(uint8_t)read_row] != 0U) {
-            self->score = (uint16_t)(self->score + 100U);
+            self->score += 100U;
             continue;
         }
         if (write_row != read_row) {
@@ -415,14 +417,17 @@ static void reset_game(tetris_t *self)
                        sizeof(self->preview_shown));
     self->score = 0;
     self->drop_accumulator = 0;
+    self->frame_accumulator = 0;
     self->clear_animation_ms = 0;
-    self->move_wait_ms = 0;
+    self->last_move_ms = 0;
     self->game_over = false;
     self->fast_drop = false;
     self->clearing_lines = false;
     self->exit_ms = 0;
+    self->exiting = false;
     self->exit_seconds = 3;
     self->ui->obj_add_flag(self->exit_label, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    self->ui->obj_clear_flag(self->preview_obj, GM_PLUGIN_LVGL_FLAG_HIDDEN);
     self->random_state ^= self->host->monotonic_ms() | 1U;
     self->next_type = (int8_t)(random_next(self) % PIECES);
     self->ui->label_set_text(self->info_label, self->strings->controls);
@@ -442,6 +447,7 @@ static gm_plugin_result_t create_ui(tetris_t *self)
     int16_t exit_width;
     uint8_t y;
     uint8_t x;
+    if (!self->ui->font_get_line_height) return GM_PLUGIN_ENOTSUP;
     if (root == 0 || self->host->display_get_info(&display) != GM_PLUGIN_OK)
         return GM_PLUGIN_ESTATE;
     if (display.width <= INFO_LEFT + INFO_MIN_WIDTH + INFO_GAP +
@@ -454,6 +460,7 @@ static gm_plugin_result_t create_ui(tetris_t *self)
     self->screen_width = (int16_t)display.width;
     self->screen_height = (int16_t)display.height;
     self->cell_size = (self->screen_height - SCREEN_EDGE * 2) / ROWS;
+    if (self->cell_size > 18) self->cell_size = 18;
     width_cell_size = (self->screen_width - INFO_LEFT - INFO_MIN_WIDTH -
                        INFO_GAP - PREVIEW_GAP -
                        PREVIEW_MAX_CELL_SIZE * PREVIEW_SIDE -
@@ -481,10 +488,11 @@ static gm_plugin_result_t create_ui(tetris_t *self)
     self->ui->obj_clear_flag(self->root, GM_PLUGIN_LVGL_FLAG_SCROLLABLE);
     board_x = self->screen_width - self->board_width - BOARD_RIGHT_MARGIN;
     preview_x = board_x - PREVIEW_GAP - preview_width;
-    self->board_obj = self->ui->obj_create(self->root);
-    self->preview_obj = self->ui->obj_create(self->root);
     self->score_label = self->ui->label_create(self->root);
     self->info_label = self->ui->label_create(self->root);
+    /* Native stacking order: preview covers instruction text beneath it. */
+    self->preview_obj = self->ui->obj_create(self->root);
+    self->board_obj = self->ui->obj_create(self->root);
     self->exit_label = self->ui->label_create(self->root);
     if (self->board_obj == 0 || self->preview_obj == 0 ||
         self->score_label == 0 ||
@@ -494,18 +502,14 @@ static gm_plugin_result_t create_ui(tetris_t *self)
     self->ui->obj_set_size(self->board_obj, self->board_width,
                            self->board_height);
     style_box(self, self->board_obj, 0, 1);
-    set_style(self, self->board_obj, GM_PLUGIN_LVGL_STYLE_BORDER_POST,
-              number(1));
     set_style(self, self->board_obj, GM_PLUGIN_LVGL_STYLE_BG_COLOR, color(0x10));
     set_style(self, self->board_obj, GM_PLUGIN_LVGL_STYLE_BG_OPA, number(255));
     self->ui->obj_clear_flag(self->board_obj, GM_PLUGIN_LVGL_FLAG_SCROLLABLE);
     self->ui->obj_set_pos(self->preview_obj, preview_x, PREVIEW_TOP);
     self->ui->obj_set_size(self->preview_obj, preview_width, preview_width);
     style_box(self, self->preview_obj, 0, 1);
-    set_style(self, self->preview_obj, GM_PLUGIN_LVGL_STYLE_BORDER_POST,
-              number(1));
     set_style(self, self->preview_obj, GM_PLUGIN_LVGL_STYLE_BG_COLOR,
-              color(0x10));
+              color(0x00));
     set_style(self, self->preview_obj, GM_PLUGIN_LVGL_STYLE_BG_OPA,
               number(255));
     self->ui->obj_clear_flag(self->preview_obj,
@@ -513,13 +517,13 @@ static gm_plugin_result_t create_ui(tetris_t *self)
     self->ui->obj_set_pos(self->score_label, INFO_LEFT, 20);
     set_style(self, self->score_label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR,
               color(0xF0));
-    self->ui->obj_set_pos(self->info_label, INFO_LEFT, 55);
-    self->ui->obj_set_size(self->info_label,
-                           preview_x - INFO_LEFT - INFO_GAP,
-                           self->screen_height - 70);
+    self->ui->obj_set_pos(self->info_label, INFO_LEFT,
+                          20 + self->ui->font_get_line_height(self->ui->font_default) + 18);
+    set_style(self, self->info_label, GM_PLUGIN_LVGL_STYLE_WIDTH,
+              number(board_x - INFO_LEFT - 10));
     self->ui->label_set_long_mode(self->info_label, GM_PLUGIN_LVGL_LABEL_WRAP);
     set_style(self, self->info_label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR,
-              color(0xA0));
+              color(0x40));
     exit_width = self->screen_width - 32;
     if (exit_width > 180) exit_width = 180;
     self->ui->obj_set_size(self->exit_label, exit_width, 32);
@@ -527,6 +531,14 @@ static gm_plugin_result_t create_ui(tetris_t *self)
     set_style(self, self->exit_label, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
               number(GM_PLUGIN_LVGL_TEXT_ALIGN_CENTER));
     style_box(self, self->exit_label, 0, 1);
+    set_style(self, self->exit_label, GM_PLUGIN_LVGL_STYLE_RADIUS, number(8));
+    set_style(self, self->exit_label, GM_PLUGIN_LVGL_STYLE_PAD_LEFT, number(8));
+    set_style(self, self->exit_label, GM_PLUGIN_LVGL_STYLE_PAD_RIGHT, number(8));
+    set_style(self, self->exit_label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR, color(0xF0));
+    gm_plugin_lvgl_style_value_t font = {.ptr = self->ui->font_default};
+    set_style(self, self->exit_label, GM_PLUGIN_LVGL_STYLE_TEXT_FONT, font);
+    set_style(self, self->exit_label, GM_PLUGIN_LVGL_STYLE_TEXT_LETTER_SPACE, number(0));
+    self->ui->label_set_long_mode(self->exit_label, GM_PLUGIN_LVGL_LABEL_DOT);
     self->ui->obj_add_flag(self->exit_label, GM_PLUGIN_LVGL_FLAG_HIDDEN);
     for (y = 0; y < ROWS; ++y) {
         for (x = 0; x < COLS; ++x) {
@@ -574,13 +586,18 @@ static gm_plugin_result_t plugin_start(void *opaque)
     self->strings = select_strings(language_tag);
     result = self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW |
                                     GM_PLUGIN_IMU_ENABLE_GESTURES);
-    if (result != GM_PLUGIN_OK) return result;
+    if (result != GM_PLUGIN_OK) {
+        example_call_ui_stop(&s_call_ui);
+        return result;
+    }
     result = create_ui(self);
     if (result == GM_PLUGIN_OK) {
+        self->exit_committed = false;
         reset_game(self);
     } else {
         (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
         self->ui->obj_clean(self->ui->root_get());
+        example_call_ui_stop(&s_call_ui);
     }
     return result;
 }
@@ -588,21 +605,31 @@ static gm_plugin_result_t plugin_start(void *opaque)
 static void plugin_loop(void *opaque, uint32_t elapsed_ms)
 {
     tetris_t *self = opaque;
+    if (self->exit_committed) return;
     gm_plugin_imu_sample_t imu;
     uint32_t interval;
+    uint32_t now = self->host->monotonic_ms();
     if (elapsed_ms > 200U) elapsed_ms = 200U;
-    if (self->move_wait_ms > elapsed_ms) self->move_wait_ms -= elapsed_ms;
-    else self->move_wait_ms = 0;
+    self->frame_accumulator += elapsed_ms;
+    if (self->frame_accumulator < FRAME_MS) return;
+    /* Keep fractional time across callbacks; discard missed whole ticks after
+     * a stall so a callback still advances simulation by at most one step. */
+    self->frame_accumulator %= FRAME_MS;
     if (self->host->imu_read(&imu) == GM_PLUGIN_OK) {
         int32_t gx = imu.gyro_raw[0];
         int32_t gy = imu.gyro_raw[1];
         int32_t ax = gx < 0 ? -gx : gx;
         int32_t ay = gy < 0 ? -gy : gy;
         if (imu.pitch_degrees > EXIT_PITCH) {
-            self->exit_ms += elapsed_ms;
-            while (self->exit_ms >= 1000U) {
-                self->exit_ms -= 1000U;
+            self->ui->obj_add_flag(self->preview_obj, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+            if (!self->exiting) {
+                self->exiting = true;
+                self->exit_ms = now;
+            }
+            if (now - self->exit_ms >= 1000U) {
+                self->exit_ms = now;
                 if (self->exit_seconds == 0U) {
+                    self->exit_committed = true;
                     self->host->app_exit();
                     return;
                 }
@@ -610,32 +637,36 @@ static void plugin_loop(void *opaque, uint32_t elapsed_ms)
                 --self->exit_seconds;
             }
         } else {
+            self->exiting = false;
             self->exit_ms = 0;
             self->exit_seconds = 3;
             self->ui->obj_add_flag(self->exit_label,
                                    GM_PLUGIN_LVGL_FLAG_HIDDEN);
+            self->ui->obj_clear_flag(self->preview_obj, GM_PLUGIN_LVGL_FLAG_HIDDEN);
         }
         if (!self->game_over && !self->clearing_lines &&
-            self->move_wait_ms == 0U &&
+            now - self->last_move_ms > MOVE_FILTER_MS &&
             (ax > GYRO_THRESHOLD || ay > GYRO_THRESHOLD)) {
-            if (gx > 0 && gy < 0) move_horizontal(self, 1);
-            else if (gx < 0 && gy > 0) move_horizontal(self, -1);
-            self->move_wait_ms = MOVE_FILTER_MS;
+            if (gx > 0 && gy < 0) {
+                move_horizontal(self, 1);
+                self->last_move_ms = now;
+            } else if (gx < 0 && gy > 0) {
+                move_horizontal(self, -1);
+                self->last_move_ms = now;
+            }
         }
     }
     if (self->game_over) return;
-    self->frame_accumulator += elapsed_ms;
-    if (self->frame_accumulator < FRAME_MS) return;
-    elapsed_ms = self->frame_accumulator;
-    self->frame_accumulator = 0;
+    /* The native timer advances simulation by exactly 100ms per callback,
+     * even after a delayed frame. Countdown above uses actual wall time. */
     if (self->clearing_lines) {
-        self->clear_animation_ms += elapsed_ms;
+        self->clear_animation_ms += FRAME_MS;
         if (self->clear_animation_ms >= CLEAR_ANIMATION_MS)
             finish_line_clear(self);
         render(self);
         return;
     }
-    self->drop_accumulator += elapsed_ms;
+    self->drop_accumulator += FRAME_MS;
     interval = self->fast_drop ? FAST_DROP_MS : NORMAL_DROP_MS;
     while (self->drop_accumulator >= interval && !self->game_over &&
            !self->clearing_lines) {
@@ -645,12 +676,35 @@ static void plugin_loop(void *opaque, uint32_t elapsed_ms)
     render(self);
 }
 
+static void plugin_suspend(void *opaque)
+{
+    tetris_t *self = opaque;
+    if (self->exit_committed) return;
+    self->fast_drop = false;
+    self->exiting = false;
+    self->exit_ms = 0;
+    self->exit_seconds = 3;
+    self->frame_accumulator = 0;
+    self->ui->obj_add_flag(self->exit_label, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    self->ui->obj_clear_flag(self->preview_obj, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
+}
+
+static void plugin_resume(void *opaque)
+{
+    tetris_t *self = opaque;
+    if (self->exit_committed) return;
+    (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW |
+                                GM_PLUGIN_IMU_ENABLE_GESTURES);
+}
+
 static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
 {
     tetris_t *self = opaque;
     gm_plugin_button_t button;
     gm_plugin_button_action_t action;
     if (event == 0 || event->type != GM_PLUGIN_EVENT_BUTTON) return false;
+    if (self->exit_committed) return true;
     button = event->data.button.button;
     action = event->data.button.action;
 
@@ -743,6 +797,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
     plugin->on_start = plugin_start;
     plugin->on_loop = plugin_loop;
     plugin->on_event = plugin_event;
+    plugin->on_suspend = plugin_suspend;
+    plugin->on_resume = plugin_resume;
     plugin->on_stop = plugin_stop;
     return GM_PLUGIN_OK;
 }
