@@ -12,59 +12,92 @@ typedef struct {
 
 static const tetris_strings_t tetris_translations[] = {
     {
-        "zh-CN", "分数：",
-        "操作说明:\n头部/方向键左右：移动\n方向键上/单击：旋转\n方向键下：下落一格\n长按：快速下落\n抬头：退出",
-        "游戏结束，单击继续\n抬头退出", "", "s后退出"
+        .tag = "zh-CN",
+        .score = "分数：",
+        .controls = "操作说明:\n头向左：左移\n头向右：右移\n单击：旋转\n长按：快速下落\n抬头3秒退出",
+        .game_over = "游戏结束，单击继续\n抬头3秒退出",
+        .exit_prefix = "",
+        .exit_suffix = "s后退出",
     },
     {
-        "en", "Score: ",
-        "Instructions:\nHead/Left/Right: Move\nUp/Click: Rotate\nDown: Drop One Row\nLong Press: Fast Drop\nLook Up: Exit",
-        "Game Over, Click to continue\nLook Up: Exit", "", "s to Exit"
+        .tag = "en",
+        .score = "Score: ",
+        .controls = "Instructions:\nHead Left: Move Left\nHead Right: Move Right\nClick: Rotate\nLong Press: Fast Drop\nLook up for 3 seconds to exit",
+        .game_over = "Game Over, Click to continue\nLook up for 3 seconds to exit",
+        .exit_prefix = "",
+        .exit_suffix = "s to Exit",
     },
     {
-        "ja", "スコア: ",
-        "操作説明:\n頭/左右キー: 移動\n上キー/クリック: 回転\n下キー: 1段落下\n長押し: 高速落下\n上を向く: 終了",
-        "ゲームオーバー、クリックして続行\n上を向く：終了", "", "s後に終了"
+        .tag = "ja",
+        .score = "スコア: ",
+        .controls = "操作説明:\n頭を左に向ける：左移動\n頭を右に向ける：右移動\nクリック：回転\n長押し：高速落下\n3秒間上を向いて終了",
+        .game_over = "ゲームオーバー、クリックして続行\n3秒間上を向いて終了",
+        .exit_prefix = "",
+        .exit_suffix = "s後に終了",
     },
     {
-        "ko", "점수: ",
-        "조작법:\n머리/좌우 키: 이동\n위 키/클릭: 회전\n아래 키: 한 칸 하강\n길게 누르기: 빠른 하강\n위 보기: 종료",
-        "게임 오버, 클릭하여 계속\n위로 보기: 종료", "", "s 후 종료"
+        .tag = "ko",
+        .score = "점수: ",
+        .controls = "조작 설명:\n왼쪽으로 머리 돌리기: 왼쪽으로 이동\n오른쪽으로 머리 돌리기: 오른쪽으로 이동\n클릭: 회전\n길게 누르기: 빠르게 떨어뜨리기\n3초간 위를 보면 종료",
+        .game_over = "게임 오버, 클릭하여 계속\n3초간 위를 보면 종료",
+        .exit_prefix = "",
+        .exit_suffix = "s 후 종료",
     },
     {
-        "de", "Punkte: ",
-        "Steuerung:\nKopf/Links/Rechts: Bewegen\nOben/Klick: Drehen\nUnten: Eine Reihe fallen\nHalten: Schnell fallen\nHochsehen: Ende",
-        "Game Over, Klicken zum Fortsetzen\nNach oben schauen: Beenden", "", "s bis zum Beenden"
+        .tag = "de",
+        .score = "Punkte: ",
+        .controls = "Bedienungsanleitung:\nKopf nach links: Nach links bewegen\nKopf nach rechts: Nach rechts bewegen\nKlicken: Drehen\nLanges Drücken: Schnelles Fallenlassen\n3 Sek. nach oben schauen: Beenden",
+        .game_over = "Game Over, Klicken zum Fortsetzen\n3 Sek. nach oben schauen: Beenden",
+        .exit_prefix = "",
+        .exit_suffix = "s bis zum Beenden",
     },
     {
-        "fr", "Score : ",
-        "Commandes :\nTête/Gauche/Droite : déplacer\nHaut/Clic : tourner\nBas : descendre d'une ligne\nAppui long : chute rapide\nLever la tête : quitter",
-        "Game Over, Cliquez pour continuer\nRegarder en haut : Quitter", "", "s avant de quitter"
+        .tag = "fr",
+        .score = "Score : ",
+        .controls = "Instructions :\nTête à gauche : Déplacer à gauche\nTête à droite : Déplacer à droite\nCliquez : Tourner\nAppui long : Chute rapide\nRegarder en haut pendant 3 s : quitter",
+        .game_over = "Game Over, Cliquez pour continuer\nRegarder en haut pendant 3 s : quitter",
+        .exit_prefix = "",
+        .exit_suffix = "s avant de quitter",
     },
     {
-        "es", "Puntuación: ",
-        "Controles:\nCabeza/Izq./Der.: mover\nArriba/Clic: rotar\nAbajo: bajar una fila\nPulsación larga: caída rápida\nMirar arriba: salir",
-        "Game Over, Haga clic para continuar\nMirar hacia arriba: Salir", "", "s para salir"
+        .tag = "es",
+        .score = "Puntuación: ",
+        .controls = "Instrucciones:\nCabeza a la izquierda: Mover a la izquierda\nCabeza a la derecha: Mover a la derecha\nClic: Rotar\nPulsación larga: Caída rápida\nMira hacia arriba durante 3 s: salir",
+        .game_over = "Game Over, Haga clic para continuar\nMira hacia arriba durante 3 s: salir",
+        .exit_prefix = "",
+        .exit_suffix = "s para salir",
     },
     {
-        "it", "Punteggio: ",
-        "Comandi:\nTesta/Sinistra/Destra: muovi\nSu/Clic: ruota\nGiù: scendi una riga\nPressione lunga: caduta rapida\nGuarda su: esci",
-        "Game Over, Clicca per continuare\nGuarda in alto: Esci", "", "s per uscire"
+        .tag = "it",
+        .score = "Punteggio: ",
+        .controls = "Istruzioni:\nTesta a sinistra: Sposta a sinistra\nTesta a destra: Sposta a destra\nClicca: Ruota\nPressione prolungata: Caduta rapida\nGuarda in alto per 3 s: esci",
+        .game_over = "Game Over, Clicca per continuare\nGuarda in alto per 3 s: esci",
+        .exit_prefix = "",
+        .exit_suffix = "s per uscire",
     },
     {
-        "ru", "Счет: ",
-        "Управление:\nГолова/Влево/Вправо: двигать\nВверх/Клик: вращать\nВниз: опустить на ряд\nУдержание: быстрое падение\nСмотреть вверх: выход",
-        "Игра окончена, нажмите, чтобы продолжить\nСмотреть вверх: выйти", "", "s до выхода"
+        .tag = "ru",
+        .score = "Счет: ",
+        .controls = "Инструкции:\nГолова влево: двигаться влево\nГолова вправо: двигаться вправо\nКлик: вращать\nДлительное нажатие: быстрое падение\nСмотреть вверх 3 секунды: выйти",
+        .game_over = "Игра окончена, нажмите, чтобы продолжить\nСмотреть вверх 3 секунды: выйти",
+        .exit_prefix = "",
+        .exit_suffix = "s до выхода",
     },
     {
-        "pt", "Pontuação: ",
-        "Controles:\nCabeça/Esq./Dir.: mover\nCima/Clique: girar\nBaixo: descer uma linha\nPressão longa: queda rápida\nOlhar para cima: sair",
-        "Game Over, Clique para continuar\nOlhar para cima: Sair", "", "s para sair"
+        .tag = "pt",
+        .score = "Pontuação: ",
+        .controls = "Instruções:\nCabeça para esquerda: Mover para esquerda\nCabeça para direita: Mover para direita\nClique: Girar\nPressão longa: Queda rápida\nOlhe para cima por 3 s: sair",
+        .game_over = "Game Over, Clique para continuar\nOlhe para cima por 3 s: sair",
+        .exit_prefix = "",
+        .exit_suffix = "s para sair",
     },
     {
-        "zh-TW", "分數：",
-        "操作說明:\n頭部/方向鍵左右：移動\n方向鍵上/單擊：旋轉\n方向鍵下：下落一格\n長按：快速下落\n抬頭：退出",
-        "遊戲結束，單擊繼續\n抬頭退出", "", "s後退出"
+        .tag = "zh-TW",
+        .score = "分數：",
+        .controls = "操作說明:\n頭向左：左移\n頭向右：右移\n單擊：旋轉\n長按：快速下落\n抬頭3秒退出",
+        .game_over = "遊戲結束，單擊繼續\n抬頭3秒退出",
+        .exit_prefix = "",
+        .exit_suffix = "s後退出",
     },
 };
 

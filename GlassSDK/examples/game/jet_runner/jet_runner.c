@@ -1,6 +1,7 @@
 #include "../../common/call_ui.h"
 
 #include "gm_plugin_lvgl_api.h"
+#include "../common/firmware_exit.h"
 #include "gm_plugin_libc.h"
 #include "jet_runner_translations.h"
 
@@ -30,7 +31,7 @@ static example_call_ui_t s_call_ui;
 #define PITCH_DEAD_ZONE 2
 #define PITCH_LIMIT 38
 #define PITCH_TO_PIXEL 3
-#define ACCESSORY_PLAYER_STEP 18
+#define ACCESSORY_PLAYER_STEP 20
 #define BASE_SPEED_Q (125 * Q)
 #define SPEED_STEP_Q (4 * Q)
 #define MAX_SPEED_Q (220 * Q)
@@ -56,7 +57,7 @@ typedef struct {
     gm_plugin_lvgl_obj_t *flame_core;
     gm_plugin_lvgl_obj_t *score_label;
     gm_plugin_lvgl_obj_t *end_label;
-    gm_plugin_lvgl_obj_t *exit_arc;
+    firmware_exit_t exit_ui;
     obstacle_t obstacles[OBSTACLE_COUNT];
     int32_t player_y_q;
     int16_t width;
@@ -65,14 +66,12 @@ typedef struct {
     int16_t board_h;
     int16_t neutral_pitch;
     int16_t accessory_offset_y;
-    uint16_t score;
+    uint32_t score;
     uint32_t random_state;
     uint32_t frame_accumulator;
-    uint32_t hold_ms;
     bool game_over;
     bool calibrated;
     bool flame_long;
-    bool holding_exit;
 } jet_t;
 
 static jet_t game;
@@ -204,18 +203,18 @@ static int32_t rightmost_x(const jet_t *self)
 
 static void reset_game(jet_t *self)
 {
+    gm_plugin_imu_sample_t imu;
     uint8_t index;
     self->player_y_q = ((self->board_h - PLAYER_H) / 2) * Q;
     self->score = 0;
     self->game_over = false;
-    self->calibrated = false;
+    self->calibrated = self->host->imu_read(&imu) == GM_PLUGIN_OK;
+    if (self->calibrated) self->neutral_pitch = imu.pitch_degrees;
     self->accessory_offset_y = 0;
     self->frame_accumulator = 0;
-    self->hold_ms = 0;
-    self->holding_exit = false;
     self->random_state ^= self->host->monotonic_ms() | 1U;
     self->ui->obj_add_flag(self->end_label, GM_PLUGIN_LVGL_FLAG_HIDDEN);
-    self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    firmware_exit_cancel(&self->exit_ui, self->ui);
     self->flame_long = false;
     self->ui->obj_set_size(self->flame, 8, 4);
     position_player(self);
@@ -246,19 +245,19 @@ static void finish(jet_t *self)
 
 static bool collision(const jet_t *self, const obstacle_t *obstacle)
 {
-    int16_t player_y = (int16_t)(self->player_y_q / Q);
-    int16_t obstacle_x = (int16_t)(obstacle->x_q / Q);
-    int16_t player_left = PLAYER_X + HIT_X;
-    int16_t player_right = player_left + HIT_W;
-    int16_t player_top = player_y + HIT_Y;
-    int16_t player_bottom = player_top + HIT_H;
-    if (player_right <= obstacle_x ||
-        player_left >= obstacle_x + OBSTACLE_W) return false;
-    return player_top < obstacle->gap_top ||
-           player_bottom > obstacle->gap_top + GAP_H;
+    /* Keep subpixel positions for physics; round only when drawing. */
+    int32_t player_left = (PLAYER_X + HIT_X) * Q;
+    int32_t player_right = player_left + HIT_W * Q;
+    int32_t player_top = self->player_y_q + HIT_Y * Q;
+    int32_t player_bottom = player_top + HIT_H * Q;
+    if (player_right <= obstacle->x_q ||
+        player_left >= obstacle->x_q + OBSTACLE_W * Q) return false;
+    return player_top < obstacle->gap_top * Q ||
+           player_bottom > (obstacle->gap_top + GAP_H) * Q;
 }
 
-static void update_player(jet_t *self, const gm_plugin_imu_sample_t *imu)
+static void update_player(jet_t *self, const gm_plugin_imu_sample_t *imu,
+                           uint32_t elapsed_ms)
 {
     int16_t delta;
     int32_t target;
@@ -275,7 +274,9 @@ static void update_player(jet_t *self, const gm_plugin_imu_sample_t *imu)
               self->accessory_offset_y) * Q;
     if (target < 0) target = 0;
     if (target > maximum) target = maximum;
-    self->player_y_q += (target - self->player_y_q) * 28 / 100;
+    uint32_t smoothing = 28U * elapsed_ms / FRAME_MS;
+    if (smoothing > 70U) smoothing = 70U;
+    self->player_y_q += (target - self->player_y_q) * (int32_t)smoothing / 100;
     position_player(self);
 }
 
@@ -283,16 +284,12 @@ static void move_player_with_accessory(jet_t *self, int16_t direction)
 {
     int16_t center = (self->board_h - PLAYER_H) / 2;
     int16_t maximum_y = self->board_h - PLAYER_H;
-    int32_t maximum_q = maximum_y * Q;
     self->accessory_offset_y += direction * ACCESSORY_PLAYER_STEP;
     if (self->accessory_offset_y < -center)
         self->accessory_offset_y = -center;
     else if (self->accessory_offset_y > maximum_y - center)
         self->accessory_offset_y = maximum_y - center;
-    self->player_y_q += direction * ACCESSORY_PLAYER_STEP * Q;
-    if (self->player_y_q < 0) self->player_y_q = 0;
-    else if (self->player_y_q > maximum_q) self->player_y_q = maximum_q;
-    position_player(self);
+    /* Match the firmware: move the target, then smooth towards it on ticks. */
 }
 
 static void update_flame(jet_t *self)
@@ -339,8 +336,9 @@ static gm_plugin_result_t create_ui(jet_t *self)
     gm_plugin_lvgl_obj_t *host_root = self->ui->root_get();
     gm_plugin_lvgl_obj_t *title;
     gm_plugin_lvgl_obj_t *controls;
+    gm_plugin_lvgl_obj_t *header;
+    gm_plugin_lvgl_obj_t *footer;
     int16_t end_width;
-    int16_t end_height;
     uint8_t index;
     if (host_root == 0 || self->host->display_get_info(&display) != GM_PLUGIN_OK)
         return GM_PLUGIN_ESTATE;
@@ -359,25 +357,31 @@ static gm_plugin_result_t create_ui(jet_t *self)
     self->ui->obj_set_size(self->root, self->width, self->height);
     self->ui->obj_align(self->root, GM_PLUGIN_LVGL_ALIGN_CENTER, 0, 0);
     style_rect(self, self->root, 0x00, 255, 0, 0);
-    title = self->ui->label_create(self->root);
-    self->score_label = self->ui->label_create(self->root);
+    header = rectangle(self, self->root, 0, 0, self->width, HEADER_H, 0, 0);
+    footer = rectangle(self, self->root, 0, HEADER_H + self->board_h,
+                       self->width, FOOTER_H, 0, 0);
+    if (!header || !footer) return GM_PLUGIN_ENOMEM;
+    title = self->ui->label_create(header);
+    self->score_label = self->ui->label_create(header);
     self->board = self->ui->obj_create(self->root);
-    controls = self->ui->label_create(self->root);
+    controls = self->ui->label_create(footer);
     if (title == 0 || self->score_label == 0 || self->board == 0 ||
         controls == 0) return GM_PLUGIN_ENOMEM;
     self->ui->label_set_text(title, self->strings->title);
-    self->ui->obj_set_pos(title, 18, 10);
+    self->ui->obj_align(title, GM_PLUGIN_LVGL_ALIGN_LEFT_MID, 18, 0);
     set_style(self, title, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR, color(0xF0));
-    self->ui->obj_align(self->score_label, GM_PLUGIN_LVGL_ALIGN_TOP_RIGHT,
-                        -18, 10);
+    self->ui->obj_align(self->score_label, GM_PLUGIN_LVGL_ALIGN_RIGHT_MID,
+                        -18, 0);
     set_style(self, self->score_label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR,
               color(0xF0));
     self->ui->obj_set_pos(self->board, MARGIN, HEADER_H);
     self->ui->obj_set_size(self->board, self->board_w, self->board_h);
     style_rect(self, self->board, 0x07, 255, 2, 3);
+    set_style(self, self->board, GM_PLUGIN_LVGL_STYLE_BORDER_COLOR, color(0xF0));
     self->ui->label_set_text(controls, self->strings->controls);
-    self->ui->obj_set_size(controls, self->width - MARGIN * 2, FOOTER_H);
-    self->ui->obj_align(controls, GM_PLUGIN_LVGL_ALIGN_BOTTOM_MID, 0, 0);
+    set_style(self, controls, GM_PLUGIN_LVGL_STYLE_WIDTH,
+              number(self->width - MARGIN * 2));
+    self->ui->obj_align(controls, GM_PLUGIN_LVGL_ALIGN_CENTER, 0, 0);
     set_style(self, controls, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR, color(0xA0));
     set_style(self, controls, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
               number(GM_PLUGIN_LVGL_TEXT_ALIGN_CENTER));
@@ -390,6 +394,7 @@ static gm_plugin_result_t create_ui(jet_t *self)
         obstacle_t *obstacle = &self->obstacles[index];
         obstacle->column = rectangle(self, self->board, 0, 0,
                                      OBSTACLE_W, self->board_h, 0, 0);
+        if (!obstacle->column) return GM_PLUGIN_ENOMEM;
         obstacle->top = rectangle(self, obstacle->column, 0, 0,
                                   OBSTACLE_W, 40, 0xF0, 255);
         obstacle->bottom = rectangle(self, obstacle->column, 0,
@@ -424,10 +429,9 @@ static gm_plugin_result_t create_ui(jet_t *self)
     self->end_label = self->ui->label_create(self->board);
     if (self->end_label == 0) return GM_PLUGIN_ENOMEM;
     end_width = self->board_w - 20;
-    if (end_width > 300) end_width = 300;
-    end_height = self->board_h - 20;
-    if (end_height > 120) end_height = 120;
-    self->ui->obj_set_size(self->end_label, end_width, end_height);
+    if (end_width > 260) end_width = 260;
+    /* Content height follows the translated text, as in firmware. */
+    set_style(self, self->end_label, GM_PLUGIN_LVGL_STYLE_WIDTH, number(end_width));
     self->ui->obj_align(self->end_label, GM_PLUGIN_LVGL_ALIGN_CENTER, 0, 0);
     set_style(self, self->end_label, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
               number(GM_PLUGIN_LVGL_TEXT_ALIGN_CENTER));
@@ -447,23 +451,10 @@ static gm_plugin_result_t create_ui(jet_t *self)
     set_style(self, self->end_label, GM_PLUGIN_LVGL_STYLE_PAD_RIGHT, number(16));
     self->ui->label_set_long_mode(self->end_label, GM_PLUGIN_LVGL_LABEL_WRAP);
     self->ui->obj_add_flag(self->end_label, GM_PLUGIN_LVGL_FLAG_HIDDEN);
-    self->exit_arc = self->ui->arc_create(self->root);
-    if (self->exit_arc == 0) return GM_PLUGIN_ENOMEM;
-    self->ui->obj_set_size(self->exit_arc, 48, 48);
-    self->ui->obj_align(self->exit_arc, GM_PLUGIN_LVGL_ALIGN_CENTER, 0, 0);
-    self->ui->arc_set_range(self->exit_arc, 0, 2000);
-    self->ui->arc_set_value(self->exit_arc, 0);
-    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_WIDTH,
-                        number(4), GM_PLUGIN_LVGL_SELECTOR_MAIN);
-    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_COLOR,
-                        color(0x20), GM_PLUGIN_LVGL_SELECTOR_MAIN);
-    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_WIDTH,
-                        number(4), GM_PLUGIN_LVGL_SELECTOR_INDICATOR);
-    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_COLOR,
-                        color(0xF0), GM_PLUGIN_LVGL_SELECTOR_INDICATOR);
-    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_OPA,
-                        number(0), GM_PLUGIN_LVGL_SELECTOR_KNOB);
-    self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    gm_plugin_result_t exit_result = firmware_exit_create(
+        &self->exit_ui, self->ui, self->root, self->width, self->height,
+        self->strings->hold_exit);
+    if (exit_result != GM_PLUGIN_OK) return exit_result;
     return GM_PLUGIN_OK;
 }
 
@@ -478,13 +469,18 @@ static gm_plugin_result_t plugin_start(void *opaque)
         language_tag[0] = '\0';
     self->strings = select_strings(language_tag);
     result = self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW);
-    if (result != GM_PLUGIN_OK) return result;
+    if (result != GM_PLUGIN_OK) {
+        example_call_ui_stop(&s_call_ui);
+        return result;
+    }
     result = create_ui(self);
     if (result == GM_PLUGIN_OK) {
         reset_game(self);
     } else {
         (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
         self->ui->obj_clean(self->ui->root_get());
+        self->exit_ui.overlay = 0;
+        example_call_ui_stop(&s_call_ui);
     }
     return result;
 }
@@ -492,23 +488,22 @@ static gm_plugin_result_t plugin_start(void *opaque)
 static void plugin_loop(void *opaque, uint32_t elapsed_ms)
 {
     jet_t *self = opaque;
+    if (self->exit_ui.committed) return;
     gm_plugin_imu_sample_t imu;
     if (elapsed_ms > MAX_DELTA_MS) elapsed_ms = MAX_DELTA_MS;
-    if (self->holding_exit) {
-        self->hold_ms += elapsed_ms;
-        if (self->hold_ms >= 2000U) {
-            self->host->app_exit();
-            return;
-        }
-        self->ui->arc_set_value(self->exit_arc, (int16_t)self->hold_ms);
+    if (firmware_exit_complete(&self->exit_ui, self->ui,
+                               self->host->monotonic_ms())) {
+        self->host->app_exit();
+        return;
     }
     if (self->game_over) return;
     self->frame_accumulator += elapsed_ms;
     if (self->frame_accumulator < FRAME_MS) return;
     elapsed_ms = self->frame_accumulator;
     self->frame_accumulator = 0;
+    if (elapsed_ms > MAX_DELTA_MS) elapsed_ms = MAX_DELTA_MS;
     if (self->host->imu_read(&imu) != GM_PLUGIN_OK) return;
-    update_player(self, &imu);
+    update_player(self, &imu, elapsed_ms);
     update_obstacles(self, elapsed_ms);
     if (!self->game_over) update_flame(self);
 }
@@ -519,29 +514,27 @@ static bool plugin_event(void *opaque, const gm_plugin_event_t *event)
     gm_plugin_button_action_t action;
     gm_plugin_button_t button;
     if (event == 0 || event->type != GM_PLUGIN_EVENT_BUTTON) return false;
+    if (self->exit_ui.committed) return true;
     action = event->data.button.action;
     button = event->data.button.button;
+    if (action == GM_PLUGIN_BUTTON_ACTION_TRIGGER &&
+        button == GM_PLUGIN_BUTTON_BACK) {
+        self->host->app_exit();
+        return true;
+    }
     if (action == GM_PLUGIN_BUTTON_ACTION_LONG ||
         action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
-        if (!self->holding_exit) {
-            self->holding_exit = true;
-            self->hold_ms = 0;
-            self->ui->arc_set_value(self->exit_arc, 0);
-            self->ui->obj_clear_flag(self->exit_arc,
-                                     GM_PLUGIN_LVGL_FLAG_HIDDEN);
-        }
+        firmware_exit_begin(&self->exit_ui, self->ui, self->host->monotonic_ms());
         return true;
     }
     if (action == GM_PLUGIN_BUTTON_ACTION_RELEASE) {
-        self->holding_exit = false;
-        self->hold_ms = 0;
-        self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+        firmware_exit_cancel(&self->exit_ui, self->ui);
         return true;
     }
     if (action == GM_PLUGIN_BUTTON_ACTION_TRIGGER &&
         (button == GM_PLUGIN_BUTTON_UP ||
          button == GM_PLUGIN_BUTTON_DOWN)) {
-        if (!self->game_over && !self->holding_exit)
+        if (!self->game_over && !self->exit_ui.active)
             move_player_with_accessory(
                 self, button == GM_PLUGIN_BUTTON_UP ? -1 : 1);
         return true;
@@ -559,8 +552,27 @@ static void plugin_stop(void *opaque)
 {
     example_call_ui_stop(&s_call_ui);
     jet_t *self = opaque;
+    firmware_exit_cancel(&self->exit_ui, self->ui);
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
     self->ui->obj_clean(self->ui->root_get());
+    self->exit_ui.overlay = 0;
+}
+
+static void plugin_suspend(void *opaque)
+{
+    jet_t *self = opaque;
+    if (self->exit_ui.committed) return;
+    firmware_exit_cancel(&self->exit_ui, self->ui);
+    self->frame_accumulator = 0;
+    (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
+}
+
+static void plugin_resume(void *opaque)
+{
+    jet_t *self = opaque;
+    if (self->exit_ui.committed) return;
+    self->frame_accumulator = 0;
+    (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW);
 }
 
 gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
@@ -594,6 +606,8 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
     plugin->on_start = plugin_start;
     plugin->on_loop = plugin_loop;
     plugin->on_event = plugin_event;
+    plugin->on_suspend = plugin_suspend;
+    plugin->on_resume = plugin_resume;
     plugin->on_stop = plugin_stop;
     return GM_PLUGIN_OK;
 }
