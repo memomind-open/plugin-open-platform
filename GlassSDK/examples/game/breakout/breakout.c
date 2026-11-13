@@ -1,6 +1,7 @@
 #include "../../common/call_ui.h"
 
 #include "gm_plugin_lvgl_api.h"
+#include "../common/firmware_exit.h"
 #include "gm_plugin_libc.h"
 #include "gm_plugin_input.h"
 #include "breakout_translations.h"
@@ -22,21 +23,23 @@ static example_call_ui_t s_call_ui;
 #define BRICK_TOP 28
 #define PADDLE_W 80
 #define PADDLE_H 10
-#define ACCESSORY_PADDLE_STEP 32
+#define ACCESSORY_PADDLE_STEP 20
 #define WHEEL_PADDLE_STEP 12
 #define BALL_SIZE 10
 #define GYRO_THRESHOLD 15
 #define EXIT_PITCH 30
-#define EXIT_MS 3000U
-#define BUTTON_EXIT_MS 2000U
-#define HEADER_SIDE_W 190
-#define HEADER_TIMER_W 100
-#define HEADER_H 24
+#define EXIT_MS 4000U /* Firmware shows 3, 2, 1 after the first polling second. */
+#define HEADER_SIDE_W 130
+#define HEADER_TIMER_W 64
+#define HEADER_H 34
 #define MESSAGE_SIDE_MARGIN 36
-#define PAUSE_PANEL_MIN_W 380
-#define PAUSE_PANEL_MIN_H 120
-#define RESULT_PANEL_MIN_W 380
-#define RESULT_PANEL_MIN_H 152
+#define PANEL_PADDING 12
+#define PANEL_BORDER 1
+#define PANEL_INSET (2 * (PANEL_PADDING + PANEL_BORDER))
+#define PAUSE_PANEL_MIN_W 0
+#define PAUSE_PANEL_MIN_H 0
+#define RESULT_PANEL_MIN_W 0
+#define RESULT_PANEL_MIN_H 0
 
 typedef struct {
     const gm_plugin_host_api_t *host;
@@ -58,7 +61,7 @@ typedef struct {
     gm_plugin_lvgl_obj_t *timer_label;
     gm_plugin_lvgl_obj_t *control_label;
     gm_plugin_lvgl_obj_t *message_label;
-    gm_plugin_lvgl_obj_t *exit_arc;
+    firmware_exit_t exit_ui;
     int32_t ball_x;
     int32_t ball_y;
     int32_t ball_vx;
@@ -67,12 +70,13 @@ typedef struct {
     int32_t paddle_vx;
     int16_t trail_x[TRAILS];
     int16_t trail_y[TRAILS];
+    int16_t drawn_ball_x;
+    int16_t drawn_ball_y;
     uint32_t frame_accumulator;
     uint32_t start_ms;
     uint32_t pause_ms;
     uint32_t paused_total_ms;
     uint32_t exit_start_ms;
-    uint32_t button_hold_ms;
     uint32_t last_second;
     int16_t screen_width;
     int16_t screen_height;
@@ -88,7 +92,6 @@ typedef struct {
     uint8_t ended;
     uint8_t exiting;
     uint8_t exit_seconds;
-    uint8_t button_holding_exit;
 } breakout_t;
 
 static breakout_t game;
@@ -145,7 +148,14 @@ static void style_box(breakout_t *self, gm_plugin_lvgl_obj_t *object,
 
 static void style_panel(breakout_t *self, gm_plugin_lvgl_obj_t *label)
 {
-    style_box(self, label, GM_PLUGIN_LVGL_OPA_80, 1, 4);
+    gm_plugin_lvgl_style_value_t font = {.ptr = self->ui->font_default};
+    style_box(self, label, GM_PLUGIN_LVGL_OPA_80, PANEL_BORDER, 4);
+    self->ui->style_set(label, GM_PLUGIN_LVGL_STYLE_TEXT_FONT,
+                        font, GM_PLUGIN_LVGL_SELECTOR_MAIN);
+    self->ui->style_set(label, GM_PLUGIN_LVGL_STYLE_TEXT_LETTER_SPACE,
+                        number(0), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+    self->ui->style_set(label, GM_PLUGIN_LVGL_STYLE_TEXT_LINE_SPACE,
+                        number(0), GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->style_set(label, GM_PLUGIN_LVGL_STYLE_BG_COLOR,
                         color(0), GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->style_set(label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR,
@@ -161,13 +171,13 @@ static void style_panel(breakout_t *self, gm_plugin_lvgl_obj_t *label)
                         number(GM_PLUGIN_LVGL_TEXT_ALIGN_CENTER),
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->style_set(label, GM_PLUGIN_LVGL_STYLE_PAD_TOP,
-                        number(12), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+                        number(PANEL_PADDING), GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->style_set(label, GM_PLUGIN_LVGL_STYLE_PAD_BOTTOM,
-                        number(12), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+                        number(PANEL_PADDING), GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->style_set(label, GM_PLUGIN_LVGL_STYLE_PAD_LEFT,
-                        number(12), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+                        number(PANEL_PADDING), GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->style_set(label, GM_PLUGIN_LVGL_STYLE_PAD_RIGHT,
-                        number(12), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+                        number(PANEL_PADDING), GM_PLUGIN_LVGL_SELECTOR_MAIN);
 }
 
 static void set_score(breakout_t *self)
@@ -223,18 +233,19 @@ static void set_message(breakout_t *self, const char *text, uint8_t visible,
         int16_t width;
         int16_t height;
         self->ui->text_get_size(&natural_size, text, self->ui->font_default,
-                                0, 0, maximum_width - 24,
+                                0, 0, maximum_width - PANEL_INSET,
                                 GM_PLUGIN_LVGL_TEXT_FLAG_NONE);
-        width = (int16_t)natural_size.x + 24;
+        width = (int16_t)natural_size.x + PANEL_INSET;
         if (width < minimum_width) width = minimum_width;
         if (width > maximum_width) width = maximum_width;
 
         /* Measure again with the final content width. A translation that fits
-         * the initial limit can still wrap after minimum/maximum sizing. */
+         * the initial limit can still wrap after minimum/maximum sizing.
+         * LVGL content bounds exclude both padding and border widths. */
         self->ui->text_get_size(&wrapped_size, text, self->ui->font_default,
-                                0, 0, width - 24,
+                                0, 0, width - PANEL_INSET,
                                 GM_PLUGIN_LVGL_TEXT_FLAG_NONE);
-        height = (int16_t)wrapped_size.y + 32;
+        height = (int16_t)wrapped_size.y + PANEL_INSET;
         if (height < minimum_height) height = minimum_height;
         if (height > self->screen_height - 48)
             height = self->screen_height - 48;
@@ -267,6 +278,8 @@ static void initialize_state(breakout_t *self)
     self->ball_y = (self->paddle_y - BALL_SIZE - 4) * Q;
     self->ball_vx = 1587;
     self->ball_vy = -2202;
+    self->drawn_ball_x = (int16_t)(self->ball_x / Q);
+    self->drawn_ball_y = (int16_t)(self->ball_y / Q);
     self->frame_accumulator = 0;
     self->start_ms = self->host->monotonic_ms();
     self->paused_total_ms = 0;
@@ -277,8 +290,6 @@ static void initialize_state(breakout_t *self)
     self->ended = 0;
     self->exiting = 0;
     self->exit_seconds = 0;
-    self->button_hold_ms = 0;
-    self->button_holding_exit = 0;
 }
 
 static gm_plugin_result_t create_ui(breakout_t *self)
@@ -365,6 +376,15 @@ static gm_plugin_result_t create_ui(breakout_t *self)
         self->ui->style_set(line, GM_PLUGIN_LVGL_STYLE_BG_COLOR,
                             color(0x40U), GM_PLUGIN_LVGL_SELECTOR_MAIN);
     }
+    for (position = 78; position < self->board_width - 40; position += 86) {
+        gm_plugin_lvgl_obj_t *line = self->ui->obj_create(self->board);
+        if (line == 0) return GM_PLUGIN_ENOMEM;
+        self->ui->obj_set_size(line, 1, self->board_height - 42);
+        self->ui->obj_set_pos(line, position, 20);
+        style_box(self, line, GM_PLUGIN_LVGL_OPA_20, 0, 0);
+        self->ui->style_set(line, GM_PLUGIN_LVGL_STYLE_BG_COLOR,
+                            color(0x30U), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+    }
     for (row = 0; row < ROWS; ++row) {
         for (col = 0; col < COLS; ++col) {
             gm_plugin_lvgl_obj_t *brick = self->ui->obj_create(self->board);
@@ -375,8 +395,20 @@ static gm_plugin_result_t create_ui(breakout_t *self)
             self->bricks[row][col] = brick;
             self->ui->obj_set_pos(brick, x, y);
             self->ui->obj_set_size(brick, self->brick_width, BRICK_H);
-            style_box(self, brick, row == 1U ? 0 : (row == 2U ? 150 : 255),
+            style_box(self, brick, row == 1U ? 0 : (row == 2U ? GM_PLUGIN_LVGL_OPA_60 : 255),
                       row == 1U ? 2 : 1, 2);
+            self->ui->style_set(brick, GM_PLUGIN_LVGL_STYLE_BG_COLOR,
+                                color(0xF0U), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+            self->ui->style_set(brick, GM_PLUGIN_LVGL_STYLE_BORDER_OPA,
+                                number(row == 2U ? GM_PLUGIN_LVGL_OPA_70 : 255),
+                                GM_PLUGIN_LVGL_SELECTOR_MAIN);
+            if (row == 2U) {
+                gm_plugin_lvgl_obj_t *slot = self->ui->obj_create(brick);
+                if (!slot) return GM_PLUGIN_ENOMEM;
+                self->ui->obj_set_size(slot, self->brick_width - 10, 2);
+                self->ui->obj_align(slot, GM_PLUGIN_LVGL_ALIGN_CENTER, 0, 0);
+                style_box(self, slot, GM_PLUGIN_LVGL_OPA_70, 0, 0);
+            }
             if (self->alive[row][col] == 0U)
                 self->ui->obj_add_flag(brick, GM_PLUGIN_LVGL_FLAG_HIDDEN);
         }
@@ -384,6 +416,7 @@ static gm_plugin_result_t create_ui(breakout_t *self)
     self->paddle = self->ui->obj_create(self->board);
     if (self->paddle == 0) return GM_PLUGIN_ENOMEM;
     self->ui->obj_set_size(self->paddle, PADDLE_W, PADDLE_H + 4);
+    self->ui->obj_set_pos(self->paddle, self->paddle_x / Q, self->paddle_y - 2);
     style_box(self, self->paddle, 0, 0, 0);
     self->ui->style_set(self->paddle, GM_PLUGIN_LVGL_STYLE_PAD_TOP,
                         number(0), GM_PLUGIN_LVGL_SELECTOR_MAIN);
@@ -402,43 +435,60 @@ static gm_plugin_result_t create_ui(breakout_t *self)
         self->ui->obj_set_size(body, PADDLE_W - 16, PADDLE_H);
         self->ui->obj_set_pos(body, 8, 2);
         style_box(self, body, 255, 1, 2);
+        self->ui->style_set(body, GM_PLUGIN_LVGL_STYLE_BG_COLOR,
+                            color(0xF0), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+        self->ui->style_set(body, GM_PLUGIN_LVGL_STYLE_BORDER_COLOR,
+                            color(0x60), GM_PLUGIN_LVGL_SELECTOR_MAIN);
         self->ui->obj_set_size(left, 10, PADDLE_H + 4);
         self->ui->obj_set_pos(left, 0, 0);
         style_box(self, left, 204, 1, 2);
         self->ui->obj_set_size(right, 10, PADDLE_H + 4);
         self->ui->obj_set_pos(right, PADDLE_W - 10, 0);
         style_box(self, right, 204, 1, 2);
+        self->ui->style_set(left, GM_PLUGIN_LVGL_STYLE_BG_COLOR,
+                            color(0xF0), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+        self->ui->style_set(right, GM_PLUGIN_LVGL_STYLE_BG_COLOR,
+                            color(0xF0), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+        self->ui->style_set(left, GM_PLUGIN_LVGL_STYLE_BORDER_OPA,
+                            number(GM_PLUGIN_LVGL_OPA_50), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+        self->ui->style_set(right, GM_PLUGIN_LVGL_STYLE_BORDER_OPA,
+                            number(GM_PLUGIN_LVGL_OPA_50), GM_PLUGIN_LVGL_SELECTOR_MAIN);
     }
     for (index = 0; index < TRAILS; ++index) {
         int16_t size = BALL_SIZE - 2 - index * 2;
         self->trails[index] = self->ui->obj_create(self->board);
         if (self->trails[index] == 0) return GM_PLUGIN_ENOMEM;
         self->ui->obj_set_size(self->trails[index], size, size);
-        style_box(self, self->trails[index], 100U - index * 30U, 0, size / 2);
+        style_box(self, self->trails[index], index == 0 ? GM_PLUGIN_LVGL_OPA_50 :
+                  (index == 1 ? GM_PLUGIN_LVGL_OPA_30 : GM_PLUGIN_LVGL_OPA_20),
+                  0, size / 2);
+        self->ui->style_set(self->trails[index], GM_PLUGIN_LVGL_STYLE_BG_COLOR,
+                            color(0xF0), GM_PLUGIN_LVGL_SELECTOR_MAIN);
         self->trail_x[index] = (int16_t)(self->ball_x / Q);
         self->trail_y[index] = (int16_t)(self->ball_y / Q);
+        self->ui->obj_set_pos(self->trails[index], self->trail_x[index], self->trail_y[index]);
     }
     self->ball = self->ui->obj_create(self->board);
     if (self->ball == 0) return GM_PLUGIN_ENOMEM;
     self->ui->obj_set_size(self->ball, BALL_SIZE, BALL_SIZE);
+    self->ui->obj_set_pos(self->ball, self->drawn_ball_x, self->drawn_ball_y);
     style_box(self, self->ball, 255, 0, BALL_SIZE / 2);
     header_side_width = (self->screen_width - HEADER_TIMER_W) / 2 - 16;
     if (header_side_width > HEADER_SIDE_W)
         header_side_width = HEADER_SIDE_W;
     self->ui->obj_set_pos(self->score_label, BOARD_X + 4, 8);
-    self->ui->obj_set_size(self->score_label, header_side_width, HEADER_H);
-    self->ui->label_set_long_mode(self->score_label, GM_PLUGIN_LVGL_LABEL_CLIP);
+    /* The native score label is content-sized (including longer translations). */
     self->ui->style_set(self->score_label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR,
                         color(0xF0U), GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->style_set(self->score_label, GM_PLUGIN_LVGL_STYLE_TEXT_OPA,
                         number(GM_PLUGIN_LVGL_OPA_COVER),
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->obj_set_size(self->timer_label, HEADER_TIMER_W, HEADER_H);
-    self->ui->obj_align(self->timer_label, GM_PLUGIN_LVGL_ALIGN_TOP_RIGHT,
-                        -12, 8);
+    self->ui->obj_set_pos(self->timer_label,
+                          BOARD_X + self->board_width - HEADER_TIMER_W, 8);
     self->ui->label_set_long_mode(self->timer_label, GM_PLUGIN_LVGL_LABEL_CLIP);
     self->ui->style_set(self->timer_label, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
-                        number(GM_PLUGIN_LVGL_TEXT_ALIGN_CENTER),
+                        number(GM_PLUGIN_LVGL_TEXT_ALIGN_RIGHT),
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
     self->ui->style_set(self->timer_label, GM_PLUGIN_LVGL_STYLE_TEXT_COLOR,
                         color(0xFFU), GM_PLUGIN_LVGL_SELECTOR_MAIN);
@@ -450,38 +500,29 @@ static gm_plugin_result_t create_ui(breakout_t *self)
     self->ui->style_set(self->control_label, GM_PLUGIN_LVGL_STYLE_TEXT_OPA,
                         number(GM_PLUGIN_LVGL_OPA_COVER),
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
-    control_x = BOARD_X + 4 + header_side_width + 12;
-    control_width = self->screen_width - control_x - HEADER_TIMER_W - 20;
+    control_x = BOARD_X + header_side_width;
+    control_width = self->board_width - header_side_width - HEADER_TIMER_W;
     if (control_width < 0) control_width = 0;
     self->ui->obj_set_pos(self->control_label, control_x, 8);
     self->ui->obj_set_size(self->control_label, control_width, HEADER_H);
     self->ui->label_set_long_mode(self->control_label,
                                   GM_PLUGIN_LVGL_LABEL_CLIP);
     self->ui->style_set(self->control_label, GM_PLUGIN_LVGL_STYLE_TEXT_ALIGN,
-                        number(GM_PLUGIN_LVGL_TEXT_ALIGN_RIGHT),
+                        number(GM_PLUGIN_LVGL_TEXT_ALIGN_CENTER),
                         GM_PLUGIN_LVGL_SELECTOR_MAIN);
+    self->ui->style_set(self->control_label, GM_PLUGIN_LVGL_STYLE_PAD_LEFT,
+                        number(4), GM_PLUGIN_LVGL_SELECTOR_MAIN);
+    self->ui->style_set(self->control_label, GM_PLUGIN_LVGL_STYLE_PAD_RIGHT,
+                        number(4), GM_PLUGIN_LVGL_SELECTOR_MAIN);
     set_control_text(self, self->strings->control_hint);
     style_panel(self, self->message_label);
     self->ui->label_set_long_mode(self->message_label,
                                   GM_PLUGIN_LVGL_LABEL_WRAP);
     set_message(self, "", 0, 0, 0);
-    self->exit_arc = self->ui->arc_create(self->root);
-    if (self->exit_arc == 0) return GM_PLUGIN_ENOMEM;
-    self->ui->obj_set_size(self->exit_arc, 48, 48);
-    self->ui->obj_align(self->exit_arc, GM_PLUGIN_LVGL_ALIGN_CENTER, 0, 0);
-    self->ui->arc_set_range(self->exit_arc, 0, BUTTON_EXIT_MS);
-    self->ui->arc_set_value(self->exit_arc, 0);
-    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_WIDTH,
-                        number(4), GM_PLUGIN_LVGL_SELECTOR_MAIN);
-    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_COLOR,
-                        color(0x20), GM_PLUGIN_LVGL_SELECTOR_MAIN);
-    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_WIDTH,
-                        number(4), GM_PLUGIN_LVGL_SELECTOR_INDICATOR);
-    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_ARC_COLOR,
-                        color(0xF0), GM_PLUGIN_LVGL_SELECTOR_INDICATOR);
-    self->ui->style_set(self->exit_arc, GM_PLUGIN_LVGL_STYLE_OPA,
-                        number(0), GM_PLUGIN_LVGL_SELECTOR_KNOB);
-    self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    gm_plugin_result_t exit_result = firmware_exit_create(
+        &self->exit_ui, self->ui, self->root, self->screen_width, self->screen_height,
+        self->strings->hold_exit);
+    if (exit_result != GM_PLUGIN_OK) return exit_result;
     set_score(self);
     set_timer(self, 0);
     return GM_PLUGIN_OK;
@@ -530,7 +571,8 @@ static void on_input(void *opaque, const gm_plugin_input_event_t *event)
     int32_t delta;
     int32_t maximum;
     if (self == 0 || event == 0 || event->struct_size < sizeof(*event) ||
-        self->input_active == 0U || self->exiting == 2U) return;
+        self->input_active == 0U || self->exiting == 2U ||
+        self->exit_ui.committed) return;
     category = gm_plugin_input_event_class(event);
     if (category == GM_PLUGIN_INPUT_CLASS_KEY) {
         if (event->phase != GM_PLUGIN_INPUT_PHASE_DOWN &&
@@ -666,7 +708,8 @@ static void subscribe_input(breakout_t *self)
         self->input_active = 1;
 }
 
-static void move_paddle(breakout_t *self, const gm_plugin_imu_sample_t *imu)
+static void move_paddle(breakout_t *self, const gm_plugin_imu_sample_t *imu,
+                        uint32_t elapsed_ms)
 {
     int32_t gyro_x = imu->gyro_raw[0];
     int32_t gyro_y = imu->gyro_raw[1];
@@ -676,14 +719,15 @@ static void move_paddle(breakout_t *self, const gm_plugin_imu_sample_t *imu)
     int32_t target = 0;
     int32_t maximum = (self->board_width - PADDLE_W) * Q;
     if (abs_x > GYRO_THRESHOLD || abs_y > GYRO_THRESHOLD) {
-        int32_t speed = magnitude / 5;
-        if (speed < 6) speed = 6;
-        if (speed > 70) speed = 70;
-        if (gyro_x > 0 && gyro_y < 0) target = speed * Q;
-        else if (gyro_x < 0 && gyro_y > 0) target = -speed * Q;
+        int32_t speed = magnitude * Q / 5;
+        if (speed < 6 * Q) speed = 6 * Q;
+        if (speed > 70 * Q) speed = 70 * Q;
+        if (gyro_x > 0 && gyro_y < 0) target = speed;
+        else if (gyro_x < 0 && gyro_y > 0) target = -speed;
     }
-    self->paddle_vx += (target - self->paddle_vx) / 2;
-    self->paddle_x += self->paddle_vx;
+    uint32_t smoothing_ms = elapsed_ms > 100U ? 100U : elapsed_ms;
+    self->paddle_vx += (target - self->paddle_vx) * (int32_t)smoothing_ms / 100;
+    self->paddle_x += self->paddle_vx * (int32_t)elapsed_ms / (int32_t)FRAME_MS;
     if (self->paddle_x < 0) {
         self->paddle_x = 0;
         self->paddle_vx = 0;
@@ -706,8 +750,8 @@ static void move_paddle_with_accessory(breakout_t *self, int32_t direction)
 
 static void brick_collision(breakout_t *self)
 {
-    int32_t ball_x = self->ball_x / Q;
-    int32_t ball_y = self->ball_y / Q;
+    int32_t ball_x = self->ball_x;
+    int32_t ball_y = self->ball_y;
     uint8_t row;
     uint8_t col;
     for (row = 0; row < ROWS; ++row) {
@@ -719,20 +763,20 @@ static void brick_collision(breakout_t *self)
             int32_t dy1;
             int32_t dy2;
             if (self->alive[row][col] == 0U) continue;
-            x = self->brick_left + col * (self->brick_width + BRICK_GAP);
-            y = BRICK_TOP + row * (BRICK_H + BRICK_GAP);
-            if (ball_x + BALL_SIZE <= x || ball_x >= x + self->brick_width ||
-                ball_y + BALL_SIZE <= y || ball_y >= y + BRICK_H) continue;
+            x = (self->brick_left + col * (self->brick_width + BRICK_GAP)) * Q;
+            y = (BRICK_TOP + row * (BRICK_H + BRICK_GAP)) * Q;
+            if (ball_x + BALL_SIZE * Q <= x || ball_x >= x + self->brick_width * Q ||
+                ball_y + BALL_SIZE * Q <= y || ball_y >= y + BRICK_H * Q) continue;
             self->alive[row][col] = 0;
             self->ui->obj_add_flag(self->bricks[row][col],
                                    GM_PLUGIN_LVGL_FLAG_HIDDEN);
             self->score += 10;
             --self->bricks_remaining;
             set_score(self);
-            dx1 = ball_x + BALL_SIZE - x;
-            dx2 = x + self->brick_width - ball_x;
-            dy1 = ball_y + BALL_SIZE - y;
-            dy2 = y + BRICK_H - ball_y;
+            dx1 = ball_x + BALL_SIZE * Q - x;
+            dx2 = x + self->brick_width * Q - ball_x;
+            dy1 = ball_y + BALL_SIZE * Q - y;
+            dy2 = y + BRICK_H * Q - ball_y;
             if ((dx1 < dx2 ? dx1 : dx2) < (dy1 < dy2 ? dy1 : dy2))
                 self->ball_vx = -self->ball_vx;
             else
@@ -765,8 +809,10 @@ static void render(breakout_t *self)
                             (TRAILS - 1U) * sizeof(self->trail_x[0]));
     self->libc->memmove(&self->trail_y[1], &self->trail_y[0],
                             (TRAILS - 1U) * sizeof(self->trail_y[0]));
-    self->trail_x[0] = x;
-    self->trail_y[0] = y;
+    self->trail_x[0] = self->drawn_ball_x;
+    self->trail_y[0] = self->drawn_ball_y;
+    self->drawn_ball_x = x;
+    self->drawn_ball_y = y;
     for (index = 0; index < TRAILS; ++index)
         self->ui->obj_set_pos(self->trails[index], self->trail_x[index],
                               self->trail_y[index]);
@@ -775,27 +821,25 @@ static void render(breakout_t *self)
                           self->paddle_y - 2);
 }
 
-static void frame(breakout_t *self, uint32_t now)
+static bool frame(breakout_t *self, uint32_t now, uint32_t elapsed_ms)
 {
     gm_plugin_imu_sample_t imu;
     int32_t x;
     int32_t y;
-    if (self->host->imu_read(&imu) != GM_PLUGIN_OK) return;
+    if (self->host->imu_read(&imu) != GM_PLUGIN_OK) return false;
     if (imu.pitch_degrees > EXIT_PITCH) {
         if (self->exiting == 0U) {
             self->exiting = 1;
             self->exit_start_ms = now;
-            self->exit_seconds = 3;
-            set_exit_countdown(self, self->exit_seconds);
+            self->exit_seconds = 0;
             self->ui->obj_clear_flag(self->control_label,
                                      GM_PLUGIN_LVGL_FLAG_HIDDEN);
         } else {
             uint32_t elapsed = now - self->exit_start_ms;
             if (elapsed >= EXIT_MS) {
                 self->exiting = 2;
-                self->host->app_exit();
-                return;
-            } else {
+                return true;
+            } else if (elapsed >= 1000U) {
                 uint8_t seconds = (uint8_t)((EXIT_MS - elapsed + 999U) / 1000U);
                 if (seconds != self->exit_seconds) {
                     self->exit_seconds = seconds;
@@ -808,10 +852,10 @@ static void frame(breakout_t *self, uint32_t now)
         self->exit_seconds = 0;
         set_control_text(self, self->strings->control_hint);
     }
-    if (self->paused != 0U || self->ended != 0U) return;
-    move_paddle(self, &imu);
-    self->ball_x += self->ball_vx;
-    self->ball_y += self->ball_vy;
+    if (self->paused != 0U || self->ended != 0U) return false;
+    move_paddle(self, &imu, elapsed_ms);
+    self->ball_x += self->ball_vx * (int32_t)elapsed_ms / (int32_t)FRAME_MS;
+    self->ball_y += self->ball_vy * (int32_t)elapsed_ms / (int32_t)FRAME_MS;
     if (self->ball_x < 0) {
         self->ball_x = 0;
         self->ball_vx = -self->ball_vx;
@@ -824,14 +868,14 @@ static void frame(breakout_t *self, uint32_t now)
         self->ball_vy = -self->ball_vy;
     }
     brick_collision(self);
-    x = self->ball_x / Q;
-    y = self->ball_y / Q;
-    if (self->ball_vy > 0 && y + BALL_SIZE >= self->paddle_y &&
-        y < self->paddle_y + PADDLE_H &&
-        x + BALL_SIZE > self->paddle_x / Q &&
-        x < self->paddle_x / Q + PADDLE_W) {
-        int32_t offset = x + BALL_SIZE / 2 - self->paddle_x / Q;
-        int32_t relative = offset * Q / PADDLE_W - Q / 2;
+    x = self->ball_x;
+    y = self->ball_y;
+    if (self->ball_vy > 0 && y + BALL_SIZE * Q >= self->paddle_y * Q &&
+        y < (self->paddle_y + PADDLE_H) * Q &&
+        x + BALL_SIZE * Q > self->paddle_x &&
+        x < self->paddle_x + PADDLE_W * Q) {
+        int32_t offset = x + BALL_SIZE * Q / 2 - self->paddle_x;
+        int32_t relative = offset / PADDLE_W - Q / 2;
         self->ball_y = (self->paddle_y - BALL_SIZE) * Q;
         self->ball_vy = -self->ball_vy;
         self->ball_vx = relative * 2202 / Q;
@@ -840,9 +884,10 @@ static void frame(breakout_t *self, uint32_t now)
         if (self->ball_vx > -220 && self->ball_vx < 220)
             self->ball_vx = self->ball_vx >= 0 ? 256 : -256;
     }
-    if (self->ball_y > self->board_height * Q) finish_game(self, 0);
-    else if (self->bricks_remaining == 0U) finish_game(self, 1);
+    if (self->ball_y > self->board_height * Q) { finish_game(self, 0); return false; }
+    if (self->bricks_remaining == 0U) { finish_game(self, 1); return false; }
     render(self);
+    return false;
 }
 
 static gm_plugin_result_t on_load(void *opaque)
@@ -862,31 +907,39 @@ static gm_plugin_result_t on_start(void *opaque)
     char language_tag[GM_PLUGIN_LOCALE_TAG_MAX] = {0};
     if (self->host->display_get_info(&display) != GM_PLUGIN_OK ||
         display.width <= BOARD_X * 2U ||
-        display.height <= BOARD_Y + BOARD_BOTTOM_MARGIN)
+        display.height <= BOARD_Y + BOARD_BOTTOM_MARGIN) {
+        example_call_ui_stop(&s_call_ui);
         return GM_PLUGIN_ENOTSUP;
+    }
     self->screen_width = (int16_t)display.width;
     self->screen_height = (int16_t)display.height;
     self->board_width = self->screen_width - BOARD_X * 2;
     self->board_height = self->screen_height - BOARD_Y -
                          BOARD_BOTTOM_MARGIN;
     if (self->board_width < MIN_BOARD_W ||
-        self->board_height < MIN_BOARD_H)
+        self->board_height < MIN_BOARD_H) {
+        example_call_ui_stop(&s_call_ui);
         return GM_PLUGIN_ENOTSUP;
+    }
     self->paddle_y = self->board_height - 24;
-    self->brick_width = (self->board_width - self->board_width / 5 -
-        (COLS - 1) * BRICK_GAP) / COLS;
+    self->brick_width = (self->board_width - (COLS - 1) * BRICK_GAP) / COLS;
+    if (self->brick_width > 28) self->brick_width = 28;
     self->brick_left = (self->board_width -
         (COLS * self->brick_width + (COLS - 1) * BRICK_GAP)) / 2;
     if (self->host->locale_get(language_tag) != GM_PLUGIN_OK)
         language_tag[0] = '\0';
     self->strings = select_strings(language_tag);
-    if (self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW) != GM_PLUGIN_OK)
+    if (self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW) != GM_PLUGIN_OK) {
+        example_call_ui_stop(&s_call_ui);
         return GM_PLUGIN_ESTATE;
+    }
     result = restart(self);
     if (result == GM_PLUGIN_OK) subscribe_input(self);
     if (result != GM_PLUGIN_OK) {
         (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
         self->ui->obj_clean(self->ui->root_get());
+        self->exit_ui.overlay = 0;
+        example_call_ui_stop(&s_call_ui);
     }
     return result;
 }
@@ -894,23 +947,24 @@ static gm_plugin_result_t on_start(void *opaque)
 static void on_loop(void *opaque, uint32_t elapsed_ms)
 {
     breakout_t *self = opaque;
+    if (self->exit_ui.committed) return;
     uint32_t now = self->host->monotonic_ms();
     uint32_t seconds = active_elapsed_ms(self, now) / 1000U;
     if (elapsed_ms > 150U) elapsed_ms = 150U;
-    if (self->button_holding_exit != 0U) {
-        self->button_hold_ms += elapsed_ms;
-        if (self->button_hold_ms >= BUTTON_EXIT_MS) {
-            self->host->app_exit();
-            return;
-        }
-        self->ui->arc_set_value(self->exit_arc,
-                                (int16_t)self->button_hold_ms);
+    if (firmware_exit_complete(&self->exit_ui, self->ui, now)) {
+        self->host->app_exit();
+        return;
     }
     self->frame_accumulator += elapsed_ms;
     if (self->frame_accumulator > 150U) self->frame_accumulator = 150U;
-    while (self->frame_accumulator >= FRAME_MS && self->exiting != 2U) {
-        self->frame_accumulator -= FRAME_MS;
-        frame(self, now);
+    if (self->frame_accumulator >= FRAME_MS && self->exiting != 2U) {
+        uint32_t frame_ms = self->frame_accumulator;
+        self->frame_accumulator = 0;
+        if (frame(self, now, frame_ms)) {
+            /* Host may unload the plugin in app_exit. Do not touch it again. */
+            self->host->app_exit();
+            return;
+        }
     }
     if (self->ended == 0U && self->exiting != 2U &&
         seconds != self->last_second) {
@@ -925,23 +979,16 @@ static bool on_event(void *opaque, const gm_plugin_event_t *event)
     gm_plugin_button_action_t action;
     gm_plugin_button_t button;
     if (event == 0 || event->type != GM_PLUGIN_EVENT_BUTTON) return false;
+    if (self->exit_ui.committed) return true;
     action = event->data.button.action;
     button = event->data.button.button;
     if (action == GM_PLUGIN_BUTTON_ACTION_LONG ||
         action == GM_PLUGIN_BUTTON_ACTION_VERY_LONG) {
-        if (self->button_holding_exit == 0U) {
-            self->button_holding_exit = 1;
-            self->button_hold_ms = 0;
-            self->ui->arc_set_value(self->exit_arc, 0);
-            self->ui->obj_clear_flag(self->exit_arc,
-                                     GM_PLUGIN_LVGL_FLAG_HIDDEN);
-        }
+        firmware_exit_begin(&self->exit_ui, self->ui, self->host->monotonic_ms());
         return true;
     }
     if (action == GM_PLUGIN_BUTTON_ACTION_RELEASE) {
-        self->button_holding_exit = 0;
-        self->button_hold_ms = 0;
-        self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+        firmware_exit_cancel(&self->exit_ui, self->ui);
         return true;
     }
     if (action == GM_PLUGIN_BUTTON_ACTION_TRIGGER) {
@@ -989,17 +1036,20 @@ static bool on_event(void *opaque, const gm_plugin_event_t *event)
 static void on_suspend(void *opaque)
 {
     breakout_t *self = opaque;
+    if (self->exit_ui.committed) return;
     self->touch_axes = 0;
     self->input_active = 0; /* Host pauses the subscription under overlays. */
-    self->button_holding_exit = 0;
-    self->button_hold_ms = 0;
-    self->ui->obj_add_flag(self->exit_arc, GM_PLUGIN_LVGL_FLAG_HIDDEN);
+    firmware_exit_cancel(&self->exit_ui, self->ui);
+    self->exiting = 0;
+    self->exit_seconds = 0;
+    set_control_text(self, self->strings->control_hint);
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
 }
 
 static void on_resume(void *opaque)
 {
     breakout_t *self = opaque;
+    if (self->exit_ui.committed) return;
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_RAW);
     subscribe_input(self);
     self->frame_accumulator = 0;
@@ -1009,11 +1059,13 @@ static void on_stop(void *opaque)
 {
     example_call_ui_stop(&s_call_ui);
     breakout_t *self = opaque;
+    firmware_exit_cancel(&self->exit_ui, self->ui);
     self->touch_axes = 0;
     self->input_active = 0;
     if (self->input != 0) self->input->unsubscribe();
     (void)self->host->imu_enable(GM_PLUGIN_IMU_ENABLE_NONE);
     self->ui->obj_clean(self->ui->root_get());
+    self->exit_ui.overlay = 0;
 }
 
 gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
