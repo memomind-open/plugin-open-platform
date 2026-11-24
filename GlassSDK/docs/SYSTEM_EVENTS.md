@@ -62,12 +62,17 @@ python3 -m unittest discover -s tests -p test_system_native.py
 
 ## Other display examples
 
-The other 17 display examples opt in through
+Seventeen other display examples opt in through
 [`examples/common/call_ui.h`](../examples/common/call_ui.h). This is private
 example code, not an addition to a published SDK interface. Each example starts
 its subscription before creating UI or drawing pixels and unsubscribes on stop.
 A synchronous initial notification covers starting a plugin during a call.
 The extension-only example has no display and needs no call policy.
+
+BLE GATT Lab opts in separately with a [local copy of the helper](../examples/ble-gatt-lab/call_ui.h)
+in its standalone example directory. Changes to the shared helper do not reach
+that copy automatically. The Lab's native fixture also tests Bluetooth state
+processing while call UI is active.
 
 The helper hides the plugin's LVGL root for the call, so child labels, animation
 objects and game state can keep updating without rendering over the telephone

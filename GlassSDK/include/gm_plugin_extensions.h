@@ -2,6 +2,7 @@
 #define GM_PLUGIN_EXTENSIONS_H
 
 #include "gm_plugin.h"
+#include "gm_plugin_ble_gatt.h"
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -19,6 +20,9 @@
 #define GM_PLUGIN_EXTENSION_LIBC UINT32_C(3)
 #define GM_PLUGIN_EXTENSION_INPUT UINT32_C(4)
 #define GM_PLUGIN_EXTENSION_SYSTEM_EVENTS UINT32_C(5)
+#define GM_PLUGIN_EXTENSION_BLE_GATT UINT32_C(6)
+#define GM_PLUGIN_EXTENSION_BLE_GATT_REFRESH UINT32_C(7)
+#define GM_PLUGIN_EXTENSION_BLE_GATT_BOND_LIST UINT32_C(8)
 
 /** System UI notifications. Delivery continues while an overlay is visible.
  * No caller identity or phone number is exposed. Drawing remains plugin-owned. */
@@ -386,5 +390,46 @@ typedef struct gm_plugin_libc_extension_api {
     int (*vsnprintf)(char *destination, size_t capacity,
                      const char *format, va_list arguments);
 } gm_plugin_libc_extension_api_t;
+
+/* Local generic BLE client: see gm_plugin_ble_gatt.h for event ownership and
+ * lifecycle. The existing host API and phone service/command IDs are unchanged. */
+typedef struct gm_plugin_ble_gatt_extension_api {
+    gm_plugin_result_t (*get_capabilities)(gm_ble_capabilities_t *out);
+    gm_plugin_result_t (*open)(gm_ble_callback_t callback, void *context, uint32_t *client_id);
+    void (*close)(uint32_t client_id);
+    gm_plugin_result_t (*get_connected_devices)(uint32_t client_id);
+    gm_plugin_result_t (*scan_start)(uint32_t client_id, const gm_ble_scan_filter_t *filter);
+    gm_plugin_result_t (*scan_stop)(uint32_t client_id);
+    gm_plugin_result_t (*connect)(uint32_t client_id, const gm_ble_device_t *device, uint32_t request_id);
+    gm_plugin_result_t (*disconnect)(uint32_t client_id, uint32_t session_id);
+    gm_plugin_result_t (*discover_service)(uint32_t client_id, uint32_t session_id,
+                                           const gm_ble_uuid_t *uuid, uint32_t request_id);
+    gm_plugin_result_t (*read)(uint32_t client_id, uint32_t session_id,
+                               uint16_t value_handle, uint32_t request_id);
+    gm_plugin_result_t (*write)(uint32_t client_id, uint32_t session_id, uint16_t value_handle,
+                                const uint8_t *value, uint16_t length, bool with_response,
+                                uint32_t request_id);
+    gm_plugin_result_t (*subscribe)(uint32_t client_id, uint32_t session_id, uint16_t value_handle,
+                                    bool enable, bool indicate, uint32_t request_id);
+    gm_plugin_result_t (*pair)(uint32_t client_id, uint32_t session_id, uint32_t request_id);
+    /* Explicit complete attribute discovery; no service UUID is required. */
+    gm_plugin_result_t (*discover_all)(uint32_t client_id, uint32_t session_id, uint32_t request_id);
+    gm_plugin_result_t (*unbond)(uint32_t client_id, const gm_ble_device_t *identity,
+                                 uint32_t request_id);
+    gm_plugin_result_t (*get_session_state)(uint32_t client_id, uint32_t session_id,
+                                            uint32_t request_id);
+    gm_plugin_result_t (*get_bonded_devices)(uint32_t client_id, uint32_t request_id);
+} gm_plugin_ble_gatt_extension_api_t;
+
+/* Optional force-refresh entry. ID 6's immutable table remains unchanged.
+ * Uses the same client/session, DISCOVER_ALL events and request completion. */
+typedef struct gm_plugin_ble_gatt_refresh_extension_api {
+    gm_plugin_result_t (*refresh_all)(uint32_t client_id, uint32_t session_id, uint32_t request_id);
+} gm_plugin_ble_gatt_refresh_extension_api_t;
+
+/* Optional accessory list: the immutable ID 6 table stays unchanged. */
+typedef struct gm_plugin_ble_gatt_bond_list_extension_api {
+    gm_plugin_result_t (*get_bonded_accessories)(uint32_t client_id, uint32_t request_id);
+} gm_plugin_ble_gatt_bond_list_extension_api_t;
 
 #endif
