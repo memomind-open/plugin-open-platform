@@ -14,6 +14,7 @@ table plus independently queried extensions.
 | Phone-call UI | call state presentation and controls | LVGL, BT/system events; audio uses phone HFP |
 | Head calibration | calibration state machine | LVGL, raw IMU, display control; calibration/storage remain privileged |
 | Notifications/dashboard | card/layout modules and cached data | LVGL, BT, device state; persistent KV is not yet exposed |
+| BLE accessory integration | standard/vendor service decoding owned by the plugin | optional native BLE GATT extension ID 6; scan/connect/discovery/read/write/subscribe and owned bond management |
 
 Breakout additionally queries the optional [HOGP Input extension](INPUT.md)
 (ID 4) for KEY/REL/ABS/TOUCH control. Without it, button/IMU controls remain
@@ -22,6 +23,16 @@ available; the extension does not change the core event ABI.
 Fighter optionally queries [System UI notifications](SYSTEM_EVENTS.md) (ID 5)
 to yield its framebuffer while telephone UI is visible. This notification does
 not restrict drawing or change the core event ABI.
+
+[Native BLE GATT](ABI.md#optional-native-ble-gatt) (ID 6) is separate from
+phone application messages and HOGP input (ID 4). It requires the full extension
+on the target firmware; a manifest or successful SDK build does not establish
+availability. Current Desktop Studio support is not claimed. No PhoneSDK
+Bridge method or new phone service/command ID is added.
+Full metadata is cached only within a connection session. Optional ID `7`
+adds one force-refresh call on the same client; it leaves ID `6` unchanged.
+Optional ID `8` adds an accessory list including the marked App-bound HOGP
+peer for GATT reconnect; it does not grant additional unpair permissions.
 
 Per-pixel plugins lock a Host-owned GRAY_4 framebuffer slice and draw into it
 directly; neither side allocates another framebuffer. Text uses LVGL labels,

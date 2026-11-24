@@ -4,12 +4,15 @@
 #include "gm_plugin_package.h"
 #include "gm_plugin_protocol.h"
 #include "../../../tests/input_abi_asserts.h"
+#include "../../../tests/ble_abi_asserts.h"
 
 #define ABI_CHECK(name, condition) typedef char name[(condition) ? 1 : -1]
 
 /* This SDK targets RV32. Published values and prefix sizes must never move. */
 ABI_CHECK(gm_abi_pointer_is_32_bit, sizeof(void *) == 4U);
 ABI_CHECK(gm_input_table_rv32_size, sizeof(gm_plugin_input_extension_api_t) == 8U);
+ABI_CHECK(gm_ble_table_rv32_size, sizeof(gm_plugin_ble_gatt_extension_api_t) == 68U);
+ABI_CHECK(gm_ble_event_rv32_size, sizeof(gm_ble_event_t) == 100U);
 ABI_CHECK(gm_abi_initial_value,
           GM_PLUGIN_ABI_MIN_VERSION == UINT16_C(0x0100));
 ABI_CHECK(gm_lvgl_initial_version,

@@ -22,6 +22,7 @@ spacing, or minimum usable layout sizes rather than device width or height.
 | Example | What it teaches | Required capability |
 | --- | --- | --- |
 | `extension` | query, validate and call `extension_get` function tables | LZ4 + libc extensions |
+| `ble-gatt-lab` | glasses-only interactive BLE scan/connect, catalog, read/write, subscriptions and owned pairing management | button + libc; optional full BLE GATT extension ID 6 (unsupported hosts show a message) |
 | `lvgl_ui` | core `host->graphics.lvgl` drawing, text and `on_loop` | none (core LVGL) |
 | `image_animation` | indexed-4 transparent images, source changes, and Host-driven frame animation | LVGL API 1.1 |
 | `framebuffer` | zero-copy lock/draw/unlock across Host framebuffer slices | display bitmap |

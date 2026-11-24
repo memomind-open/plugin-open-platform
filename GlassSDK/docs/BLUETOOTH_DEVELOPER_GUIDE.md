@@ -15,6 +15,7 @@ HOGP mapping-table data are not GMP delivery and are documented publicly.
 
 | Goal | Contract |
 | --- | --- |
+| Access arbitrary BLE accessories from a native glasses `.gmp` plugin | [Native BLE GATT extension ID 6](ABI.md#optional-native-ble-gatt); this is a local Host API, not the phone-facing wire protocol below |
 | Control a ring/remote from a computer or phone without the official App | [Independent HOGP quick start](HOGP_QUICKSTART.md) |
 | Connect using BLE, choose the correct characteristic | Transport section below |
 | Encode/decode the command envelope and responses | [GM framing and TLVs](PROTOCOL.md#gm-packet-framing) |

@@ -1,11 +1,13 @@
 #include "gm_plugin.h"
 #include "gm_plugin_extensions.h"
 #include "gm_plugin_libc.h"
+#include "gm_plugin_ble.h"
 
 static const gm_plugin_host_api_t *s_host;
 static const gm_plugin_random_extension_api_t *s_random_extension;
 static const gm_plugin_lz4_extension_api_t *s_extension;
 static const gm_plugin_libc_extension_api_t *s_libc;
+static const gm_plugin_ble_gatt_extension_api_t *s_ble;
 
 static gm_plugin_result_t extension_load(void *context)
 {
@@ -21,6 +23,22 @@ static gm_plugin_result_t extension_load(void *context)
                           (int)bound);
     if (s_libc->strstr(message, "LZ4") == 0) return GM_PLUGIN_EIO;
     s_host->log("extension discovery: %s", message);
+    if (s_ble != NULL) {
+        gm_ble_capabilities_t capabilities = {0};
+        gm_plugin_result_t result = s_ble->get_capabilities(&capabilities);
+        if (result != GM_PLUGIN_OK) {
+            return result;
+        }
+        if (capabilities.struct_size != sizeof(capabilities)) {
+            return GM_PLUGIN_EVERSION;
+        }
+        s_host->log("optional BLE GATT: write=%u read=%u connections=%u",
+                    (unsigned)capabilities.max_write,
+                    (unsigned)capabilities.max_read,
+                    (unsigned)capabilities.max_plugin_connections);
+    } else {
+        s_host->log("optional BLE GATT is not supported by this Host");
+    }
     return GM_PLUGIN_OK;
 }
 
@@ -51,6 +69,11 @@ gm_plugin_result_t gm_plugin_entry(const gm_plugin_host_api_t *host,
         return GM_PLUGIN_EVERSION;
     result = gm_plugin_libc_get(host, &s_libc);
     if (result != GM_PLUGIN_OK) return result;
+
+    result = gm_plugin_ble_get(host, &s_ble);
+    if (result != GM_PLUGIN_OK && result != GM_PLUGIN_ENOTSUP) {
+        return result;
+    }
 
     s_host = host;
     plugin->abi_version = GM_PLUGIN_ABI_MIN_VERSION;
