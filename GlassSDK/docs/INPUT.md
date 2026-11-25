@@ -2,6 +2,18 @@
 
 ## Primary glasses button: triple click
 
+> **Firmware update required:** Triple-click input on physical glasses requires
+> firmware that includes plugin triple-click routing and Host event mapping.
+> Updating only this SDK, the GMP, or Desktop Studio does not enable it on older
+> glasses firmware. Upgrade the glasses before testing this feature on hardware.
+
+The minimum released firmware version has not yet been specified here. Confirm
+that the firmware release notes explicitly include plugin triple-click support;
+do not assume that any available firmware update contains it. Studio simulation
+can verify plugin handling but cannot establish that the connected glasses support
+the event. On older firmware, keep single/double-click or other existing controls
+available rather than making triple click the only way to perform a required action.
+
 The cooked `GM_PLUGIN_EVENT_BUTTON` event supports
 `GM_PLUGIN_BUTTON_ACTION_TRIPLE = 7` for `GM_PLUGIN_BUTTON_PRIMARY`.
 This is a core button action, not a new HOGP key or touch gesture. Existing
