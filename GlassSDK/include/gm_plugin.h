@@ -312,6 +312,7 @@ enum {
     GM_PLUGIN_BUTTON_ACTION_VERY_LONG = 4,
     GM_PLUGIN_BUTTON_ACTION_RELEASE = 5,
     GM_PLUGIN_BUTTON_ACTION_TRIGGER = 6,
+    GM_PLUGIN_BUTTON_ACTION_TRIPLE = 7,
 };
 
 typedef uint16_t gm_plugin_imu_gesture_t;

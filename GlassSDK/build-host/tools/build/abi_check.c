@@ -87,6 +87,8 @@ ABI_CHECK(gm_button_action_release_value,
           GM_PLUGIN_BUTTON_ACTION_RELEASE == 5);
 ABI_CHECK(gm_button_action_trigger_value,
           GM_PLUGIN_BUTTON_ACTION_TRIGGER == 6);
+ABI_CHECK(gm_button_action_triple_value,
+          GM_PLUGIN_BUTTON_ACTION_TRIPLE == 7);
 ABI_CHECK(gm_imu_gesture_is_compact, sizeof(gm_plugin_imu_gesture_t) == 2U);
 ABI_CHECK(gm_bt_channel_is_compact, sizeof(gm_plugin_bt_channel_t) == 2U);
 ABI_CHECK(gm_event_type_is_compact, sizeof(gm_plugin_event_type_t) == 2U);
