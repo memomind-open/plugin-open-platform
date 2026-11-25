@@ -293,7 +293,7 @@ enum {
 
 /* An action describes what happened to a button. The currently valid pairs are:
  *
- *   PRIMARY                         SINGLE, DOUBLE, LONG, VERY_LONG, RELEASE
+ *   PRIMARY                         SINGLE, DOUBLE, TRIPLE, LONG, VERY_LONG, RELEASE
  *   UP, DOWN, LEFT, RIGHT           TRIGGER
  *   PAGE_UP, PAGE_DOWN              TRIGGER
  *   SCROLL_UP, SCROLL_DOWN          TRIGGER
@@ -312,6 +312,7 @@ enum {
     GM_PLUGIN_BUTTON_ACTION_VERY_LONG = 4,
     GM_PLUGIN_BUTTON_ACTION_RELEASE = 5,
     GM_PLUGIN_BUTTON_ACTION_TRIGGER = 6,
+    GM_PLUGIN_BUTTON_ACTION_TRIPLE = 7,
 };
 
 typedef uint16_t gm_plugin_imu_gesture_t;

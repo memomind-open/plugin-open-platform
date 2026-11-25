@@ -85,7 +85,7 @@ static gm_plugin_result_t input_start(void *context)
     title = create_label(self, self->screen, "BUTTON INPUT", 0xC0);
     panel = self->ui->obj_create(self->screen);
     help = create_label(self, self->screen,
-                        "Click once  |  twice  |  hold 1s", 0x80);
+                        "Click 1 / 2 / 3 times | Hold", 0x80);
     if (title == 0 || panel == 0 || help == 0) goto no_memory;
 
     self->ui->obj_set_size(title, display.width - SCREEN_MARGIN * 2U, 36);
@@ -128,6 +128,9 @@ static bool input_event(void *context, const gm_plugin_event_t *event)
         break;
     case GM_PLUGIN_BUTTON_ACTION_DOUBLE:
         message = "DOUBLE CLICK";
+        break;
+    case GM_PLUGIN_BUTTON_ACTION_TRIPLE:
+        message = "TRIPLE CLICK";
         break;
     case GM_PLUGIN_BUTTON_ACTION_LONG:
         message = "LONG PRESS";
