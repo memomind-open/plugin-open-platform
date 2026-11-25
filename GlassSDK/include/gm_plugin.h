@@ -293,7 +293,7 @@ enum {
 
 /* An action describes what happened to a button. The currently valid pairs are:
  *
- *   PRIMARY                         SINGLE, DOUBLE, LONG, VERY_LONG, RELEASE
+ *   PRIMARY                         SINGLE, DOUBLE, TRIPLE, LONG, VERY_LONG, RELEASE
  *   UP, DOWN, LEFT, RIGHT           TRIGGER
  *   PAGE_UP, PAGE_DOWN              TRIGGER
  *   SCROLL_UP, SCROLL_DOWN          TRIGGER

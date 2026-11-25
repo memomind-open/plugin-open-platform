@@ -25,6 +25,9 @@ class InputTests(unittest.TestCase):
     def test_breakout(self):
         self.run_fixture('test_input_breakout.c')
 
+    def test_button_triple(self):
+        self.run_fixture('test_button_triple.c')
+
 
 if __name__ == '__main__':
     unittest.main()
